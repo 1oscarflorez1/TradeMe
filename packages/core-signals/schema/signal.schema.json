@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trademe.local/schemas/signal.schema.json",
+  "title": "Signal",
+  "description": "Señal de TradeMe: acción sugerida (BUY/HOLD/SELL) con votos de indicadores, probabilidades calibradas y plan de acción. Fuente de verdad del contrato Node<->Python.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "symbol", "ts", "price", "votes", "net", "probs", "action", "confidence"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Versión semántica del esquema de señal.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "symbol": { "type": "string", "minLength": 1, "examples": ["BTCUSDT", "AAPL", "EURUSD"] },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de la vela de cierre (UTC, ISO-8601)."
+    },
+    "price": { "type": "number", "description": "Precio de referencia en ts." },
+    "regime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adx", "label"],
+      "properties": {
+        "adx": { "type": "number", "minimum": 0 },
+        "label": { "type": "string", "enum": ["tendencia", "rango"] }
+      }
+    },
+    "votes": {
+      "type": "array",
+      "description": "Voto normalizado de cada indicador.",
+      "items": { "$ref": "#/$defs/vote" }
+    },
+    "net": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1,
+      "description": "Voto neto del ensemble (media ponderada de scores)."
+    },
+    "probs": { "$ref": "#/$defs/probs" },
+    "action": { "type": "string", "enum": ["BUY", "HOLD", "SELL"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "plan": { "type": "array", "items": { "$ref": "#/$defs/planStep" } },
+    "atr": {
+      "type": "number",
+      "minimum": 0,
+      "description": "ATR(14) usado por el generador de plan."
+    },
+    "model_version": {
+      "type": "string",
+      "description": "Identificador del artefacto de modelo vigente."
+    }
+  },
+  "$defs": {
+    "vote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "kind", "value", "score", "confidence", "weight"],
+      "properties": {
+        "key": { "type": "string", "examples": ["rsi14", "sniper_ultra"] },
+        "label": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["trend", "momentum", "reversion", "volatility", "custom"]
+        },
+        "value": { "type": "number", "description": "Lectura cruda para mostrar (RSI=28.4)." },
+        "score": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Voto normalizado en [-1, +1] (+ = sesgo comprador)."
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Peso aplicado por el ensemble según el régimen."
+        }
+      }
+    },
+    "probs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["BUY", "HOLD", "SELL"],
+      "properties": {
+        "BUY": { "type": "number", "minimum": 0, "maximum": 1 },
+        "HOLD": { "type": "number", "minimum": 0, "maximum": 1 },
+        "SELL": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "description": "Probabilidades calibradas; deberían sumar ~1."
+    },
+    "planStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "title"],
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "detail": { "type": "string" }
+      }
+    }
+  }
+}
