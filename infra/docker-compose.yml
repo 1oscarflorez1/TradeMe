@@ -1,0 +1,73 @@
+# TradeMe — orquestación local (M0). Contexto de build = raíz del monorepo.
+# Antes: `cp .env.example .env` (los valores de abajo son por defecto para desarrollo).
+name: trademe
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg16
+    environment:
+      POSTGRES_USER: trademe
+      POSTGRES_PASSWORD: trademe
+      POSTGRES_DB: trademe
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U trademe -d trademe']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: '3001'
+      LOG_LEVEL: info
+      ENABLE_LIVE_TRADING: 'false'
+      DATABASE_URL: postgres://trademe:trademe@postgres:5432/trademe
+      REDIS_URL: redis://redis:6379
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '5173:5173'
+    depends_on:
+      - api
+
+  quant:
+    build:
+      context: ..
+      dockerfile: apps/quant/Dockerfile
+    environment:
+      MLFLOW_TRACKING_URI: file:./mlruns
+      DATABASE_URL: postgres://trademe:trademe@postgres:5432/trademe
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
