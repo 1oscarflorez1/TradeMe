@@ -1,0 +1,21 @@
+{
+  "name": "trademe",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TradeMe — copiloto de trading en tiempo real (apoyo a la decisión, no asesoría financiera). Arquitectura híbrida Node + Python.",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "build": "pnpm -r --if-present build",
+    "format": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  }
+}
