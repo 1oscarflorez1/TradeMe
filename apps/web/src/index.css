@@ -1,0 +1,111 @@
+:root {
+  --bg: #0b0e14;
+  --bg-elev: #141a23;
+  --border: #232b38;
+  --text: #e6edf3;
+  --muted: #8b97a7;
+  --accent: #4da3ff;
+  --buy: #2ecc71;
+  --sell: #ff5c5c;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.brand h1 {
+  font-size: 1.15rem;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.logo {
+  color: var(--accent);
+}
+
+.tag {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.asset-selector select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+.content {
+  flex: 1;
+  padding: 1.5rem 1.25rem;
+}
+
+.panel {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  max-width: 720px;
+}
+
+.panel h2 {
+  margin-top: 0;
+}
+
+.placeholder p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.disclaimer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.78rem;
+  background: var(--bg-elev);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
