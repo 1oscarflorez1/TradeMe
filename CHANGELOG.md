@@ -5,6 +5,19 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M1 · Datos en vivo (Binance)
+
+- `apps/api`: interfaz `DataAdapter` y `BinanceAdapter` (WebSocket de klines, normalización OHLCV,
+  reconexión con backoff exponencial + jitter, `getHistory` por REST).
+- `apps/api`: canal `ws://…/stream/{symbol}?interval=1m|1h`, endpoints `GET /candles` y `GET /symbols`,
+  y persistencia de velas cerradas en TimescaleDB vía `pg`.
+- `apps/quant`: `seed_history` (siembra idempotente), `detect_gaps`, cliente REST de Binance y sink
+  `PgCandleSink` (psycopg).
+- `apps/web`: gráfico de velas en vivo con lightweight-charts, selector de activo y temporalidad
+  (1m/1h) y estado de conexión.
+- `infra`: `candles` multi-temporalidad (PK `symbol, interval, ts`) + migración `002`.
+- Tests nuevos (Node y Python), incluida la prueba de reconexión del adaptador.
+
 ### Added — M0 · Scaffolding
 
 - Monorepo pnpm con workspaces (`apps/api`, `apps/quant`, `apps/web`, `packages/core-signals`).
