@@ -1,24 +1,28 @@
 import type { Server } from 'node:http';
-import { WebSocketServer, type WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
+import { isInterval } from './domain/candle.js';
+import type { StreamHub } from './stream/hub.js';
 
-/**
- * Canal WebSocket base en `/stream`. En M0 solo saluda y hace eco;
- * el motor de señales (objeto Signal completo) llega en M1+.
- */
-export function attachStream(server: Server): WebSocketServer {
-  const wss = new WebSocketServer({ server, path: '/stream' });
+const STREAM_PATH = /^\/stream\/([A-Za-z0-9]+)$/;
 
-  wss.on('connection', (socket: WebSocket) => {
-    socket.send(
-      JSON.stringify({
-        type: 'hello',
-        service: 'trademe-api',
-        note: 'WS base — sin señales todavía (M0).',
-      }),
-    );
+/** Adjunta el canal WS `/stream/{symbol}?interval=1m|1h` al servidor HTTP. */
+export function attachStream(server: Server, hub: StreamHub): WebSocketServer {
+  const wss = new WebSocketServer({ noServer: true });
 
-    socket.on('message', (data) => {
-      socket.send(JSON.stringify({ type: 'echo', received: data.toString() }));
+  server.on('upgrade', (req, socket, head) => {
+    const url = new URL(req.url ?? '', 'http://localhost');
+    const match = STREAM_PATH.exec(url.pathname);
+    const symbol = match?.[1];
+    const interval = url.searchParams.get('interval') ?? '1m';
+
+    if (!symbol || !isInterval(interval)) {
+      socket.destroy();
+      return;
+    }
+
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      hub.add(ws, symbol.toUpperCase(), interval);
+      ws.send(JSON.stringify({ type: 'hello', symbol: symbol.toUpperCase(), interval }));
     });
   });
 
