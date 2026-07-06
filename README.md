@@ -62,24 +62,38 @@ cd apps/quant && ruff check . && mypy . && pytest         # Python
 
 CI ejecuta ambos jobs (Node + Python) más la suite de paridad. No se avanza de hito sin CI verde.
 
+## Endpoints y datos en vivo (M1)
+
+La API (`apps/api`) sirve, además de `/health`:
+
+- `GET /symbols` — símbolos e intervalos disponibles.
+- `GET /candles?symbol=BTCUSDT&interval=1m&limit=300` — histórico OHLCV (Binance REST).
+- `ws://…/stream/{symbol}?interval=1m|1h` — velas en vivo por WebSocket.
+
+Los datos vienen de **Binance** (públicos, sin clave). El adaptador (`DataAdapter` →
+`BinanceAdapter`) normaliza OHLCV, se **reconecta con backoff** ante caídas y persiste las velas
+cerradas en TimescaleDB (multi-temporalidad **1m + 1h**). `apps/quant` siembra el histórico
+(`seed_history`) sin gaps ni duplicados. El dashboard dibuja las velas en vivo con selector de
+activo y temporalidad y un indicador de estado de conexión.
+
 ## Hitos
 
 El desarrollo va por hitos **M0 → M10** (ver [`trademe.md`](trademe.md), sección 11). Una rama y
 un PR por hito; Conventional Commits; nunca commits directos a `main`.
 
-| Hito                            | Estado      |
-| ------------------------------- | ----------- |
-| **M0** Scaffolding              | 🟡 En curso |
-| M1 Datos en vivo (Binance)      | ⬜          |
-| M2 Indicadores plugin + paridad | ⬜          |
-| M3 Ensemble + probabilidades    | ⬜          |
-| M4 Plan de acción               | ⬜          |
-| M5 TradingView + SniperUltra    | ⬜          |
-| M6 Backtesting                  | ⬜          |
-| M7 Entrenamiento / calibración  | ⬜          |
-| M8 Notificaciones               | ⬜          |
-| M9 App móvil                    | ⬜          |
-| M10 Hardening + v1.0.0          | ⬜          |
+| Hito                            | Estado        |
+| ------------------------------- | ------------- |
+| **M0** Scaffolding              | ✅ Completado |
+| **M1** Datos en vivo (Binance)  | 🟡 En curso   |
+| M2 Indicadores plugin + paridad | ⬜            |
+| M3 Ensemble + probabilidades    | ⬜            |
+| M4 Plan de acción               | ⬜            |
+| M5 TradingView + SniperUltra    | ⬜            |
+| M6 Backtesting                  | ⬜            |
+| M7 Entrenamiento / calibración  | ⬜            |
+| M8 Notificaciones               | ⬜            |
+| M9 App móvil                    | ⬜            |
+| M10 Hardening + v1.0.0          | ⬜            |
 
 ## Documentación
 
