@@ -18,6 +18,11 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - `infra`: `candles` multi-temporalidad (PK `symbol, interval, ts`) + migración `002`.
 - Tests nuevos (Node y Python), incluida la prueba de reconexión del adaptador.
 
+### Fixed
+- Build de imágenes Docker de `apps/api` y `apps/web`: se instala el workspace pnpm completo
+  (devDeps incluidas, `tsc` disponible) y se añade `.dockerignore` para no arrastrar `node_modules`
+  del host. Resuelve `MODULE_NOT_FOUND` de `tsc` en `docker compose build`.
+
 ### Added — M0 · Scaffolding
 
 - Monorepo pnpm con workspaces (`apps/api`, `apps/quant`, `apps/web`, `packages/core-signals`).

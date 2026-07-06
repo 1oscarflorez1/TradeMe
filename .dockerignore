@@ -1,0 +1,13 @@
+# No arrastrar dependencias/artefactos del host al contexto de build
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+**/mlruns
+**/mlartifacts
+.git
+*.bundle
+.env
