@@ -1,0 +1,12 @@
+# Mapeo declarativo de señales externas -> voto normalizado en [-1,+1].
+# El puente real de NinjaTrader (NinjaScript C#) llega en M5; aquí probamos con stubs.
+ninjatrader:
+  sniper_ultra:
+    kind: custom
+    ttl_ms: 120000
+    map: # señal directa NT8 -> score
+      long: { score: 1.0, confidence: 0.8 }
+      short: { score: -1.0, confidence: 0.8 }
+      flat: { score: 0.0, confidence: 0.3 }
+    # Alternativa para valores continuos de NT8 (se escala linealmente a [-1,+1]):
+    # range: { min: -100, max: 100 }

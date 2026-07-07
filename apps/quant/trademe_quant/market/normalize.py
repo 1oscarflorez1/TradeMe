@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 INTERVAL_MS: dict[str, int] = {"1m": 60_000, "1h": 3_600_000}

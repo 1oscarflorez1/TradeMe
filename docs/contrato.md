@@ -32,3 +32,8 @@ backtestea en Python y lo que se infiere en vivo en Node son idénticos. (Se lle
 
 Esquema único en TimescaleDB (`candles`, `signals`) leído por ambos. `quant` lee para backtestear;
 `api` escribe en vivo y lee para features.
+
+## Voto extendido (M2)
+
+Desde M2 cada voto incluye `source` (`internal|ninjatrader|tradingview`), `ts` y `ttlMs?` para
+admitir señales externas (NinjaTrader) junto a los indicadores calculados. Ver `docs/indicadores.md`.

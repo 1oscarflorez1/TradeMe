@@ -5,6 +5,17 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M2 · Indicadores plugin + paridad
+
+- `apps/api`: contrato `Indicator`/voto (con `source`, `ts`, `ttlMs`), 7 built-in con
+  `technicalindicators` y normalización a `score` en [-1,+1], `IndicatorRegistry` y `GET /indicators`.
+- `apps/api`: votos en vivo por WS (`{type:'votes'}`), `GET /votes`, y slot de señales externas
+  `POST /signals/ninjatrader` con mapeo declarativo `config/external_signals.yaml` y TTL (stub NT8).
+- `apps/quant`: mirror de indicadores en numpy (paridad con technicalindicators) y runner de paridad.
+- `packages/core-signals`: vectores dorados `parity/vectors.json` (generador `gen-parity.ts`).
+- CI: tercer job **parity** (Node y Python contra los mismos vectores).
+- `apps/web`: heatmap de indicadores en vivo (color por score, intensidad por confianza, badge NT8).
+
 ### Added — M1 · Datos en vivo (Binance)
 
 - `apps/api`: interfaz `DataAdapter` y `BinanceAdapter` (WebSocket de klines, normalización OHLCV,
@@ -19,6 +30,7 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - Tests nuevos (Node y Python), incluida la prueba de reconexión del adaptador.
 
 ### Fixed
+
 - Build de imágenes Docker de `apps/api` y `apps/web`: se instala el workspace pnpm completo
   (devDeps incluidas, `tsc` disponible) y se añade `.dockerignore` para no arrastrar `node_modules`
   del host. Resuelve `MODULE_NOT_FOUND` de `tsc` en `docker compose build`.

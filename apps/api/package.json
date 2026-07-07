@@ -1,6 +1,6 @@
 {
   "name": "@trademe/api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "TradeMe API (Node + TypeScript): tiempo real, WS, webhooks, inferencia en vivo.",
@@ -11,13 +11,16 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:parity": "vitest run test/parity.test.ts"
   },
   "dependencies": {
     "fastify": "^5.2.0",
     "ws": "^8.18.0",
     "zod": "^3.24.1",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "technicalindicators": "^3.1.0",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

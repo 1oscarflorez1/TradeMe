@@ -13,4 +13,18 @@ export interface Candle {
   closed: boolean;
 }
 
+export type VoteSource = 'internal' | 'ninjatrader' | 'tradingview';
+
+export interface Vote {
+  key: string;
+  label: string;
+  kind: string;
+  source: VoteSource;
+  value: number;
+  score: number;
+  confidence: number;
+  ts: string;
+  ttlMs?: number;
+}
+
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';

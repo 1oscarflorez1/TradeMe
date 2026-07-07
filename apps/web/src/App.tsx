@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { CandleChart } from './CandleChart';
-import { fetchCandles, fetchSymbols, streamUrl } from './api';
-import type { Candle, ConnectionStatus, Interval } from './types';
+import { VotesHeatmap } from './VotesHeatmap';
+import { fetchCandles, fetchSymbols, fetchVotes, streamUrl } from './api';
+import type { Candle, ConnectionStatus, Interval, Vote } from './types';
 
 const INTERVALS: Interval[] = ['1m', '1h'];
 
@@ -17,6 +18,7 @@ export function App() {
   const [tf, setTf] = useState<Interval>('1m');
   const [candles, setCandles] = useState<Candle[]>([]);
   const [last, setLast] = useState<Candle | null>(null);
+  const [votes, setVotes] = useState<Vote[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +35,7 @@ export function App() {
     if (!symbol) return;
     let cancelled = false;
     setError(null);
+    setVotes([]);
 
     fetchCandles(symbol, tf)
       .then((c) => {
@@ -45,6 +48,12 @@ export function App() {
         if (!cancelled) setError(String(e));
       });
 
+    fetchVotes(symbol, tf)
+      .then((v) => {
+        if (!cancelled) setVotes(v);
+      })
+      .catch(() => {});
+
     let ws: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout> | null = null;
 
@@ -52,8 +61,13 @@ export function App() {
       ws = new WebSocket(streamUrl(symbol, tf));
       ws.onopen = () => setStatus('connected');
       ws.onmessage = (ev) => {
-        const msg = JSON.parse(ev.data as string) as { type: string; candle?: Candle };
+        const msg = JSON.parse(ev.data as string) as {
+          type: string;
+          candle?: Candle;
+          votes?: Vote[];
+        };
         if (msg.type === 'candle' && msg.candle) setLast(msg.candle);
+        if (msg.type === 'votes' && msg.votes) setVotes(msg.votes);
       };
       ws.onclose = () => {
         if (cancelled) return;
@@ -128,13 +142,23 @@ export function App() {
             <p className="hint">¿Está la API en marcha? (`pnpm --filter @trademe/api dev`)</p>
           </div>
         ) : (
-          <section className="panel chart-panel">
-            <div className="chart-head">
-              <strong>{symbol || '—'}</strong>
-              <span className="muted">· {tf} · Binance</span>
-            </div>
-            <CandleChart candles={candles} last={last} />
-          </section>
+          <div className="grid">
+            <section className="panel chart-panel">
+              <div className="chart-head">
+                <strong>{symbol || '—'}</strong>
+                <span className="muted">· {tf} · Binance</span>
+              </div>
+              <CandleChart candles={candles} last={last} />
+            </section>
+
+            <section className="panel votes-panel">
+              <div className="chart-head">
+                <strong>Indicadores</strong>
+                <span className="muted">· voto normalizado [-1, +1]</span>
+              </div>
+              <VotesHeatmap votes={votes} />
+            </section>
+          </div>
         )}
       </main>
 

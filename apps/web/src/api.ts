@@ -1,4 +1,4 @@
-import type { Candle, Interval } from './types';
+import type { Candle, Interval, Vote } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -24,6 +24,17 @@ export async function fetchCandles(
   if (!res.ok) throw new Error(`GET /candles ${res.status}`);
   const body = (await res.json()) as { candles: Candle[] };
   return body.candles;
+}
+
+export async function fetchVotes(symbol: string, interval: Interval): Promise<Vote[]> {
+  try {
+    const res = await fetch(`${API_URL}/votes?symbol=${symbol}&interval=${interval}`);
+    if (!res.ok) return [];
+    const body = (await res.json()) as { votes: Vote[] };
+    return body.votes;
+  } catch {
+    return [];
+  }
 }
 
 export function streamUrl(symbol: string, interval: Interval): string {

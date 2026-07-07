@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trademe-quant"
-version = "0.1.0"
+version = "0.2.0"
 description = "TradeMe quant (Python): backtesting, optimización y entrenamiento/calibración offline. Exporta artefactos para apps/api."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "UNLICENSED" }
 dependencies = [
   "mlflow-skinny>=2.9,<3",
-  "psycopg[binary]>=3.1,<4"
+  "psycopg[binary]>=3.1,<4",
+  "numpy>=1.24"
 ]
 
 [project.optional-dependencies]

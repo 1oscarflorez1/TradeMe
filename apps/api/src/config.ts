@@ -6,12 +6,13 @@ const EnvSchema = z.object({
   API_HOST: z.string().default('0.0.0.0'),
   API_PORT: z.coerce.number().int().positive().default(3001),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-  // La ejecución con dinero real SIEMPRE va detrás de este flag, desactivado por defecto.
   ENABLE_LIVE_TRADING: z.enum(['true', 'false']).default('false'),
-  // Persistencia opcional: si falta, la API funciona en modo solo-stream.
   DATABASE_URL: z.string().optional(),
   TRADEME_SYMBOLS: z.string().default('BTCUSDT'),
   TRADEME_INTERVALS: z.string().default('1m,1h'),
+  // Señales externas (NinjaTrader). Si el secret está vacío, el endpoint acepta en dev.
+  NT8_WEBHOOK_SECRET: z.string().optional(),
+  EXTERNAL_SIGNALS_CONFIG: z.string().default('apps/api/config/external_signals.yaml'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
