@@ -8,7 +8,7 @@ VECTORS = json.loads(
 )
 
 
-def _series():
+def _series() -> tuple[list[float], list[float], list[float]]:
     candles = VECTORS["dataset"]["candles"]
     high = [c["h"] for c in candles]
     low = [c["l"] for c in candles]

@@ -11,13 +11,14 @@ import math
 from collections.abc import Sequence
 
 import numpy as np
+import numpy.typing as npt
 
 
 def clamp(x: float, lo: float = -1.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, x))
 
 
-def _ema_series(values: np.ndarray, period: int) -> np.ndarray:
+def _ema_series(values: npt.NDArray[np.float64], period: int) -> npt.NDArray[np.float64]:
     k = 2.0 / (period + 1)
     out = np.empty(len(values) - period + 1)
     out[0] = float(values[:period].mean())
@@ -43,10 +44,12 @@ def rsi_last(values: Sequence[float], period: int = 14) -> float:
     if avg_loss == 0:
         return 100.0
     rs = avg_gain / avg_loss
-    return 100 - 100 / (1 + rs)
+    return float(100 - 100 / (1 + rs))
 
 
-def _true_range(high: np.ndarray, low: np.ndarray, close: np.ndarray) -> np.ndarray:
+def _true_range(
+    high: npt.NDArray[np.float64], low: npt.NDArray[np.float64], close: npt.NDArray[np.float64]
+) -> npt.NDArray[np.float64]:
     tr = np.empty(len(high))
     tr[0] = high[0] - low[0]
     for i in range(1, len(high)):
@@ -69,7 +72,7 @@ def atr_last(
     atr = float(tr[:period].mean())
     for i in range(period, len(tr)):
         atr = (atr * (period - 1) + tr[i]) / period
-    return atr
+    return float(atr)
 
 
 def stoch_k_last(
@@ -82,7 +85,7 @@ def stoch_k_last(
     ll = float(low_a[-period:].min())
     if hh == ll:
         return 50.0
-    return 100 * (c[-1] - ll) / (hh - ll)
+    return float(100 * (c[-1] - ll) / (hh - ll))
 
 
 def macd_hist_last(
@@ -127,7 +130,7 @@ def adx_last(
         minus_dm[i] = down if (down > up and down > 0) else 0.0
         tr[i] = max(h[i] - low_a[i], abs(h[i] - c[i - 1]), abs(low_a[i] - c[i - 1]))
 
-    def wilder(x: np.ndarray) -> np.ndarray:
+    def wilder(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         sm = np.zeros(n)
         sm[period] = x[1 : period + 1].sum()
         for i in range(period + 1, n):
@@ -150,7 +153,7 @@ def adx_last(
     adx = float(dx[period:first].mean())
     for i in range(first, n):
         adx = (adx * (period - 1) + dx[i]) / period
-    return adx
+    return float(adx)
 
 
 # ---- normalización a voto (idéntica a Node) ----
