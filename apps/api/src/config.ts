@@ -13,6 +13,8 @@ const EnvSchema = z.object({
   // Señales externas (NinjaTrader). Si el secret está vacío, el endpoint acepta en dev.
   NT8_WEBHOOK_SECRET: z.string().optional(),
   EXTERNAL_SIGNALS_CONFIG: z.string().default('apps/api/config/external_signals.yaml'),
+  // CORS: lista de orígenes separada por comas; vacío = permitir cualquiera (dev).
+  CORS_ORIGIN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
