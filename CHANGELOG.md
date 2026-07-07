@@ -12,6 +12,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - `artifacts/ensemble.yaml`: pesos, reglas de régimen, temperatura y NinjaTrader con peso 2×.
 - `apps/quant`: validación de esquema de `ensemble.yaml` (`load_ensemble`/`validate_ensemble`).
 - `apps/web`: panel de decisión con anillo de confianza y desglose de probabilidades BUY/HOLD/SELL.
+- Multi-temporalidad: soporte para `1m, 5m, 15m, 30m, 1h, 4h, 1d` (suscritas en vivo; configurable
+  vía `TRADEME_INTERVALS`). El selector del dashboard se puebla desde `GET /symbols`.
 
 ### Added — M2 · Indicadores plugin + paridad
 

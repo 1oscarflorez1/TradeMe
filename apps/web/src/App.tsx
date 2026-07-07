@@ -6,8 +6,6 @@ import { ProbabilityBars } from './ProbabilityBars';
 import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
-const INTERVALS: Interval[] = ['1m', '1h'];
-
 const STATUS_LABEL: Record<ConnectionStatus, string> = {
   connecting: 'Conectando…',
   connected: 'En vivo',
@@ -18,6 +16,7 @@ export function App() {
   const [symbols, setSymbols] = useState<string[]>([]);
   const [symbol, setSymbol] = useState<string>('');
   const [tf, setTf] = useState<Interval>('1m');
+  const [intervals, setIntervals] = useState<Interval[]>(['1m']);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [last, setLast] = useState<Candle | null>(null);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -29,6 +28,7 @@ export function App() {
     fetchSymbols()
       .then((r) => {
         setSymbols(r.symbols);
+        setIntervals(r.intervals);
         setSymbol((current) => current || r.symbols[0] || '');
       })
       .catch((e: unknown) => setError(String(e)));
@@ -123,7 +123,7 @@ export function App() {
           </label>
 
           <div className="tf-group" role="group" aria-label="Temporalidad">
-            {INTERVALS.map((it) => (
+            {intervals.map((it) => (
               <button
                 key={it}
                 type="button"
