@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import { z } from 'zod';
 import { loadEnv } from './config.js';
 import { INTERVALS, isInterval, type Candle } from './domain/candle.js';
@@ -35,6 +36,10 @@ const NinjaBody = z.object({
 export function buildApp(deps: AppDeps): FastifyInstance {
   const env = loadEnv();
   const app = Fastify({ logger: { level: env.LOG_LEVEL } });
+
+  // CORS: el dashboard (otro puerto) necesita cabeceras para hablar con la API.
+  const corsOrigin = env.CORS_ORIGIN ? env.CORS_ORIGIN.split(',').map((o) => o.trim()) : true;
+  void app.register(cors, { origin: corsOrigin });
 
   app.get('/health', async () => ({
     status: 'ok',
