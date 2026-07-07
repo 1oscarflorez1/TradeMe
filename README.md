@@ -69,6 +69,11 @@ La API (`apps/api`) sirve, además de `/health`:
 - `GET /symbols` — símbolos e intervalos disponibles.
 - `GET /candles?symbol=BTCUSDT&interval=1m&limit=300` — histórico OHLCV (Binance REST).
 - `ws://…/stream/{symbol}?interval=1m|1h` — velas en vivo por WebSocket.
+- `GET /indicators` — catálogo de indicadores disponibles.
+- `GET /votes?symbol=BTCUSDT&interval=1m` — votos actuales (internos + señales externas activas).
+- `POST /signals/ninjatrader` — ingreso de señales externas (NinjaTrader), mapeadas vía
+  `apps/api/config/external_signals.yaml`. Ver [`docs/indicadores.md`](docs/indicadores.md).
+- El WS `stream/{symbol}` emite además mensajes `{ type: 'votes', ... }` con el heatmap en vivo.
 
 Los datos vienen de **Binance** (públicos, sin clave). El adaptador (`DataAdapter` →
 `BinanceAdapter`) normaliza OHLCV, se **reconecta con backoff** ante caídas y persiste las velas
