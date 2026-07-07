@@ -15,6 +15,7 @@ const EnvSchema = z.object({
   EXTERNAL_SIGNALS_CONFIG: z.string().default('apps/api/config/external_signals.yaml'),
   // CORS: lista de orígenes separada por comas; vacío = permitir cualquiera (dev).
   CORS_ORIGIN: z.string().optional(),
+  ENSEMBLE_CONFIG: z.string().default('artifacts/ensemble.yaml'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

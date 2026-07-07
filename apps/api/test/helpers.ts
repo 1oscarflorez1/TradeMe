@@ -3,6 +3,7 @@ import type { Candle, Interval } from '../src/domain/candle.js';
 import { IndicatorRegistry } from '../src/indicators/registry.js';
 import { ExternalSignalStore } from '../src/signals/external-store.js';
 import { ExternalMapper } from '../src/signals/external-mapper.js';
+import { DEFAULT_ENSEMBLE } from '../src/ensemble/config.js';
 
 export function testMapper(): ExternalMapper {
   return new ExternalMapper({
@@ -27,6 +28,7 @@ export function makeDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     registry: new IndicatorRegistry(),
     externalStore: new ExternalSignalStore(),
     mapper: testMapper(),
+    ensemble: DEFAULT_ENSEMBLE,
     ...overrides,
   };
 }

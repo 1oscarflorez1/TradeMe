@@ -1,0 +1,32 @@
+# Configuración del ensemble (M3, hand-authored). La optimización con Optuna es M7.
+# Producido por apps/quant en el futuro; consumido por apps/api para inferir.
+version: 'ens-m3-2026-07-07'
+
+# Softmax: temperatura (menor = más decidido) y banda neutra que favorece HOLD.
+temperature: 0.5
+hold_band: 0.15
+
+# Pesos base por indicador interno (ADX/ATR no votan: son contexto/volatilidad).
+weights:
+  ema_cross: 1.0
+  macd: 1.0
+  rsi14: 1.0
+  bbands: 1.0
+  stoch14: 1.0
+
+# Pesos por fuente externa. NinjaTrader es la señal core -> pesa 2x.
+external_weights:
+  ninjatrader: 2.0
+  tradingview: 1.5
+
+# Conmutación por régimen (ADX). En tendencia sube tendencia/momentum; en rango, reversión.
+regime:
+  adx_threshold: 25
+  trend: # ADX >= threshold
+    trend: 1.5
+    momentum: 1.5
+    reversion: 0.6
+  range: # ADX < threshold
+    trend: 0.6
+    momentum: 0.8
+    reversion: 1.5
