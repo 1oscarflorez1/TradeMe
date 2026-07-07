@@ -28,3 +28,31 @@ export interface Vote {
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
+
+export type Action = 'BUY' | 'HOLD' | 'SELL';
+
+export interface Probs {
+  BUY: number;
+  HOLD: number;
+  SELL: number;
+}
+
+export interface Regime {
+  adx: number;
+  label: 'tendencia' | 'rango';
+}
+
+export interface Signal {
+  version: string;
+  symbol: string;
+  ts: string;
+  price: number;
+  regime: Regime;
+  votes: Vote[];
+  net: number;
+  probs: Probs;
+  action: Action;
+  confidence: number;
+  atr: number;
+  model_version: string;
+}
