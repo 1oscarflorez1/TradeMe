@@ -20,9 +20,15 @@ importers:
       pg:
         specifier: ^8.13.1
         version: 8.22.0
+      technicalindicators:
+        specifier: ^3.1.0
+        version: 3.1.0
       ws:
         specifier: ^8.18.0
         version: 8.21.0
+      yaml:
+        specifier: ^2.6.1
+        version: 2.9.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -78,7 +84,7 @@ importers:
         version: 18.3.7(@types/react@18.3.31)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.3(@types/node@20.19.43)(tsx@4.22.4))
+        version: 4.7.0(vite@6.4.3(@types/node@20.19.43)(tsx@4.22.4)(yaml@2.9.0))
       eslint:
         specifier: ^9.17.0
         version: 9.39.4
@@ -90,7 +96,7 @@ importers:
         version: 8.62.1(eslint@9.39.4)(typescript@5.9.3)
       vite:
         specifier: ^6.0.5
-        version: 6.4.3(@types/node@20.19.43)(tsx@4.22.4)
+        version: 6.4.3(@types/node@20.19.43)(tsx@4.22.4)(yaml@2.9.0)
 
   packages/core-signals: {}
 
@@ -873,6 +879,9 @@ packages:
   '@types/node@20.19.43':
     resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
 
+  '@types/node@6.14.13':
+    resolution: {integrity: sha512-J1F0XJ/9zxlZel5ZlbeSuHW2OpabrUAqpFuC2sm2I3by8sERQ8+KCjNKUcq8QHuzpGMWiJpo9ZxeHrqrP2KzQw==}
+
   '@types/pg@8.20.0':
     resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
 
@@ -1633,6 +1642,9 @@ packages:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
     engines: {node: '>=8'}
 
+  technicalindicators@3.1.0:
+    resolution: {integrity: sha512-f16mOc+Y05hNy/of+UbGxhxQQmxUztCiluhsqC5QLUYz4WowUgKde9m6nIjK1Kay0wGHigT0IkOabpp0+22UfA==}
+
   thread-stream@4.2.0:
     resolution: {integrity: sha512-e2zZ96wSChazBsbENf/Pcm/4swHt2cEKQ92rhUjkL9GCKiTDJIaTBenjE/m9DXi0QBmTMDkFDdOomUy20A1tDQ==}
     engines: {node: '>=20'}
@@ -1835,6 +1847,11 @@ packages:
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
+
+  yaml@2.9.0:
+    resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
 
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
@@ -2394,6 +2411,8 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/node@6.14.13': {}
+
   '@types/pg@8.20.0':
     dependencies:
       '@types/node': 20.19.43
@@ -2506,7 +2525,7 @@ snapshots:
       '@typescript-eslint/types': 8.62.1
       eslint-visitor-keys: 5.0.1
 
-  '@vitejs/plugin-react@4.7.0(vite@6.4.3(@types/node@20.19.43)(tsx@4.22.4))':
+  '@vitejs/plugin-react@4.7.0(vite@6.4.3(@types/node@20.19.43)(tsx@4.22.4)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7)
@@ -2514,7 +2533,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.4.3(@types/node@20.19.43)(tsx@4.22.4)
+      vite: 6.4.3(@types/node@20.19.43)(tsx@4.22.4)(yaml@2.9.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -3242,6 +3261,10 @@ snapshots:
     dependencies:
       has-flag: 4.0.0
 
+  technicalindicators@3.1.0:
+    dependencies:
+      '@types/node': 6.14.13
+
   thread-stream@4.2.0:
     dependencies:
       real-require: 1.0.0
@@ -3329,7 +3352,7 @@ snapshots:
       '@types/node': 20.19.43
       fsevents: 2.3.3
 
-  vite@6.4.3(@types/node@20.19.43)(tsx@4.22.4):
+  vite@6.4.3(@types/node@20.19.43)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.4)
@@ -3341,6 +3364,7 @@ snapshots:
       '@types/node': 20.19.43
       fsevents: 2.3.3
       tsx: 4.22.4
+      yaml: 2.9.0
 
   vitest@2.1.9(@types/node@20.19.43):
     dependencies:
@@ -3393,6 +3417,8 @@ snapshots:
   xtend@4.0.2: {}
 
   yallist@3.1.1: {}
+
+  yaml@2.9.0: {}
 
   yocto-queue@0.1.0: {}
 
