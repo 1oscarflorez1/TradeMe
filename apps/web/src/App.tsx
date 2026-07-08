@@ -3,6 +3,7 @@ import { CandleChart } from './CandleChart';
 import { VotesHeatmap } from './VotesHeatmap';
 import { ConfidenceRing } from './ConfidenceRing';
 import { ProbabilityBars } from './ProbabilityBars';
+import { ActionPlan } from './ActionPlan';
 import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
@@ -176,6 +177,14 @@ export function App() {
                 ) : (
                   <p className="muted">Calculando la señal…</p>
                 )}
+              </section>
+
+              <section className="panel plan-panel">
+                <div className="chart-head">
+                  <strong>Plan de acción</strong>
+                  {signal && <span className="muted">· {signal.action}</span>}
+                </div>
+                {signal ? <ActionPlan plan={signal.plan} /> : <p className="muted">Calculando…</p>}
               </section>
 
               <section className="panel votes-panel">

@@ -326,3 +326,26 @@ body {
   width: 34px;
   text-align: right;
 }
+
+/* ---- M4: plan de acción ---- */
+.plan {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.plan-step {
+  font-size: 0.82rem;
+}
+
+.plan-title {
+  font-weight: 600;
+}
+
+.plan-detail {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
