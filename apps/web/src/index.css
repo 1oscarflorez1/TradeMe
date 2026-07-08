@@ -259,3 +259,70 @@ body {
   color: var(--muted);
   font-size: 0.7rem;
 }
+
+/* ---- M3: panel de decisión ---- */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.decision {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ring {
+  width: 130px;
+  height: 130px;
+  flex-shrink: 0;
+}
+
+.ring-action {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ring-pct {
+  font-size: 15px;
+  fill: var(--muted);
+}
+
+.probs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prob-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.prob-label {
+  width: 38px;
+  color: var(--muted);
+}
+
+.prob-track {
+  flex: 1;
+  height: 10px;
+  background: var(--bg);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.prob-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.prob-val {
+  width: 34px;
+  text-align: right;
+}

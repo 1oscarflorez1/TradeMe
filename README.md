@@ -74,6 +74,8 @@ La API (`apps/api`) sirve, además de `/health`:
 - `POST /signals/ninjatrader` — ingreso de señales externas (NinjaTrader), mapeadas vía
   `apps/api/config/external_signals.yaml`. Ver [`docs/indicadores.md`](docs/indicadores.md).
 - El WS `stream/{symbol}` emite además mensajes `{ type: 'votes', ... }` con el heatmap en vivo.
+- `GET /signal?symbol=BTCUSDT&interval=1m` — señal completa del ensemble (acción, probabilidades,
+  régimen, votos ponderados). El WS emite también `{ type: 'signal', ... }`. Ver [`docs/ensemble.md`](docs/ensemble.md).
 
 Los datos vienen de **Binance** (públicos, sin clave). El adaptador (`DataAdapter` →
 `BinanceAdapter`) normaliza OHLCV, se **reconecta con backoff** ante caídas y persiste las velas

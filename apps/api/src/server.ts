@@ -11,6 +11,8 @@ import { CandleBuffer } from './indicators/buffer.js';
 import type { Vote } from './indicators/types.js';
 import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
+import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
+import { buildSignal } from './ensemble/signal.js';
 
 const MIN_CANDLES_FOR_VOTES = 40;
 
@@ -23,6 +25,15 @@ function loadMapper(path: string, warn: (msg: string) => void): ExternalMapper {
   }
 }
 
+function loadEnsembleSafe(path: string, warn: (msg: string) => void): EnsembleConfig {
+  try {
+    return loadEnsemble(path);
+  } catch (err) {
+    warn(`no se pudo cargar ${path} (${String(err)}); usando ensemble por defecto`);
+    return DEFAULT_ENSEMBLE;
+  }
+}
+
 async function main(): Promise<void> {
   const env = loadEnv();
   const hub = new StreamHub();
@@ -30,6 +41,7 @@ async function main(): Promise<void> {
   const registry = new IndicatorRegistry();
   const buffer = new CandleBuffer(300);
   const externalStore = new ExternalSignalStore();
+  const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
 
   const app = buildApp({
     getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
@@ -38,8 +50,9 @@ async function main(): Promise<void> {
     registry,
     externalStore,
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
+    ensemble,
     nt8Secret: env.NT8_WEBHOOK_SECRET,
-    onExternalVote: (symbol: string) => broadcastVotes(symbol),
+    onExternalVote: (symbol: string) => broadcast(symbol),
   });
 
   adapter.setLogger({
@@ -50,20 +63,23 @@ async function main(): Promise<void> {
 
   const repo = env.DATABASE_URL ? new CandlesRepo(createPool(env.DATABASE_URL)) : null;
 
-  function broadcastVotes(symbol: string, interval?: Interval): void {
+  function broadcast(symbol: string, interval?: Interval): void {
     const intervals = interval ? [interval] : [...INTERVALS];
     for (const iv of intervals) {
       const window = buffer.get(symbol, iv);
       if (window.length < MIN_CANDLES_FOR_VOTES) continue;
       const votes: Vote[] = [...registry.computeVotes(window), ...externalStore.active(symbol)];
       hub.broadcastVotes(symbol, iv, votes);
+      const price = window[window.length - 1]!.close;
+      const signal = buildSignal({ symbol, price, votes, config: ensemble });
+      hub.broadcastSignal(symbol, iv, signal);
     }
   }
 
   const onCandle = (candle: Candle): void => {
     buffer.push(candle);
     hub.broadcast(candle);
-    broadcastVotes(candle.symbol, candle.interval);
+    broadcast(candle.symbol, candle.interval);
     if (repo && candle.closed) {
       repo
         .upsert(candle)
@@ -76,7 +92,6 @@ async function main(): Promise<void> {
   await app.listen({ host: env.API_HOST, port: env.API_PORT });
 
   const subscriptions = buildSubscriptions(env);
-  // Semilla de histórico para poder calcular indicadores desde el primer momento.
   for (const sub of subscriptions) {
     try {
       const history = await adapter.getHistory(sub.symbol, sub.interval, 300);
@@ -92,8 +107,9 @@ async function main(): Promise<void> {
       subscriptions: subscriptions.length,
       persistence: Boolean(repo),
       indicators: registry.catalog().length,
+      ensemble: ensemble.version,
     },
-    'ingesta + indicadores iniciados',
+    'ingesta + indicadores + ensemble iniciados',
   );
 }
 

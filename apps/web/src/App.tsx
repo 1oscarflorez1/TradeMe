@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { CandleChart } from './CandleChart';
 import { VotesHeatmap } from './VotesHeatmap';
-import { fetchCandles, fetchSymbols, fetchVotes, streamUrl } from './api';
-import type { Candle, ConnectionStatus, Interval, Vote } from './types';
-
-const INTERVALS: Interval[] = ['1m', '1h'];
+import { ConfidenceRing } from './ConfidenceRing';
+import { ProbabilityBars } from './ProbabilityBars';
+import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
+import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
 const STATUS_LABEL: Record<ConnectionStatus, string> = {
   connecting: 'Conectando…',
@@ -16,9 +16,11 @@ export function App() {
   const [symbols, setSymbols] = useState<string[]>([]);
   const [symbol, setSymbol] = useState<string>('');
   const [tf, setTf] = useState<Interval>('1m');
+  const [intervals, setIntervals] = useState<Interval[]>(['1m']);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [last, setLast] = useState<Candle | null>(null);
   const [votes, setVotes] = useState<Vote[]>([]);
+  const [signal, setSignal] = useState<Signal | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +28,7 @@ export function App() {
     fetchSymbols()
       .then((r) => {
         setSymbols(r.symbols);
+        setIntervals(r.intervals);
         setSymbol((current) => current || r.symbols[0] || '');
       })
       .catch((e: unknown) => setError(String(e)));
@@ -36,6 +39,7 @@ export function App() {
     let cancelled = false;
     setError(null);
     setVotes([]);
+    setSignal(null);
 
     fetchCandles(symbol, tf)
       .then((c) => {
@@ -49,9 +53,10 @@ export function App() {
       });
 
     fetchVotes(symbol, tf)
-      .then((v) => {
-        if (!cancelled) setVotes(v);
-      })
+      .then((v) => !cancelled && setVotes(v))
+      .catch(() => {});
+    fetchSignal(symbol, tf)
+      .then((s) => !cancelled && setSignal(s))
       .catch(() => {});
 
     let ws: WebSocket | null = null;
@@ -65,9 +70,11 @@ export function App() {
           type: string;
           candle?: Candle;
           votes?: Vote[];
+          signal?: Signal;
         };
         if (msg.type === 'candle' && msg.candle) setLast(msg.candle);
         if (msg.type === 'votes' && msg.votes) setVotes(msg.votes);
+        if (msg.type === 'signal' && msg.signal) setSignal(msg.signal);
       };
       ws.onclose = () => {
         if (cancelled) return;
@@ -116,7 +123,7 @@ export function App() {
           </label>
 
           <div className="tf-group" role="group" aria-label="Temporalidad">
-            {INTERVALS.map((it) => (
+            {intervals.map((it) => (
               <button
                 key={it}
                 type="button"
@@ -151,13 +158,34 @@ export function App() {
               <CandleChart candles={candles} last={last} />
             </section>
 
-            <section className="panel votes-panel">
-              <div className="chart-head">
-                <strong>Indicadores</strong>
-                <span className="muted">· voto normalizado [-1, +1]</span>
-              </div>
-              <VotesHeatmap votes={votes} />
-            </section>
+            <div className="side">
+              <section className="panel signal-panel">
+                <div className="chart-head">
+                  <strong>Decisión</strong>
+                  {signal && (
+                    <span className="muted">
+                      · régimen {signal.regime.label} · net {signal.net.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                {signal ? (
+                  <div className="decision">
+                    <ConfidenceRing action={signal.action} confidence={signal.confidence} />
+                    <ProbabilityBars probs={signal.probs} />
+                  </div>
+                ) : (
+                  <p className="muted">Calculando la señal…</p>
+                )}
+              </section>
+
+              <section className="panel votes-panel">
+                <div className="chart-head">
+                  <strong>Indicadores</strong>
+                  <span className="muted">· voto normalizado [-1, +1]</span>
+                </div>
+                <VotesHeatmap votes={votes} />
+              </section>
+            </div>
           </div>
         )}
       </main>

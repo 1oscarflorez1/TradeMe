@@ -32,7 +32,7 @@ describe('rutas de mercado', () => {
 
   it('GET /candles rechaza intervalos no soportados', async () => {
     const app = buildApp(makeDeps({ getHistory: async () => [sample] }));
-    const res = await app.inject({ method: 'GET', url: '/candles?symbol=BTCUSDT&interval=5m' });
+    const res = await app.inject({ method: 'GET', url: '/candles?symbol=BTCUSDT&interval=2h' });
     expect(res.statusCode).toBe(400);
     await app.close();
   });

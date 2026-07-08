@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const INTERVALS = ['1m', '1h'] as const;
+export const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'] as const;
 export type Interval = (typeof INTERVALS)[number];
 
 export function isInterval(value: string): value is Interval {

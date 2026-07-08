@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import type { Candle, Interval } from '../domain/candle.js';
 import type { Vote } from '../indicators/types.js';
+import type { Signal } from '../domain/signal.js';
 
 interface Client {
   socket: WebSocket;
@@ -37,6 +38,10 @@ export class StreamHub {
   broadcastVotes(symbol: string, interval: Interval, votes: Vote[]): void {
     const ts = votes.length > 0 ? votes[votes.length - 1]?.ts : new Date().toISOString();
     this.send(symbol, interval, JSON.stringify({ type: 'votes', symbol, interval, ts, votes }));
+  }
+
+  broadcastSignal(symbol: string, interval: Interval, signal: Signal): void {
+    this.send(symbol, interval, JSON.stringify({ type: 'signal', symbol, interval, signal }));
   }
 
   get size(): number {

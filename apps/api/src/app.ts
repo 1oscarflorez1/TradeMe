@@ -7,6 +7,8 @@ import type { IndicatorRegistry } from './indicators/registry.js';
 import type { Vote } from './indicators/types.js';
 import type { ExternalSignalStore } from './signals/external-store.js';
 import type { ExternalMapper } from './signals/external-mapper.js';
+import type { EnsembleConfig } from './ensemble/config.js';
+import { buildSignal } from './ensemble/signal.js';
 
 export interface AppDeps {
   getHistory: (symbol: string, interval: string, limit: number) => Promise<Candle[]>;
@@ -14,6 +16,7 @@ export interface AppDeps {
   registry: IndicatorRegistry;
   externalStore: ExternalSignalStore;
   mapper: ExternalMapper;
+  ensemble: EnsembleConfig;
   nt8Secret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -88,6 +91,26 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return { symbol: sym, interval, votes };
     } catch (err) {
       request.log.warn({ err: String(err) }, 'fallo al calcular votos');
+      return reply.status(502).send({ error: 'proveedor de datos no disponible' });
+    }
+  });
+
+  // Señal completa del ensemble (agregación + probabilidades). Carga inicial y pruebas.
+  app.get('/signal', async (request, reply) => {
+    const parsed = CandlesQuery.safeParse(request.query);
+    if (!parsed.success || !isInterval(parsed.data.interval)) {
+      return reply.status(400).send({ error: 'parámetros inválidos' });
+    }
+    const { symbol, interval, limit } = parsed.data;
+    const sym = symbol.toUpperCase();
+    try {
+      const candles = await deps.getHistory(sym, interval, limit);
+      const price = candles.length > 0 ? candles[candles.length - 1]!.close : 0;
+      const votes = [...deps.registry.computeVotes(candles), ...deps.externalStore.active(sym)];
+      const signal = buildSignal({ symbol: sym, price, votes, config: deps.ensemble });
+      return { interval, signal };
+    } catch (err) {
+      request.log.warn({ err: String(err) }, 'fallo al construir la señal');
       return reply.status(502).send({ error: 'proveedor de datos no disponible' });
     }
   });
