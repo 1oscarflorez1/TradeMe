@@ -38,3 +38,16 @@ completo (`packages/core-signals/schema/signal.schema.json`): `regime`, `votes` 
 `probs`, `action`, `confidence`, `atr`, `model_version`. El plan de acción (`plan`) se llena en M4.
 
 > Recordatorio: apoyo a la decisión, no asesoría financiera. Ningún modelo garantiza rentabilidad.
+
+## Plan de acción (M4)
+
+Con la acción decidida y el **ATR**, TradeMe genera un plan operativo (llena `Signal.plan`):
+
+- **Entrada**: precio de referencia.
+- **Stop-loss**: `entrada ∓ atr_stop_mult × ATR` (la volatilidad define la distancia).
+- **Take-profit**: `entrada ± tp_r_multiple × distancia_al_stop` (múltiplo de riesgo; 2R = 1:2).
+- **Tamaño de posición**: `(capital × risk_pct) / distancia_al_stop` — se arriesga un % fijo por
+  operación. El capital va en `ACCOUNT_EQUITY` (env); los parámetros de riesgo en `ensemble.yaml`.
+
+Defaults (M4): stop **1.5×ATR**, take-profit **2R**, riesgo **1%**. HOLD (o datos insuficientes) no
+abre posición. El panel "Plan de acción" del dashboard muestra el checklist numerado.
