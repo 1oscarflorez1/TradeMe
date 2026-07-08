@@ -10,7 +10,16 @@ from typing import Any, cast
 
 import yaml
 
-REQUIRED_KEYS = ["version", "temperature", "hold_band", "weights", "external_weights", "regime"]
+REQUIRED_KEYS = [
+    "version",
+    "temperature",
+    "hold_band",
+    "weights",
+    "external_weights",
+    "regime",
+    "risk",
+]
+RISK_KEYS = ["atr_stop_mult", "tp_r_multiple", "risk_pct"]
 
 
 class EnsembleConfigError(ValueError):
@@ -44,6 +53,12 @@ def validate_ensemble(data: Any) -> None:
     for phase in ("trend", "range"):
         if phase not in regime or not isinstance(regime[phase], dict):
             raise EnsembleConfigError(f"regime.{phase} debe ser un mapping")
+    risk = data["risk"]
+    if not isinstance(risk, dict):
+        raise EnsembleConfigError("risk debe ser un mapping")
+    for key in RISK_KEYS:
+        if key not in risk or not _is_number(risk[key]) or risk[key] < 0:
+            raise EnsembleConfigError(f"risk.{key} debe ser un número >= 0")
 
 
 def load_ensemble(path: str | Path) -> dict[str, Any]:
