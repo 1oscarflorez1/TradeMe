@@ -7,6 +7,12 @@ export interface RegimeMultipliers {
   reversion: number;
 }
 
+export interface RiskConfig {
+  atrStopMult: number;
+  tpRMultiple: number;
+  riskPct: number;
+}
+
 export interface EnsembleConfig {
   version: string;
   temperature: number;
@@ -14,6 +20,7 @@ export interface EnsembleConfig {
   weights: Record<string, number>;
   externalWeights: Record<string, number>;
   regime: { adxThreshold: number; trend: RegimeMultipliers; range: RegimeMultipliers };
+  risk: RiskConfig;
 }
 
 export const DEFAULT_ENSEMBLE: EnsembleConfig = {
@@ -27,6 +34,7 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
     trend: { trend: 1.5, momentum: 1.5, reversion: 0.6 },
     range: { trend: 0.6, momentum: 0.8, reversion: 1.5 },
   },
+  risk: { atrStopMult: 1.5, tpRMultiple: 2, riskPct: 0.01 },
 };
 
 interface RawRegimeMult {
@@ -41,6 +49,7 @@ interface RawConfig {
   weights?: Record<string, number>;
   external_weights?: Record<string, number>;
   regime?: { adx_threshold?: number; trend?: RawRegimeMult; range?: RawRegimeMult };
+  risk?: { atr_stop_mult?: number; tp_r_multiple?: number; risk_pct?: number };
 }
 
 function mult(raw: RawRegimeMult | undefined, fallback: RegimeMultipliers): RegimeMultipliers {
@@ -63,6 +72,11 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
       adxThreshold: raw.regime?.adx_threshold ?? d.regime.adxThreshold,
       trend: mult(raw.regime?.trend, d.regime.trend),
       range: mult(raw.regime?.range, d.regime.range),
+    },
+    risk: {
+      atrStopMult: raw.risk?.atr_stop_mult ?? d.risk.atrStopMult,
+      tpRMultiple: raw.risk?.tp_r_multiple ?? d.risk.tpRMultiple,
+      riskPct: raw.risk?.risk_pct ?? d.risk.riskPct,
     },
   };
 }
