@@ -74,6 +74,7 @@ describe('buildSignal', () => {
       price: 64000,
       votes,
       config: DEFAULT_ENSEMBLE,
+      equity: 10_000,
     });
     expect(signal.probs.BUY + signal.probs.HOLD + signal.probs.SELL).toBeCloseTo(1, 6);
     expect(signal.net).toBeGreaterThan(0);

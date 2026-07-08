@@ -17,6 +17,7 @@ export interface AppDeps {
   externalStore: ExternalSignalStore;
   mapper: ExternalMapper;
   ensemble: EnsembleConfig;
+  equity: number;
   nt8Secret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -107,7 +108,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       const candles = await deps.getHistory(sym, interval, limit);
       const price = candles.length > 0 ? candles[candles.length - 1]!.close : 0;
       const votes = [...deps.registry.computeVotes(candles), ...deps.externalStore.active(sym)];
-      const signal = buildSignal({ symbol: sym, price, votes, config: deps.ensemble });
+      const signal = buildSignal({
+        symbol: sym,
+        price,
+        votes,
+        config: deps.ensemble,
+        equity: deps.equity,
+      });
       return { interval, signal };
     } catch (err) {
       request.log.warn({ err: String(err) }, 'fallo al construir la señal');

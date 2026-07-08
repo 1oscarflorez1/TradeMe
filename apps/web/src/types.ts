@@ -42,6 +42,12 @@ export interface Regime {
   label: 'tendencia' | 'rango';
 }
 
+export interface PlanStep {
+  step: number;
+  title: string;
+  detail?: string;
+}
+
 export interface Signal {
   version: string;
   symbol: string;
@@ -53,6 +59,7 @@ export interface Signal {
   probs: Probs;
   action: Action;
   confidence: number;
+  plan: PlanStep[];
   atr: number;
   model_version: string;
 }

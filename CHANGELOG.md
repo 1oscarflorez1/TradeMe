@@ -5,6 +5,14 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M4 · Plan de acción
+
+- `apps/api`: `buildPlan` (entrada, stop-loss por ATR, take-profit por múltiplo de riesgo y tamaño
+  de posición por riesgo fijo) integrado en el Signal; parámetros en `ensemble.yaml` (sección `risk`)
+  y capital por `ACCOUNT_EQUITY`.
+- `apps/quant`: validación de la sección `risk` del `ensemble.yaml`.
+- `apps/web`: panel "Plan de acción" con el checklist numerado.
+
 ### Added — M3 · Ensemble + probabilidades
 
 - `apps/api`: agregador ponderado por régimen (ADX), inferencia `net → BUY/HOLD/SELL` vía softmax

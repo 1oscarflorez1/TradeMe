@@ -29,6 +29,7 @@ export function makeDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     externalStore: new ExternalSignalStore(),
     mapper: testMapper(),
     ensemble: DEFAULT_ENSEMBLE,
+    equity: 10_000,
     ...overrides,
   };
 }

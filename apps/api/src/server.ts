@@ -51,6 +51,7 @@ async function main(): Promise<void> {
     externalStore,
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
     ensemble,
+    equity: env.ACCOUNT_EQUITY,
     nt8Secret: env.NT8_WEBHOOK_SECRET,
     onExternalVote: (symbol: string) => broadcast(symbol),
   });
@@ -71,7 +72,13 @@ async function main(): Promise<void> {
       const votes: Vote[] = [...registry.computeVotes(window), ...externalStore.active(symbol)];
       hub.broadcastVotes(symbol, iv, votes);
       const price = window[window.length - 1]!.close;
-      const signal = buildSignal({ symbol, price, votes, config: ensemble });
+      const signal = buildSignal({
+        symbol,
+        price,
+        votes,
+        config: ensemble,
+        equity: env.ACCOUNT_EQUITY,
+      });
       hub.broadcastSignal(symbol, iv, signal);
     }
   }
