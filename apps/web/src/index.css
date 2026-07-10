@@ -349,3 +349,60 @@ body {
   color: var(--muted);
   font-size: 0.78rem;
 }
+
+/* ---- M5: pestañas del gráfico, TradingView y webhooks ---- */
+.chart-tabs {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tv-chart {
+  width: 100%;
+  height: 460px;
+}
+
+.webhooks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.webhook-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+}
+
+.wh-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.wh-long {
+  color: var(--buy);
+  font-weight: 700;
+}
+
+.wh-short {
+  color: var(--sell);
+  font-weight: 700;
+}
+
+.wh-flat {
+  color: var(--muted);
+}
+
+.wh-meta {
+  color: var(--muted);
+  font-size: 0.72rem;
+}

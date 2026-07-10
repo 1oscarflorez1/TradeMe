@@ -25,7 +25,7 @@ export function VotesHeatmap({ votes }: { votes: Vote[] }) {
           <div className="vote-head">
             <span className="vote-label">{v.label}</span>
             {v.source !== 'internal' && (
-              <span className="vote-src">{v.source === 'ninjatrader' ? 'NT8' : v.source}</span>
+              <span className="vote-src">{v.source === 'tradingview' ? 'TV' : v.source}</span>
             )}
           </div>
           <div className="vote-score">

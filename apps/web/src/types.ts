@@ -13,7 +13,7 @@ export interface Candle {
   closed: boolean;
 }
 
-export type VoteSource = 'internal' | 'ninjatrader' | 'tradingview';
+export type VoteSource = 'internal' | 'tradingview';
 
 export interface Vote {
   key: string;
