@@ -5,6 +5,7 @@ import { BinanceAdapter } from './adapters/binance-adapter.js';
 import { StreamHub } from './stream/hub.js';
 import { createPool } from './db/pool.js';
 import { CandlesRepo } from './db/candles-repo.js';
+import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
 import { CandleBuffer } from './indicators/buffer.js';
@@ -43,6 +44,10 @@ async function main(): Promise<void> {
   const externalStore = new ExternalSignalStore();
   const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
 
+  const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
+  const repo = pool ? new CandlesRepo(pool) : null;
+  const externalRepo = pool ? new ExternalSignalsRepo(pool) : null;
+
   const app = buildApp({
     getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
       adapter.getHistory(symbol, interval as Interval, limit),
@@ -52,8 +57,16 @@ async function main(): Promise<void> {
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
     ensemble,
     equity: env.ACCOUNT_EQUITY,
-    nt8Secret: env.NT8_WEBHOOK_SECRET,
+    tvSecret: env.TV_WEBHOOK_SECRET,
     onExternalVote: (symbol: string) => broadcast(symbol),
+    recordExternal: externalRepo
+      ? (rec) =>
+          void externalRepo
+            .record(rec)
+            .catch((err: unknown) =>
+              app.log.error({ err: String(err) }, 'fallo al registrar alerta externa'),
+            )
+      : undefined,
   });
 
   adapter.setLogger({
@@ -61,8 +74,6 @@ async function main(): Promise<void> {
     warn: (obj, msg) => app.log.warn(obj as object, msg),
     error: (obj, msg) => app.log.error(obj as object, msg),
   });
-
-  const repo = env.DATABASE_URL ? new CandlesRepo(createPool(env.DATABASE_URL)) : null;
 
   function broadcast(symbol: string, interval?: Interval): void {
     const intervals = interval ? [interval] : [...INTERVALS];

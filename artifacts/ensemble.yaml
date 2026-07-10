@@ -14,10 +14,9 @@ weights:
   bbands: 1.0
   stoch14: 1.0
 
-# Pesos por fuente externa. NinjaTrader es la señal core -> pesa 2x.
+# Pesos por fuente externa. Reditum (TradingView) es la señal core -> pesa 2x.
 external_weights:
-  ninjatrader: 2.0
-  tradingview: 1.5
+  tradingview: 2.0 # Reditum (SniperUltra + nuevoPOC) es la fuente core de alfa
 
 # Conmutación por régimen (ADX). En tendencia sube tendencia/momentum; en rango, reversión.
 regime:

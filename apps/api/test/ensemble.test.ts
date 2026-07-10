@@ -32,20 +32,20 @@ describe('inferProbs (softmax)', () => {
 });
 
 describe('aggregate (régimen + pesos)', () => {
-  it('pondera por régimen y da a NT8 el doble de peso', () => {
+  it('pondera por régimen y da a Reditum el doble de peso', () => {
     const votes: Vote[] = [
       vote({ key: 'ema_cross', kind: 'trend', score: 0.8 }),
       vote({ key: 'rsi14', kind: 'reversion', score: -0.5 }),
       vote({ key: 'adx14', kind: 'context', score: 0, value: 30 }),
       vote({ key: 'atr14', kind: 'volatility', score: 0, value: 12 }),
-      vote({ key: 'sniper_ultra', kind: 'custom', score: 1, source: 'ninjatrader' }),
+      vote({ key: 'reditum_sniper', kind: 'custom', score: 1, source: 'tradingview' }),
     ];
     const agg = aggregate(votes, DEFAULT_ENSEMBLE);
     expect(agg.regime.label).toBe('tendencia'); // ADX 30 >= 25
     // ADX/ATR no votan
     expect(agg.votes.find((v) => v.key === 'adx14')?.weight).toBe(0);
-    // NT8: peso 2 (externalWeights) * 1 (custom sin ajuste de régimen)
-    expect(agg.votes.find((v) => v.key === 'sniper_ultra')?.weight).toBe(2);
+    // Reditum/TradingView: peso 2 (externalWeights) * 1 (custom sin ajuste de régimen)
+    expect(agg.votes.find((v) => v.key === 'reditum_sniper')?.weight).toBe(2);
     // EMA (trend, mult 1.5) => 1.5 ; RSI (reversion, mult 0.6) => 0.6
     expect(agg.votes.find((v) => v.key === 'ema_cross')?.weight).toBeCloseTo(1.5, 6);
     const expected = (0.8 * 1.5 + -0.5 * 0.6 + 1 * 2) / (1.5 + 0.6 + 2);

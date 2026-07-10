@@ -10,8 +10,8 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().optional(),
   TRADEME_SYMBOLS: z.string().default('BTCUSDT'),
   TRADEME_INTERVALS: z.string().default('1m,5m,15m,30m,1h,4h,1d'),
-  // Señales externas (NinjaTrader). Si el secret está vacío, el endpoint acepta en dev.
-  NT8_WEBHOOK_SECRET: z.string().optional(),
+  // Señales externas (TradingView). Si el secret está vacío, el endpoint acepta en dev.
+  TV_WEBHOOK_SECRET: z.string().optional(),
   EXTERNAL_SIGNALS_CONFIG: z.string().default('apps/api/config/external_signals.yaml'),
   // CORS: lista de orígenes separada por comas; vacío = permitir cualquiera (dev).
   CORS_ORIGIN: z.string().optional(),

@@ -28,7 +28,7 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
   temperature: 0.5,
   holdBand: 0.15,
   weights: { ema_cross: 1, macd: 1, rsi14: 1, bbands: 1, stoch14: 1 },
-  externalWeights: { ninjatrader: 2, tradingview: 1.5 },
+  externalWeights: { tradingview: 2 },
   regime: {
     adxThreshold: 25,
     trend: { trend: 1.5, momentum: 1.5, reversion: 0.6 },

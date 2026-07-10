@@ -17,19 +17,19 @@ describe('GET /signal', () => {
     await app.close();
   });
 
-  it('la señal externa NT8 entra en la agregación con su peso', async () => {
+  it('la señal externa de Reditum entra en la agregación con su peso', async () => {
     const app = buildApp(makeDeps({ getHistory: async () => synthCandles(80) }));
     await app.inject({
       method: 'POST',
-      url: '/signals/ninjatrader',
-      payload: { indicator: 'sniper_ultra', symbol: 'BTCUSDT', signal: 'long' },
+      url: '/tv-hook',
+      payload: { strategy: 'reditum_sniper', symbol: 'BTCUSDT', signal: 'long' },
     });
     const res = await app.inject({ method: 'GET', url: '/signal?symbol=BTCUSDT&interval=1m' });
     const s = (res.json() as { signal: Signal }).signal;
-    const nt8 = s.votes.find((v) => v.key === 'sniper_ultra');
-    expect(nt8).toBeDefined();
-    expect(nt8?.source).toBe('ninjatrader');
-    expect(nt8?.weight).toBe(2);
+    const reditum = s.votes.find((v) => v.key === 'reditum_sniper');
+    expect(reditum).toBeDefined();
+    expect(reditum?.source).toBe('tradingview');
+    expect(reditum?.weight).toBe(2);
     await app.close();
   });
 });
