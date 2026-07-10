@@ -6,17 +6,15 @@ import { ExternalMapper } from '../src/signals/external-mapper.js';
 import { DEFAULT_ENSEMBLE } from '../src/ensemble/config.js';
 
 export function testMapper(): ExternalMapper {
+  const map = {
+    long: { score: 1, confidence: 0.85 },
+    short: { score: -1, confidence: 0.85 },
+    flat: { score: 0, confidence: 0.3 },
+  };
   return new ExternalMapper({
-    ninjatrader: {
-      sniper_ultra: {
-        kind: 'custom',
-        ttl_ms: 120_000,
-        map: {
-          long: { score: 1, confidence: 0.8 },
-          short: { score: -1, confidence: 0.8 },
-          flat: { score: 0, confidence: 0.3 },
-        },
-      },
+    tradingview: {
+      reditum_sniper: { kind: 'custom', ttl_ms: 300_000, map },
+      reditum_poc: { kind: 'custom', ttl_ms: 300_000, map },
     },
   });
 }

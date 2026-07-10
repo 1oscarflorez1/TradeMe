@@ -16,7 +16,7 @@ function regimeMultiplier(kind: string, mult: RegimeMultipliers): number {
   if (kind === 'trend') return mult.trend;
   if (kind === 'momentum') return mult.momentum;
   if (kind === 'reversion') return mult.reversion;
-  return 1; // custom (p. ej. NT8): sin ajuste por régimen
+  return 1; // custom (p. ej. Reditum/TradingView): sin ajuste por régimen
 }
 
 /** Combina los votos en un score neto ponderado por régimen. */

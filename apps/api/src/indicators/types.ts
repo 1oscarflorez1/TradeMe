@@ -3,7 +3,7 @@ import type { Candle } from '../domain/candle.js';
 export type IndicatorKind =
   'trend' | 'momentum' | 'reversion' | 'volatility' | 'context' | 'custom';
 
-export type VoteSource = 'internal' | 'ninjatrader' | 'tradingview';
+export type VoteSource = 'internal' | 'tradingview';
 
 /** Lectura normalizada de un indicador. `score` en [-1,+1] (+ = sesgo comprador). */
 export interface IndicatorReading {

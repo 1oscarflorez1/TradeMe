@@ -4,6 +4,8 @@ import { VotesHeatmap } from './VotesHeatmap';
 import { ConfidenceRing } from './ConfidenceRing';
 import { ProbabilityBars } from './ProbabilityBars';
 import { ActionPlan } from './ActionPlan';
+import { TradingViewChart } from './TradingViewChart';
+import { WebhookStatus } from './WebhookStatus';
 import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
@@ -24,6 +26,13 @@ export function App() {
   const [signal, setSignal] = useState<Signal | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
+  const [chartTab, setChartTab] = useState<'local' | 'tv'>('local');
+  const [now, setNow] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     fetchSymbols()
@@ -154,9 +163,29 @@ export function App() {
             <section className="panel chart-panel">
               <div className="chart-head">
                 <strong>{symbol || '—'}</strong>
-                <span className="muted">· {tf} · Binance</span>
+                <span className="muted">· {tf}</span>
+                <div className="chart-tabs" role="group" aria-label="Fuente del gráfico">
+                  <button
+                    type="button"
+                    className={chartTab === 'local' ? 'tf active' : 'tf'}
+                    onClick={() => setChartTab('local')}
+                  >
+                    Local
+                  </button>
+                  <button
+                    type="button"
+                    className={chartTab === 'tv' ? 'tf active' : 'tf'}
+                    onClick={() => setChartTab('tv')}
+                  >
+                    TradingView
+                  </button>
+                </div>
               </div>
-              <CandleChart candles={candles} last={last} />
+              {chartTab === 'local' ? (
+                <CandleChart candles={candles} last={last} />
+              ) : (
+                <TradingViewChart symbol={symbol} interval={tf} />
+              )}
             </section>
 
             <div className="side">
@@ -185,6 +214,14 @@ export function App() {
                   {signal && <span className="muted">· {signal.action}</span>}
                 </div>
                 {signal ? <ActionPlan plan={signal.plan} /> : <p className="muted">Calculando…</p>}
+              </section>
+
+              <section className="panel webhooks-panel">
+                <div className="chart-head">
+                  <strong>Webhooks · Reditum</strong>
+                  <span className="muted">· TradingView</span>
+                </div>
+                <WebhookStatus votes={votes} now={now} />
               </section>
 
               <section className="panel votes-panel">

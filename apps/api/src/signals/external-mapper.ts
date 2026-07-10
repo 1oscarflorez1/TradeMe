@@ -22,7 +22,7 @@ export interface ExternalPayload {
   ts?: string;
 }
 
-/** Traduce señales externas (NT8, TradingView) a votos normalizados. */
+/** Traduce señales externas (TradingView / Reditum) a votos normalizados. */
 export class ExternalMapper {
   constructor(private readonly config: Config) {}
 
