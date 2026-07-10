@@ -9,7 +9,7 @@ ENSEMBLE_PATH = pathlib.Path(__file__).parents[3] / "artifacts/ensemble.yaml"
 
 def test_real_ensemble_is_valid() -> None:
     data = load_ensemble(ENSEMBLE_PATH)
-    assert data["external_weights"]["ninjatrader"] == 2.0
+    assert data["external_weights"]["tradingview"] == 2.0
     assert data["temperature"] > 0
     assert data["risk"]["risk_pct"] == 0.01
 
@@ -25,7 +25,7 @@ def test_bad_weight_raises() -> None:
         "temperature": 0.5,
         "hold_band": 0.1,
         "weights": {"rsi14": -1},
-        "external_weights": {"ninjatrader": 2},
+        "external_weights": {"tradingview": 2},
         "regime": {"adx_threshold": 25, "trend": {}, "range": {}},
         "risk": {"atr_stop_mult": 1.5, "tp_r_multiple": 2, "risk_pct": 0.01},
     }
@@ -39,7 +39,7 @@ def test_bad_risk_raises() -> None:
         "temperature": 0.5,
         "hold_band": 0.1,
         "weights": {"rsi14": 1},
-        "external_weights": {"ninjatrader": 2},
+        "external_weights": {"tradingview": 2},
         "regime": {"adx_threshold": 25, "trend": {}, "range": {}},
         "risk": {"atr_stop_mult": -1, "tp_r_multiple": 2, "risk_pct": 0.01},
     }
