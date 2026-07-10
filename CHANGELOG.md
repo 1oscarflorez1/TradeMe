@@ -5,6 +5,22 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M5 · Integración TradingView (Reditum)
+
+- `apps/api`: webhook seguro `POST /tv-hook` (token en el body) para alertas Pine de la suite Reditum
+  (`reditum_sniper`, `reditum_poc`); registro de alertas en TimescaleDB (`external_signals`) para el
+  backtest de M6.
+- `apps/web`: pestaña TradingView (widget Advanced Chart) junto a "Local" y panel de estado de
+  webhooks (estrategia, latencia, TTL restante).
+- `apps/quant`: lector/validador de `external_signals` (semilla del replay de M6).
+- `docs/tradingview.md`: guía de configuración de la alerta (URL + JSON + túnel ngrok).
+
+### Removed
+
+- **Purga completa de NinjaTrader**: fuera `POST /signals/ninjatrader`, la fuente `ninjatrader`, el
+  secret NT8 y toda referencia en código, tests y docs. La integración externa es exclusivamente
+  TradingView (Reditum). El peso 2× pasa a `tradingview`.
+
 ### Added — M4 · Plan de acción
 
 - `apps/api`: `buildPlan` (entrada, stop-loss por ATR, take-profit por múltiplo de riesgo y tamaño
@@ -17,7 +33,7 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 - `apps/api`: agregador ponderado por régimen (ADX), inferencia `net → BUY/HOLD/SELL` vía softmax
   con temperatura, objeto Signal completo, `GET /signal` y WS `{type:'signal'}`.
-- `artifacts/ensemble.yaml`: pesos, reglas de régimen, temperatura y NinjaTrader con peso 2×.
+- `artifacts/ensemble.yaml`: pesos, reglas de régimen, temperatura y la fuente externa con peso 2×.
 - `apps/quant`: validación de esquema de `ensemble.yaml` (`load_ensemble`/`validate_ensemble`).
 - `apps/web`: panel de decisión con anillo de confianza y desglose de probabilidades BUY/HOLD/SELL.
 - Multi-temporalidad: soporte para `1m, 5m, 15m, 30m, 1h, 4h, 1d` (suscritas en vivo; configurable
@@ -28,11 +44,11 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - `apps/api`: contrato `Indicator`/voto (con `source`, `ts`, `ttlMs`), 7 built-in con
   `technicalindicators` y normalización a `score` en [-1,+1], `IndicatorRegistry` y `GET /indicators`.
 - `apps/api`: votos en vivo por WS (`{type:'votes'}`), `GET /votes`, y slot de señales externas
-  `POST /signals/ninjatrader` con mapeo declarativo `config/external_signals.yaml` y TTL (stub NT8).
+  endpoint de señales externas con mapeo declarativo `config/external_signals.yaml` y TTL.
 - `apps/quant`: mirror de indicadores en numpy (paridad con technicalindicators) y runner de paridad.
 - `packages/core-signals`: vectores dorados `parity/vectors.json` (generador `gen-parity.ts`).
 - CI: tercer job **parity** (Node y Python contra los mismos vectores).
-- `apps/web`: heatmap de indicadores en vivo (color por score, intensidad por confianza, badge NT8).
+- `apps/web`: heatmap de indicadores en vivo (color por score, intensidad por confianza, badge de fuente externa).
 
 ### Added — M1 · Datos en vivo (Binance)
 

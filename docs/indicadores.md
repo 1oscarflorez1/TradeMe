@@ -2,7 +2,7 @@
 
 Los indicadores son **plugins** que cumplen el contrato `Indicator` y emiten una lectura
 normalizada. Todo termina siendo un **voto** con el mismo esquema, venga de un cálculo interno o de
-una señal externa (NinjaTrader, TradingView).
+una señal externa (TradingView / Reditum).
 
 ## Contrato de voto
 
@@ -11,7 +11,7 @@ una señal externa (NinjaTrader, TradingView).
   "key": "rsi14",
   "label": "RSI 14",
   "kind": "reversion",
-  "source": "internal", // internal | ninjatrader | tradingview
+  "source": "internal", // internal | tradingview
   "value": 28.4, // lectura cruda
   "score": 0.71, // NORMALIZADO a [-1,+1] (+ = compra)
   "confidence": 0.6, // 0..1
@@ -38,19 +38,19 @@ las mismas convenciones: semilla SMA + suavizado de Wilder para RSI/ATR/ADX). Am
 
 `confidence = |score|` (salvo ADX = `clamp(adx/50)` y ATR = 0).
 
-## Familia B — señales externas (NinjaTrader / TradingView)
+## Familia B — señales externas (TradingView / Reditum)
 
 No se recalculan ni se reimplementan (se respeta la licencia del curso: nada de NinjaScript
-propietario en el repo). El backend expone `POST /signals/ninjatrader` (validado por _secret_
-opcional `NT8_WEBHOOK_SECRET`) que traduce el payload con un **mapa declarativo** en
+propietario en el repo). El backend expone `POST /tv-hook` (validado por _secret_ en el cuerpo,
+`TV_WEBHOOK_SECRET`) que traduce el payload de la alerta de TradingView con un **mapa declarativo** en
 `apps/api/config/external_signals.yaml`:
 
 ```yaml
-ninjatrader:
-  sniper_ultra:
+tradingview:
+  reditum_sniper:
     kind: custom
     ttl_ms: 120000
-    map: # señal directa NT8 -> score
+    map: # signal -> score
       long: { score: 1.0, confidence: 0.8 }
       short: { score: -1.0, confidence: 0.8 }
       flat: { score: 0.0, confidence: 0.3 }
@@ -63,9 +63,9 @@ C# + transporte TCP/WebSocket) llega en **M5**; en M2 se prueba el flujo con stu
 Ejemplo:
 
 ```bash
-curl -X POST localhost:3001/signals/ninjatrader \
+curl -X POST localhost:3001/tv-hook \
   -H 'content-type: application/json' \
-  -d '{"indicator":"sniper_ultra","symbol":"BTCUSDT","signal":"long"}'
+  -d '{"secret":"TOKEN","strategy":"reditum_sniper","symbol":"BTCUSDT","signal":"long","tf":"5m"}'
 ```
 
 ## Suite de paridad (Node ≡ Python)

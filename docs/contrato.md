@@ -35,5 +35,5 @@ Esquema único en TimescaleDB (`candles`, `signals`) leído por ambos. `quant` l
 
 ## Voto extendido (M2)
 
-Desde M2 cada voto incluye `source` (`internal|ninjatrader|tradingview`), `ts` y `ttlMs?` para
-admitir señales externas (NinjaTrader) junto a los indicadores calculados. Ver `docs/indicadores.md`.
+Desde M2 cada voto incluye `source` (`internal|tradingview`), `ts` y `ttlMs?` para
+admitir señales externas (TradingView / Reditum) junto a los indicadores calculados. Ver `docs/indicadores.md`.

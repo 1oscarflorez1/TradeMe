@@ -1,6 +1,6 @@
 # Ensemble y probabilidades (M3)
 
-El ensemble combina los votos (indicadores internos **+ señales externas como NinjaTrader**) en una
+El ensemble combina los votos (indicadores internos **+ señales externas de TradingView (Reditum)**) en una
 decisión **BUY / HOLD / SELL** con probabilidades. Configuración en `artifacts/ensemble.yaml`
 (hand-authored en M3; la optimización con Optuna llega en M7).
 
@@ -11,10 +11,10 @@ decisión **BUY / HOLD / SELL** con probabilidades. Configuración en `artifacts
 
 Peso efectivo de cada voto = **peso base × multiplicador de régimen**:
 
-- **Peso base**: `weights[key]` para internos; `external_weights[source]` para externos. NinjaTrader
+- **Peso base**: `weights[key]` para internos; `external_weights[source]` para externos. Reditum (TradingView)
   pesa **2×** por ser la señal core.
 - **Conmutación por régimen** (ADX): si `ADX ≥ adx_threshold` → _tendencia_ (sube EMA/MACD, baja
-  reversión); si no → _rango_ (sube reversión). Las señales `custom` (NT8) no se ajustan por régimen.
+  reversión); si no → _rango_ (sube reversión). Las señales `custom` (Reditum) no se ajustan por régimen.
 
 El peso aplicado a cada voto se guarda en `vote.weight` para que la decisión sea **explicable**.
 

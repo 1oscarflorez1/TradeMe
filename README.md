@@ -71,8 +71,9 @@ La API (`apps/api`) sirve, además de `/health`:
 - `ws://…/stream/{symbol}?interval=1m|1h` — velas en vivo por WebSocket.
 - `GET /indicators` — catálogo de indicadores disponibles.
 - `GET /votes?symbol=BTCUSDT&interval=1m` — votos actuales (internos + señales externas activas).
-- `POST /signals/ninjatrader` — ingreso de señales externas (NinjaTrader), mapeadas vía
-  `apps/api/config/external_signals.yaml`. Ver [`docs/indicadores.md`](docs/indicadores.md).
+- `POST /tv-hook` — webhook de TradingView (alertas Pine de la suite Reditum: `reditum_sniper`,
+  `reditum_poc`), token secreto en el body, mapeadas vía `apps/api/config/external_signals.yaml`.
+  Ver [`docs/tradingview.md`](docs/tradingview.md).
 - El WS `stream/{symbol}` emite además mensajes `{ type: 'votes', ... }` con el heatmap en vivo.
 - `GET /signal?symbol=BTCUSDT&interval=1m` — señal completa del ensemble (acción, probabilidades,
   régimen, votos ponderados). El WS emite también `{ type: 'signal', ... }`. Ver [`docs/ensemble.md`](docs/ensemble.md).
