@@ -1,6 +1,16 @@
 import type { Vote } from '../indicators/types.js';
 
 export type Action = 'BUY' | 'HOLD' | 'SELL';
+export type Direction = 'LONG' | 'SHORT' | 'FLAT';
+
+export interface Macro {
+  bias: number;
+  funding: number;
+  weekly_trend: number;
+  label: 'alcista' | 'bajista' | 'neutral';
+  confluence: 'aligned' | 'conflict' | 'neutral';
+  applied: boolean;
+}
 
 export interface Regime {
   adx: number;
@@ -30,7 +40,9 @@ export interface Signal {
   net: number;
   probs: Probs;
   action: Action;
+  direction: Direction;
   confidence: number;
+  macro?: Macro;
   plan: PlanStep[];
   atr: number;
   model_version: string;

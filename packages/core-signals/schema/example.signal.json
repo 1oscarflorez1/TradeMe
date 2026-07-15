@@ -1,9 +1,12 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "symbol": "BTCUSDT",
   "ts": "2026-06-28T15:00:00Z",
   "price": 64210.5,
-  "regime": { "adx": 31.2, "label": "tendencia" },
+  "regime": {
+    "adx": 31.2,
+    "label": "tendencia"
+  },
   "votes": [
     {
       "key": "rsi14",
@@ -16,10 +19,29 @@
     }
   ],
   "net": 0.38,
-  "probs": { "BUY": 0.72, "HOLD": 0.18, "SELL": 0.1 },
+  "probs": {
+    "BUY": 0.72,
+    "HOLD": 0.18,
+    "SELL": 0.1
+  },
   "action": "BUY",
   "confidence": 0.72,
-  "plan": [{ "step": 1, "title": "Confirmar tendencia", "detail": "ADX 31 ✓" }],
+  "plan": [
+    {
+      "step": 1,
+      "title": "Confirmar tendencia",
+      "detail": "ADX 31 \u2713"
+    }
+  ],
   "atr": 540.2,
-  "model_version": "ens-2026-06-28-a"
+  "model_version": "ens-2026-06-28-a",
+  "direction": "LONG",
+  "macro": {
+    "bias": 0.42,
+    "funding": 0.0009,
+    "weekly_trend": 0.6,
+    "label": "alcista",
+    "confluence": "aligned",
+    "applied": true
+  }
 }

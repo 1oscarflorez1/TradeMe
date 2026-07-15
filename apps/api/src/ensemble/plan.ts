@@ -11,18 +11,42 @@ export interface PlanInput {
   equity: number;
 }
 
+export interface PlanLevels {
+  entry: number;
+  stop: number;
+  takeProfit: number;
+  size: number;
+  rr: number;
+}
+
 function fmt(n: number): string {
   return n.toFixed(2);
 }
 
-/**
- * Traduce la decisión en un plan operativo con ATR: entrada, stop, take-profit y tamaño
- * por riesgo fijo. HOLD (o datos insuficientes) no abre posición.
- */
+/** Niveles numéricos del plan (entrada, stop, TP, tamaño) o null si no aplica. */
+export function computePlanLevels(
+  action: Action,
+  price: number,
+  atr: number,
+  risk: RiskConfig,
+  equity: number,
+): PlanLevels | null {
+  if (action === 'HOLD' || atr <= 0 || price <= 0) return null;
+  const dir = action === 'BUY' ? 1 : -1;
+  const stopDistance = atr * risk.atrStopMult;
+  const entry = price;
+  const stop = entry - dir * stopDistance;
+  const takeProfit = entry + dir * risk.tpRMultiple * stopDistance;
+  const size = stopDistance > 0 ? (equity * risk.riskPct) / stopDistance : 0;
+  return { entry, stop, takeProfit, size, rr: risk.tpRMultiple };
+}
+
+/** Plan operativo (checklist) a partir de la decisión y el ATR. */
 export function buildPlan(input: PlanInput): PlanStep[] {
   const { action, price, atr, regimeLabel, confidence, risk, equity } = input;
+  const levels = computePlanLevels(action, price, atr, risk, equity);
 
-  if (action === 'HOLD' || atr <= 0 || price <= 0) {
+  if (!levels) {
     return [
       {
         step: 1,
@@ -37,36 +61,31 @@ export function buildPlan(input: PlanInput): PlanStep[] {
     ];
   }
 
-  const dir = action === 'BUY' ? 1 : -1;
   const stopDistance = atr * risk.atrStopMult;
-  const entry = price;
-  const stop = entry - dir * stopDistance;
-  const takeProfit = entry + dir * risk.tpRMultiple * stopDistance;
-  const riskAmount = equity * risk.riskPct;
-  const size = stopDistance > 0 ? riskAmount / stopDistance : 0;
-  const notional = size * entry;
+  const notional = levels.size * levels.entry;
+  const side = action === 'BUY' ? 'LONG' : 'SHORT';
 
   return [
     {
       step: 1,
-      title: `Confirmar ${action}`,
+      title: `Abrir ${side}`,
       detail: `Régimen ${regimeLabel}, confianza ${(confidence * 100).toFixed(0)}%.`,
     },
-    { step: 2, title: 'Entrada', detail: `~ ${fmt(entry)}` },
+    { step: 2, title: 'Entrada', detail: `~ ${fmt(levels.entry)}` },
     {
       step: 3,
       title: 'Stop-loss',
-      detail: `${fmt(stop)} (${risk.atrStopMult}×ATR = ${fmt(stopDistance)})`,
+      detail: `${fmt(levels.stop)} (${risk.atrStopMult}×ATR = ${fmt(stopDistance)})`,
     },
     {
       step: 4,
       title: 'Take-profit',
-      detail: `${fmt(takeProfit)} (R:R 1:${risk.tpRMultiple})`,
+      detail: `${fmt(levels.takeProfit)} (R:R 1:${risk.tpRMultiple})`,
     },
     {
       step: 5,
       title: 'Tamaño de posición',
-      detail: `${size.toFixed(6)} u (~${fmt(notional)}) · riesgo ${(risk.riskPct * 100).toFixed(1)}% = ${fmt(riskAmount)}`,
+      detail: `${levels.size.toFixed(6)} u (~${fmt(notional)}) · riesgo ${(risk.riskPct * 100).toFixed(1)}% = ${fmt(equity * risk.riskPct)}`,
     },
   ];
 }

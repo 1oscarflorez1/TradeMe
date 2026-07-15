@@ -17,6 +17,7 @@ const TV_INTERVAL: Record<Interval, string> = {
   '1h': '60',
   '4h': '240',
   '1d': 'D',
+  '1w': 'W',
 };
 
 export function tvInterval(interval: Interval): string {

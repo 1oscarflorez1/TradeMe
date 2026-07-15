@@ -48,6 +48,24 @@ export async function fetchSignal(symbol: string, interval: Interval): Promise<S
   }
 }
 
+export async function postSnapshot(
+  symbol: string,
+  interval: Interval,
+  note?: string,
+): Promise<{ saved: boolean; id?: string } | null> {
+  try {
+    const res = await fetch(`${API_URL}/snapshots`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ symbol, interval, note }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { saved: boolean; id?: string };
+  } catch {
+    return null;
+  }
+}
+
 export function streamUrl(symbol: string, interval: Interval): string {
   const url = new URL(API_URL);
   const proto = url.protocol === 'https:' ? 'wss:' : 'ws:';
