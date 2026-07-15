@@ -13,6 +13,17 @@ export interface RiskConfig {
   riskPct: number;
 }
 
+export interface MacroConfig {
+  enabled: boolean;
+  wMacro: number;
+  fundingWeight: number;
+  trendWeight: number;
+  fundingScale: number;
+  trendScale: number;
+  conflictDowngrade: boolean;
+  conflictThreshold: number;
+}
+
 export interface EnsembleConfig {
   version: string;
   temperature: number;
@@ -21,6 +32,7 @@ export interface EnsembleConfig {
   externalWeights: Record<string, number>;
   regime: { adxThreshold: number; trend: RegimeMultipliers; range: RegimeMultipliers };
   risk: RiskConfig;
+  macro: MacroConfig;
 }
 
 export const DEFAULT_ENSEMBLE: EnsembleConfig = {
@@ -35,6 +47,16 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
     range: { trend: 0.6, momentum: 0.8, reversion: 1.5 },
   },
   risk: { atrStopMult: 1.5, tpRMultiple: 2, riskPct: 0.01 },
+  macro: {
+    enabled: true,
+    wMacro: 1,
+    fundingWeight: 0.5,
+    trendWeight: 0.5,
+    fundingScale: 0.0005,
+    trendScale: 0.05,
+    conflictDowngrade: true,
+    conflictThreshold: 0.5,
+  },
 };
 
 interface RawRegimeMult {
@@ -50,6 +72,16 @@ interface RawConfig {
   external_weights?: Record<string, number>;
   regime?: { adx_threshold?: number; trend?: RawRegimeMult; range?: RawRegimeMult };
   risk?: { atr_stop_mult?: number; tp_r_multiple?: number; risk_pct?: number };
+  macro?: {
+    enabled?: boolean;
+    w_macro?: number;
+    funding_weight?: number;
+    trend_weight?: number;
+    funding_scale?: number;
+    trend_scale?: number;
+    conflict_downgrade?: boolean;
+    conflict_threshold?: number;
+  };
 }
 
 function mult(raw: RawRegimeMult | undefined, fallback: RegimeMultipliers): RegimeMultipliers {
@@ -77,6 +109,16 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
       atrStopMult: raw.risk?.atr_stop_mult ?? d.risk.atrStopMult,
       tpRMultiple: raw.risk?.tp_r_multiple ?? d.risk.tpRMultiple,
       riskPct: raw.risk?.risk_pct ?? d.risk.riskPct,
+    },
+    macro: {
+      enabled: raw.macro?.enabled ?? d.macro.enabled,
+      wMacro: raw.macro?.w_macro ?? d.macro.wMacro,
+      fundingWeight: raw.macro?.funding_weight ?? d.macro.fundingWeight,
+      trendWeight: raw.macro?.trend_weight ?? d.macro.trendWeight,
+      fundingScale: raw.macro?.funding_scale ?? d.macro.fundingScale,
+      trendScale: raw.macro?.trend_scale ?? d.macro.trendScale,
+      conflictDowngrade: raw.macro?.conflict_downgrade ?? d.macro.conflictDowngrade,
+      conflictThreshold: raw.macro?.conflict_threshold ?? d.macro.conflictThreshold,
     },
   };
 }

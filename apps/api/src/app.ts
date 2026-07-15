@@ -10,6 +10,8 @@ import type { ExternalSignalStore } from './signals/external-store.js';
 import type { ExternalMapper } from './signals/external-mapper.js';
 import type { EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
+import type { Macro, Signal } from './domain/signal.js';
 
 export interface AppDeps {
   getHistory: (symbol: string, interval: string, limit: number) => Promise<Candle[]>;
@@ -19,6 +21,13 @@ export interface AppDeps {
   mapper: ExternalMapper;
   ensemble: EnsembleConfig;
   equity: number;
+  getMacro?: (symbol: string) => Macro | undefined;
+  recordSnapshot?: (
+    signal: Signal,
+    interval: string,
+    levels: PlanLevels | null,
+    note?: string,
+  ) => Promise<string>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -178,6 +187,50 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       payload,
     });
     return { accepted: true, vote };
+  });
+
+  const SnapshotBody = z.object({
+    symbol: z.string().min(1),
+    interval: z.string().default('1m'),
+    note: z.string().optional(),
+  });
+
+  // Instantánea autoritativa del escenario (para análisis / entrenamiento de IA).
+  app.post('/snapshots', async (request, reply) => {
+    if (!deps.recordSnapshot) {
+      return reply.status(503).send({ error: 'persistencia no disponible (sin DATABASE_URL)' });
+    }
+    const parsed = SnapshotBody.safeParse(request.body);
+    if (!parsed.success || !isInterval(parsed.data.interval)) {
+      return reply.status(400).send({ error: 'parámetros inválidos' });
+    }
+    const { symbol, interval, note } = parsed.data;
+    const sym = symbol.toUpperCase();
+    try {
+      const candles = await deps.getHistory(sym, interval, 300);
+      const price = candles.length > 0 ? candles[candles.length - 1]!.close : 0;
+      const votes = [...deps.registry.computeVotes(candles), ...deps.externalStore.active(sym)];
+      const signal = buildSignal({
+        symbol: sym,
+        price,
+        votes,
+        config: deps.ensemble,
+        equity: deps.equity,
+        macro: deps.getMacro?.(sym),
+      });
+      const levels = computePlanLevels(
+        signal.action,
+        signal.price,
+        signal.atr,
+        deps.ensemble.risk,
+        deps.equity,
+      );
+      const id = await deps.recordSnapshot(signal, interval, levels, note);
+      return { saved: true, id, signal };
+    } catch (err) {
+      request.log.warn({ err: String(err) }, 'fallo al guardar el snapshot');
+      return reply.status(502).send({ error: 'no se pudo capturar el snapshot' });
+    }
   });
 
   return app;

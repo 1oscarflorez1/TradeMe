@@ -5,7 +5,18 @@
   "description": "Se\u00f1al de TradeMe: acci\u00f3n sugerida (BUY/HOLD/SELL) con votos de indicadores, probabilidades calibradas y plan de acci\u00f3n. Fuente de verdad del contrato Node<->Python.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "symbol", "ts", "price", "votes", "net", "probs", "action", "confidence"],
+  "required": [
+    "version",
+    "symbol",
+    "ts",
+    "price",
+    "votes",
+    "net",
+    "probs",
+    "action",
+    "confidence",
+    "direction"
+  ],
   "properties": {
     "version": {
       "type": "string",
@@ -80,6 +91,41 @@
     "model_version": {
       "type": "string",
       "description": "Identificador del artefacto de modelo vigente."
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["LONG", "SHORT", "FLAT"],
+      "description": "Direcci\u00f3n operativa derivada de la acci\u00f3n y el filtro macro."
+    },
+    "macro": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Sesgo fundamental macro (1w+), aplicado como filtro a la inferencia.",
+      "required": ["bias", "label", "confluence", "applied"],
+      "properties": {
+        "bias": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "funding": {
+          "type": "number"
+        },
+        "weekly_trend": {
+          "type": "number"
+        },
+        "label": {
+          "type": "string",
+          "enum": ["alcista", "bajista", "neutral"]
+        },
+        "confluence": {
+          "type": "string",
+          "enum": ["aligned", "conflict", "neutral"]
+        },
+        "applied": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "$defs": {

@@ -35,3 +35,16 @@ risk:
   atr_stop_mult: 1.5 # distancia del stop = 1.5 x ATR
   tp_r_multiple: 2.0 # take-profit a 2R (riesgo:beneficio 1:2)
   risk_pct: 0.01 # se arriesga 1% del capital por operación
+
+# Sesgo fundamental macro (1w+): funding rate + tendencia semanal (EMA 1w).
+# Se inyecta en los logits del softmax; si el conflicto es fuerte, degrada a FLAT.
+macro:
+  enabled: true
+  min_interval: '1w'
+  w_macro: 1.0
+  funding_weight: 0.5
+  trend_weight: 0.5
+  funding_scale: 0.0005
+  trend_scale: 0.05
+  conflict_downgrade: true
+  conflict_threshold: 0.5

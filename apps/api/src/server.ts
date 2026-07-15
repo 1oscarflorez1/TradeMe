@@ -6,6 +6,7 @@ import { StreamHub } from './stream/hub.js';
 import { createPool } from './db/pool.js';
 import { CandlesRepo } from './db/candles-repo.js';
 import { ExternalSignalsRepo } from './db/external-signals-repo.js';
+import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
 import { CandleBuffer } from './indicators/buffer.js';
@@ -14,6 +15,10 @@ import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
 import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import { MacroStore } from './macro/store.js';
+import { computeMacroBias } from './macro/bias.js';
+import { fetchFundingRate } from './macro/funding.js';
+import { EMA } from 'technicalindicators';
 
 const MIN_CANDLES_FOR_VOTES = 40;
 
@@ -47,6 +52,8 @@ async function main(): Promise<void> {
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
   const repo = pool ? new CandlesRepo(pool) : null;
   const externalRepo = pool ? new ExternalSignalsRepo(pool) : null;
+  const macroStore = new MacroStore();
+  const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
 
   const app = buildApp({
     getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
@@ -57,6 +64,10 @@ async function main(): Promise<void> {
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
     ensemble,
     equity: env.ACCOUNT_EQUITY,
+    getMacro: (symbol: string) => macroStore.get(symbol),
+    recordSnapshot: snapshotsRepo
+      ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
+      : undefined,
     tvSecret: env.TV_WEBHOOK_SECRET,
     onExternalVote: (symbol: string) => broadcast(symbol),
     recordExternal: externalRepo
@@ -105,6 +116,24 @@ async function main(): Promise<void> {
     }
   };
 
+  const MACRO_REFRESH_MS = 60 * 60 * 1000;
+  async function refreshMacro(symbol: string): Promise<void> {
+    if (!ensemble.macro.enabled) return;
+    try {
+      const weekly = buffer.get(symbol, '1w');
+      if (weekly.length < 20) return;
+      const closes = weekly.map((c) => c.close);
+      const emaSeries = EMA.calculate({ period: 20, values: closes });
+      const weeklyEma = emaSeries[emaSeries.length - 1];
+      const price = closes[closes.length - 1];
+      if (weeklyEma === undefined || price === undefined) return;
+      const funding = await fetchFundingRate(symbol);
+      macroStore.put(symbol, computeMacroBias({ funding, price, weeklyEma }, ensemble.macro));
+    } catch (err) {
+      app.log.warn({ err: String(err), symbol }, 'no se pudo refrescar el sesgo macro');
+    }
+  }
+
   await app.ready();
   attachStream(app.server, hub);
   await app.listen({ host: env.API_HOST, port: env.API_PORT });
@@ -120,6 +149,12 @@ async function main(): Promise<void> {
   }
 
   await adapter.start(subscriptions, onCandle);
+
+  const symbols = parseSymbols(env);
+  for (const symbol of symbols) await refreshMacro(symbol);
+  setInterval(() => {
+    for (const symbol of symbols) void refreshMacro(symbol);
+  }, MACRO_REFRESH_MS);
   app.log.info(
     {
       subscriptions: subscriptions.length,

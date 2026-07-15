@@ -1,0 +1,137 @@
+{
+  "description": "Paridad macro: sesgo (funding+tendencia) e inferencia modulada. Referencia Node.",
+  "macroConfig": {
+    "fundingWeight": 0.5,
+    "trendWeight": 0.5,
+    "fundingScale": 0.0005,
+    "trendScale": 0.05
+  },
+  "tolerance": 0.001,
+  "macro_bias": [
+    {
+      "input": {
+        "funding": 0.002,
+        "price": 90,
+        "weeklyEma": 100
+      },
+      "expected": {
+        "bias": -0.981678,
+        "weekly_trend": -0.964028,
+        "label": "bajista"
+      }
+    },
+    {
+      "input": {
+        "funding": -0.001,
+        "price": 110,
+        "weeklyEma": 100
+      },
+      "expected": {
+        "bias": 0.964028,
+        "weekly_trend": 0.964028,
+        "label": "alcista"
+      }
+    },
+    {
+      "input": {
+        "funding": 0.0001,
+        "price": 100,
+        "weeklyEma": 100
+      },
+      "expected": {
+        "bias": -0.098688,
+        "weekly_trend": 0,
+        "label": "neutral"
+      }
+    },
+    {
+      "input": {
+        "funding": 0.0005,
+        "price": 105,
+        "weeklyEma": 100
+      },
+      "expected": {
+        "bias": 0,
+        "weekly_trend": 0.761594,
+        "label": "neutral"
+      }
+    }
+  ],
+  "inference": [
+    {
+      "input": {
+        "net": 0,
+        "bias": 0.8,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.15
+      },
+      "expected": {
+        "BUY": 0.552967,
+        "HOLD": 0.335391,
+        "SELL": 0.111642,
+        "action": "BUY"
+      }
+    },
+    {
+      "input": {
+        "net": 0.5,
+        "bias": 0.5,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.15
+      },
+      "expected": {
+        "BUY": 0.740203,
+        "HOLD": 0.222945,
+        "SELL": 0.036853,
+        "action": "BUY"
+      }
+    },
+    {
+      "input": {
+        "net": 0.5,
+        "bias": -0.8,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.15
+      },
+      "expected": {
+        "BUY": 0.360297,
+        "HOLD": 0.398189,
+        "SELL": 0.241514,
+        "action": "HOLD"
+      }
+    },
+    {
+      "input": {
+        "net": -0.6,
+        "bias": 0.2,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.15
+      },
+      "expected": {
+        "BUY": 0.08293,
+        "HOLD": 0.304295,
+        "SELL": 0.612775,
+        "action": "SELL"
+      }
+    },
+    {
+      "input": {
+        "net": 0,
+        "bias": 0,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.15
+      },
+      "expected": {
+        "BUY": 0.29852,
+        "HOLD": 0.40296,
+        "SELL": 0.29852,
+        "action": "HOLD"
+      }
+    }
+  ]
+}
