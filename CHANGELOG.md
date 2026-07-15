@@ -5,6 +5,16 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M5.5 · Macro Bias, Direccionalidad y Snapshots
+
+- `apps/api`: sesgo macro (funding + tendencia semanal EMA 1w) inyectado en los logits del softmax,
+  con degradación a FLAT en conflicto fuerte; campo `direction` (LONG/SHORT/FLAT); intervalo `1w`.
+- `apps/api`: `POST /snapshots` (recalcula la señal, autoritativo) y tabla `snapshots` en TimescaleDB
+  con columnas nombradas + `raw_signal` JSONB (dataset para entrenamiento de IA; `outcome_*` los llena M6).
+- `apps/quant`: mirrors `macro.py` e `inference.py` con paridad (nuevos vectores dorados `macro_vectors.json`).
+- `apps/web`: anillo LONG/SHORT/FLAT, panel Macro (sesgo/funding/tendencia/confluencia) y botón 📸 Snapshot.
+- Contrato `signal.schema.json` v1.1.0 (`direction`, `macro`).
+
 ### Added — M5 · Integración TradingView (Reditum)
 
 - `apps/api`: webhook seguro `POST /tv-hook` (token en el body) para alertas Pine de la suite Reditum
