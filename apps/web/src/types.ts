@@ -1,4 +1,4 @@
-export type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
+export type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w';
 
 export interface Candle {
   symbol: string;
@@ -30,6 +30,16 @@ export interface Vote {
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
 
 export type Action = 'BUY' | 'HOLD' | 'SELL';
+export type Direction = 'LONG' | 'SHORT' | 'FLAT';
+
+export interface Macro {
+  bias: number;
+  funding: number;
+  weekly_trend: number;
+  label: 'alcista' | 'bajista' | 'neutral';
+  confluence: 'aligned' | 'conflict' | 'neutral';
+  applied: boolean;
+}
 
 export interface Probs {
   BUY: number;
@@ -58,7 +68,9 @@ export interface Signal {
   net: number;
   probs: Probs;
   action: Action;
+  direction: Direction;
   confidence: number;
+  macro?: Macro;
   plan: PlanStep[];
   atr: number;
   model_version: string;

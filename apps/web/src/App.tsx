@@ -3,6 +3,8 @@ import { CandleChart } from './CandleChart';
 import { VotesHeatmap } from './VotesHeatmap';
 import { ConfidenceRing } from './ConfidenceRing';
 import { ProbabilityBars } from './ProbabilityBars';
+import { MacroPanel } from './MacroPanel';
+import { SnapshotButton } from './SnapshotButton';
 import { ActionPlan } from './ActionPlan';
 import { TradingViewChart } from './TradingViewChart';
 import { WebhookStatus } from './WebhookStatus';
@@ -194,15 +196,20 @@ export function App() {
                   <strong>Decisión</strong>
                   {signal && (
                     <span className="muted">
-                      · régimen {signal.regime.label} · net {signal.net.toFixed(2)}
+                      · {signal.action} · régimen {signal.regime.label} · net{' '}
+                      {signal.net.toFixed(2)}
                     </span>
                   )}
+                  <SnapshotButton symbol={symbol} interval={tf} />
                 </div>
                 {signal ? (
-                  <div className="decision">
-                    <ConfidenceRing action={signal.action} confidence={signal.confidence} />
-                    <ProbabilityBars probs={signal.probs} />
-                  </div>
+                  <>
+                    <div className="decision">
+                      <ConfidenceRing direction={signal.direction} confidence={signal.confidence} />
+                      <ProbabilityBars probs={signal.probs} />
+                    </div>
+                    <MacroPanel macro={signal.macro} />
+                  </>
                 ) : (
                   <p className="muted">Calculando la señal…</p>
                 )}

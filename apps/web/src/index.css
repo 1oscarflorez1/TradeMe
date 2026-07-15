@@ -406,3 +406,62 @@ body {
   color: var(--muted);
   font-size: 0.72rem;
 }
+
+/* ---- M5.5: macro, dirección, snapshot ---- */
+.snapshot-btn {
+  margin-left: auto;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.snapshot-btn:hover {
+  border-color: var(--accent);
+}
+
+.macro {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.macro-bias {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.macro-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.macro-confluence {
+  font-size: 0.78rem;
+}
+
+.conf-aligned {
+  color: var(--buy);
+}
+
+.conf-conflict {
+  color: var(--sell);
+}
+
+.conf-neutral {
+  color: var(--muted);
+}
+
+.macro-meta {
+  display: flex;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
