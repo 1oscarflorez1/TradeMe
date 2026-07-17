@@ -77,6 +77,7 @@ La API (`apps/api`) sirve, además de `/health`:
 - El WS `stream/{symbol}` emite además mensajes `{ type: 'votes', ... }` con el heatmap en vivo.
 - `POST /snapshots` — instantánea del escenario para análisis/entrenamiento de IA (ver [`docs/macro.md`](docs/macro.md)).
 - `GET /snapshots?symbol=BTCUSDT` — lista de snapshots con seguimiento en vivo (precio actual vs niveles).
+- `GET /backtest?symbol=BTCUSDT&interval=5m` — último backtest (métricas + curva de equity). Ver [`docs/backtesting.md`](docs/backtesting.md).
 - `GET /signal?symbol=BTCUSDT&interval=1m` — señal completa del ensemble (acción, probabilidades,
   régimen, votos ponderados). El WS emite también `{ type: 'signal', ... }`. Ver [`docs/ensemble.md`](docs/ensemble.md).
 

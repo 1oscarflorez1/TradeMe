@@ -9,6 +9,7 @@ import { WebhookStatus } from './WebhookStatus';
 import { MacroPanel } from './MacroPanel';
 import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
+import { BacktestView } from './BacktestView';
 import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
@@ -18,7 +19,7 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
   reconnecting: 'Reconectando…',
 };
 
-type View = 'panel' | 'registros';
+type View = 'panel' | 'registros' | 'backtest';
 
 export function App() {
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -131,6 +132,13 @@ export function App() {
             >
               Registros
             </button>
+            <button
+              type="button"
+              className={view === 'backtest' ? 'nav active' : 'nav'}
+              onClick={() => setView('backtest')}
+            >
+              Backtest
+            </button>
           </nav>
         </div>
 
@@ -175,6 +183,8 @@ export function App() {
       <main className="content">
         {view === 'registros' ? (
           <SnapshotsView symbol={symbol} />
+        ) : view === 'backtest' ? (
+          <BacktestView symbol={symbol} interval={tf} />
         ) : error ? (
           <div className="panel error">
             <p>No se pudo cargar el mercado: {error}</p>

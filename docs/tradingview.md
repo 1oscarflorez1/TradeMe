@@ -1,6 +1,6 @@
 # Integración TradingView (Reditum) — configuración de alertas
 
-Las estrategias privadas **Reditum** (SniperUltra = `reditum_sniper`, nuevoPOC = `reditum_poc`) viven
+Las estrategias privadas **Reditum** (suite de **Ingresarios**, academia de trading — reto.ingresarios.net) (SniperUltra = `reditum_sniper`, Geny Trend = `reditum_geny`, nuevoPOC = `reditum_poc`) viven
 en TradingView (Pine Script). Sus alertas envían un webhook a TradeMe (`POST /tv-hook`), que las
 convierte en votos del ensemble (peso 2×) y las registra para el backtest.
 

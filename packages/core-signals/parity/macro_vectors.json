@@ -133,5 +133,38 @@
         "action": "HOLD"
       }
     }
+  ],
+  "decision": [
+    {
+      "macroBias": null,
+      "expected": {
+        "net": -0.104326,
+        "action": "HOLD",
+        "direction": "FLAT",
+        "levels": null
+      }
+    },
+    {
+      "macroBias": -0.5,
+      "expected": {
+        "net": -0.104326,
+        "action": "SELL",
+        "direction": "SHORT",
+        "levels": {
+          "entry": 110.876694,
+          "stop": 112.911332,
+          "take_profit": 106.807418
+        }
+      }
+    },
+    {
+      "macroBias": 0.6,
+      "expected": {
+        "net": -0.104326,
+        "action": "HOLD",
+        "direction": "FLAT",
+        "levels": null
+      }
+    }
   ]
 }
