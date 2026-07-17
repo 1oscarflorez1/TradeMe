@@ -1,6 +1,8 @@
 import json
 import pathlib
 
+from trademe_quant.decision import decide
+from trademe_quant.ensemble import load_ensemble
 from trademe_quant.indicators import compute_readings
 from trademe_quant.inference import infer_probs, pick_action
 from trademe_quant.macro import compute_macro_bias
@@ -72,3 +74,22 @@ def test_parity_inference() -> None:
         assert abs(probs["BUY"] - v["expected"]["BUY"]) < 1e-4, (probs, v["expected"])
         assert abs(probs["SELL"] - v["expected"]["SELL"]) < 1e-4
         assert pick_action(probs) == v["expected"]["action"]
+
+
+def test_parity_decision() -> None:
+    candles = VECTORS["dataset"]["candles"]
+    high = [c["h"] for c in candles]
+    low = [c["l"] for c in candles]
+    close = [c["c"] for c in candles]
+    config = load_ensemble(pathlib.Path(__file__).parents[3] / "artifacts/ensemble.yaml")
+    for v in MACRO["decision"]:
+        got = decide(high, low, close, config, v["macroBias"])
+        exp = v["expected"]
+        assert got["action"] == exp["action"], (got["action"], exp)
+        assert got["direction"] == exp["direction"]
+        assert abs(got["net"] - exp["net"]) < 1e-4, (got["net"], exp["net"])
+        if exp["levels"] is not None:
+            assert got["levels"] is not None
+            assert abs(got["levels"]["entry"] - exp["levels"]["entry"]) < 0.05
+            assert abs(got["levels"]["stop"] - exp["levels"]["stop"]) < 0.05
+            assert abs(got["levels"]["take_profit"] - exp["levels"]["take_profit"]) < 0.05
