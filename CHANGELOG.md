@@ -5,6 +5,20 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M5.6 · UX, registros y validez del plan
+
+- `apps/api`: runner de migraciones al arrancar (crea tablas faltantes sin recrear el volumen);
+  **validez temporal del plan** (`plan.valid_candles`, campo `valid_until`); `GET /snapshots` con
+  seguimiento en vivo (precio actual vs entrada/SL/TP, R aproximado, expirado). Contrato v1.2.0.
+- `apps/web`: pestañas **Panel / Registros**; indicadores reubicados a lo ancho en la parte inferior;
+  vista de Registros con tabla de snapshots y seguimiento en vivo.
+- `docs/`: `metodologia.md` y `backlog.md` (integración de los documentos del equipo).
+
+### Fixed
+
+- El sesgo macro ahora se aplica de verdad en las señales en vivo (`/signal`, WS y `/snapshots`):
+  en M5.5 el `macro` no se pasaba en esas llamadas.
+
 ### Added — M5.5 · Macro Bias, Direccionalidad y Snapshots
 
 - `apps/api`: sesgo macro (funding + tendencia semanal EMA 1w) inyectado en los logits del softmax,
