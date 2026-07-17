@@ -27,8 +27,13 @@ export async function runMigrations(
     const done = await pool.query('SELECT 1 FROM schema_migrations WHERE name = $1', [file]);
     if ((done.rowCount ?? 0) > 0) continue;
     const sql = readFileSync(join(dir, file), 'utf8');
-    await pool.query(sql);
-    await pool.query('INSERT INTO schema_migrations (name) VALUES ($1)', [file]);
-    log?.(`migración aplicada: ${file}`);
+    try {
+      await pool.query(sql);
+      await pool.query('INSERT INTO schema_migrations (name) VALUES ($1)', [file]);
+      log?.(`migración aplicada: ${file}`);
+    } catch (err) {
+      // Una migración fallida no debe bloquear las siguientes (p. ej. tablas nuevas).
+      log?.(`migración fallida (se continúa): ${file} — ${String(err)}`);
+    }
   }
 }
