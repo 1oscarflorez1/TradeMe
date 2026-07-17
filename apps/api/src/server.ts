@@ -7,6 +7,7 @@ import { createPool } from './db/pool.js';
 import { CandlesRepo } from './db/candles-repo.js';
 import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
+import { BacktestsRepo } from './db/backtests-repo.js';
 import { runMigrations } from './db/migrate.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
   const externalRepo = pool ? new ExternalSignalsRepo(pool) : null;
   const macroStore = new MacroStore();
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
+  const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
 
   const app = buildApp({
     getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
@@ -70,6 +72,9 @@ async function main(): Promise<void> {
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
+    getBacktest: backtestsRepo
+      ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
+      : undefined,
     tvSecret: env.TV_WEBHOOK_SECRET,
     onExternalVote: (symbol: string) => broadcast(symbol),
     recordExternal: externalRepo

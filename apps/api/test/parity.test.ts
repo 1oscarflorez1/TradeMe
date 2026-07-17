@@ -5,6 +5,9 @@ import { dirname, join } from 'node:path';
 import { BUILTIN_INDICATORS } from '../src/indicators/builtin.js';
 import { computeMacroBias } from '../src/macro/bias.js';
 import { inferProbs, pickAction } from '../src/ensemble/inference.js';
+import { IndicatorRegistry } from '../src/indicators/registry.js';
+import { buildSignal } from '../src/ensemble/signal.js';
+import type { Macro } from '../src/domain/signal.js';
 import { DEFAULT_ENSEMBLE } from '../src/ensemble/config.js';
 import type { Candle } from '../src/domain/candle.js';
 
@@ -62,6 +65,15 @@ interface MacroVectors {
     input: { net: number; bias: number; wMacro: number; temperature: number; holdBand: number };
     expected: { BUY: number; HOLD: number; SELL: number; action: string };
   }>;
+  decision: Array<{
+    macroBias: number | null;
+    expected: {
+      net: number;
+      action: string;
+      direction: string;
+      levels: { entry: number; stop: number; take_profit: number } | null;
+    };
+  }>;
 }
 
 const macroVectors = JSON.parse(
@@ -88,6 +100,40 @@ describe('paridad macro — Node ≡ vectores dorados', () => {
       expect(Math.abs(probs.BUY - v.expected.BUY)).toBeLessThan(1e-4);
       expect(Math.abs(probs.SELL - v.expected.SELL)).toBeLessThan(1e-4);
       expect(pickAction(probs).action).toBe(v.expected.action);
+    }
+  });
+});
+
+describe('paridad decisión — Node ≡ vectores dorados', () => {
+  const registry = new IndicatorRegistry();
+  const votes = registry.computeVotes(candles);
+  const price = candles[candles.length - 1]!.close;
+
+  it('reproduce net, acción, dirección y niveles del plan', () => {
+    for (const v of macroVectors.decision) {
+      const macro: Macro | undefined =
+        v.macroBias === null
+          ? undefined
+          : {
+              bias: v.macroBias,
+              funding: 0,
+              weekly_trend: v.macroBias,
+              label: 'neutral',
+              confluence: 'neutral',
+              applied: true,
+            };
+      const sig = buildSignal({
+        symbol: 'BTCUSDT',
+        price,
+        votes,
+        config: DEFAULT_ENSEMBLE,
+        equity: 10_000,
+        interval: '1m',
+        macro,
+      });
+      expect(sig.action).toBe(v.expected.action);
+      expect(sig.direction).toBe(v.expected.direction);
+      expect(Math.abs(sig.net - v.expected.net)).toBeLessThan(1e-4);
     }
   });
 });
