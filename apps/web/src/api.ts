@@ -1,4 +1,4 @@
-import type { Candle, Interval, Signal, Vote } from './types';
+import type { Candle, Interval, Signal, SnapshotsResponse, Vote } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -61,6 +61,16 @@ export async function postSnapshot(
     });
     if (!res.ok) return null;
     return (await res.json()) as { saved: boolean; id?: string };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchSnapshots(symbol: string): Promise<SnapshotsResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/snapshots?symbol=${symbol}&limit=50`);
+    if (!res.ok) return null;
+    return (await res.json()) as SnapshotsResponse;
   } catch {
     return null;
   }

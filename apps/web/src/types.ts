@@ -72,6 +72,39 @@ export interface Signal {
   confidence: number;
   macro?: Macro;
   plan: PlanStep[];
+  valid_until: string;
   atr: number;
   model_version: string;
+}
+
+export interface SnapshotTracking {
+  status: 'tp' | 'sl' | 'en_curso' | 'sin_plan';
+  liveR: number | null;
+  expired: boolean;
+}
+
+export interface SnapshotRow {
+  id: string;
+  captured_at: string;
+  symbol: string;
+  interval: Interval;
+  action: string;
+  direction: Direction;
+  price: number;
+  confidence: number | null;
+  macro_bias: number | null;
+  plan_entry: number | null;
+  plan_stop: number | null;
+  plan_take_profit: number | null;
+  plan_rr: number | null;
+  valid_until: string | null;
+  outcome_result: string | null;
+  outcome_return_r: number | null;
+  tracking: SnapshotTracking | null;
+}
+
+export interface SnapshotsResponse {
+  symbol: string;
+  currentPrice: number;
+  snapshots: SnapshotRow[];
 }

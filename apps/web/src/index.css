@@ -465,3 +465,69 @@ body {
   color: var(--muted);
   font-size: 0.72rem;
 }
+
+/* ---- M5.6: pestañas, layout y registros ---- */
+.nav-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-left: 1rem;
+}
+
+.nav {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.nav.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.grid-top {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .grid-top {
+    grid-template-columns: 1fr;
+  }
+}
+
+.indicators-row {
+  margin-top: 1rem;
+  max-width: none;
+}
+
+.indicators-row .heatmap {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.snap-scroll {
+  overflow-x: auto;
+}
+
+.snap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.snap-table th,
+.snap-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.snap-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
