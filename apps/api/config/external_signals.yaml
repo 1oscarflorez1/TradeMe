@@ -1,0 +1,18 @@
+# Mapeo declarativo de señales externas -> voto normalizado en [-1,+1].
+# Fuente: alertas de TradingView (Pine Script) de la suite Reditum (Ingresarios).
+# El backend recibe estas alertas en POST /tv-hook (token secreto en el body).
+tradingview:
+  reditum_sniper: # estrategia SniperUltra
+    kind: custom
+    ttl_ms: 300000 # validez 5 min
+    map: # signal -> score
+      long: { score: 1.0, confidence: 0.85 }
+      short: { score: -1.0, confidence: 0.85 }
+      flat: { score: 0.0, confidence: 0.3 }
+  reditum_poc: # estrategia nuevoPOC
+    kind: custom
+    ttl_ms: 300000
+    map:
+      long: { score: 1.0, confidence: 0.85 }
+      short: { score: -1.0, confidence: 0.85 }
+      flat: { score: 0.0, confidence: 0.3 }

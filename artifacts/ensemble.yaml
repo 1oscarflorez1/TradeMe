@@ -1,0 +1,54 @@
+# Configuración del ensemble (M3, hand-authored). La optimización con Optuna es M7.
+# Producido por apps/quant en el futuro; consumido por apps/api para inferir.
+version: 'ens-m3-2026-07-07'
+
+# Softmax: temperatura (menor = más decidido) y banda neutra que favorece HOLD.
+temperature: 0.5
+hold_band: 0.15
+
+# Pesos base por indicador interno (ADX/ATR no votan: son contexto/volatilidad).
+weights:
+  ema_cross: 1.0
+  macd: 1.0
+  rsi14: 1.0
+  bbands: 1.0
+  stoch14: 1.0
+
+# Pesos por fuente externa. Reditum (TradingView) es la señal core -> pesa 2x.
+external_weights:
+  tradingview: 2.0 # Reditum (SniperUltra + nuevoPOC) es la fuente core de alfa
+
+# Conmutación por régimen (ADX). En tendencia sube tendencia/momentum; en rango, reversión.
+regime:
+  adx_threshold: 25
+  trend: # ADX >= threshold
+    trend: 1.5
+    momentum: 1.5
+    reversion: 0.6
+  range: # ADX < threshold
+    trend: 0.6
+    momentum: 0.8
+    reversion: 1.5
+
+# Gestión de riesgo para el plan de acción (M4). El capital va por env (ACCOUNT_EQUITY).
+risk:
+  atr_stop_mult: 1.5 # distancia del stop = 1.5 x ATR
+  tp_r_multiple: 2.0 # take-profit a 2R (riesgo:beneficio 1:2)
+  risk_pct: 0.01 # se arriesga 1% del capital por operación
+
+# Validez temporal del plan de acción (M5.6): velas de la temporalidad antes de descartar la entrada.
+plan:
+  valid_candles: 3
+
+# Sesgo fundamental macro (1w+): funding rate + tendencia semanal (EMA 1w).
+# Se inyecta en los logits del softmax; si el conflicto es fuerte, degrada a FLAT.
+macro:
+  enabled: true
+  min_interval: '1w'
+  w_macro: 1.0
+  funding_weight: 0.5
+  trend_weight: 0.5
+  funding_scale: 0.0005
+  trend_scale: 0.05
+  conflict_downgrade: true
+  conflict_threshold: 0.5

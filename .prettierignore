@@ -3,3 +3,7 @@
 **/mlruns/**
 **/.venv/**
 pnpm-lock.yaml
+trademe.md
+data-providers.md
+about-me.md
+*.bundle

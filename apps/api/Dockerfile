@@ -1,17 +1,17 @@
-# TradeMe API — imagen de producción
-FROM node:20-slim AS base
-ENV PNPM_HOME=/pnpm
-ENV PATH="$PNPM_HOME:$PATH"
+# TradeMe API (Node) — imagen de producción
+FROM node:20-slim
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 WORKDIR /repo
 
-# Instalar dependencias del workspace (contexto = raíz del monorepo)
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
-COPY apps/api/package.json apps/api/
-COPY packages/core-signals/package.json packages/core-signals/
-RUN pnpm install --frozen-lockfile || pnpm install
-
+# Copia todo el monorepo. El .dockerignore excluye node_modules/dist/.git,
+# así que la estructura de workspaces de pnpm se resuelve dentro del contenedor.
 COPY . .
+
+# Instala TODAS las dependencias del workspace (incluye devDeps -> tsc disponible).
+RUN pnpm install --frozen-lockfile
+
+# Compila la API.
 RUN pnpm --filter @trademe/api build
 
 EXPOSE 3001
