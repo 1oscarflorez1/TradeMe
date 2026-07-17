@@ -5,6 +5,16 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M6 · Backtesting
+
+- `apps/quant`: mirror de la decisión (`decision.py`, agregación + plan) con **paridad** ampliada;
+  harness de backtest sin look-ahead (primer toque, peor caso SL), métricas out-of-sample
+  (win rate, expectancy, profit factor, max drawdown, Sharpe) y **evaluador de outcomes** de snapshots;
+  CLI `python -m trademe_quant.run_backtest`.
+- `apps/api`: tabla `backtests` (TimescaleDB) y `GET /backtest` (último resultado).
+- `apps/web`: pestaña **Backtest** (métricas + curva de equity).
+- Reditum: se añade `reditum_geny` (Geny Trend) al mapeo; atribución corregida a **Ingresarios**.
+
 ### Added — M5.6 · UX, registros y validez del plan
 
 - `apps/api`: runner de migraciones al arrancar (crea tablas faltantes sin recrear el volumen);
