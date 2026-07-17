@@ -11,6 +11,7 @@ import type { ExternalMapper } from './signals/external-mapper.js';
 import type { EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
+import { trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
 import type { Macro, Signal } from './domain/signal.js';
 
 export interface AppDeps {
@@ -28,6 +29,7 @@ export interface AppDeps {
     levels: PlanLevels | null,
     note?: string,
   ) => Promise<string>;
+  listSnapshots?: (symbol: string, limit: number) => Promise<SnapshotRow[]>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -144,6 +146,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         votes,
         config: deps.ensemble,
         equity: deps.equity,
+        interval,
+        macro: deps.getMacro?.(sym),
       });
       return { interval, signal };
     } catch (err) {
@@ -189,6 +193,34 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     return { accepted: true, vote };
   });
 
+  // Listado de snapshots con seguimiento en vivo (precio actual vs niveles).
+  app.get('/snapshots', async (request, reply) => {
+    if (!deps.listSnapshots) {
+      return reply.status(503).send({ error: 'persistencia no disponible' });
+    }
+    const q = z
+      .object({
+        symbol: z.string().default(deps.symbols[0] ?? 'BTCUSDT'),
+        limit: z.coerce.number().int().min(1).max(200).default(20),
+      })
+      .parse(request.query);
+    const sym = q.symbol.toUpperCase();
+    const rows = await deps.listSnapshots(sym, q.limit);
+    let currentPrice = 0;
+    try {
+      const candles = await deps.getHistory(sym, '1m', 1);
+      currentPrice = candles.length > 0 ? candles[candles.length - 1]!.close : 0;
+    } catch {
+      currentPrice = 0;
+    }
+    const now = Date.now();
+    const snapshots = rows.map((row) => ({
+      ...row,
+      tracking: currentPrice > 0 ? trackSnapshot(row, currentPrice, now) : null,
+    }));
+    return { symbol: sym, currentPrice, snapshots };
+  });
+
   const SnapshotBody = z.object({
     symbol: z.string().min(1),
     interval: z.string().default('1m'),
@@ -216,6 +248,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         votes,
         config: deps.ensemble,
         equity: deps.equity,
+        interval,
         macro: deps.getMacro?.(sym),
       });
       const levels = computePlanLevels(

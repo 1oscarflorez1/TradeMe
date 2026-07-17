@@ -15,7 +15,8 @@ describe('buildPlan', () => {
       risk,
       equity: 10_000,
     });
-    expect(plan).toHaveLength(5);
+    expect(plan).toHaveLength(6);
+    expect(plan[5]?.title).toBe('Validez de la entrada');
     const stopDistance = 2 * risk.atrStopMult; // 3
     // stop = 100 - 3 = 97 ; TP = 100 + 2*3 = 106
     expect(plan[2]?.detail).toContain('97.00');

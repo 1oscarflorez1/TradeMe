@@ -13,6 +13,10 @@ export interface RiskConfig {
   riskPct: number;
 }
 
+export interface PlanConfig {
+  validCandles: number;
+}
+
 export interface MacroConfig {
   enabled: boolean;
   wMacro: number;
@@ -33,6 +37,7 @@ export interface EnsembleConfig {
   regime: { adxThreshold: number; trend: RegimeMultipliers; range: RegimeMultipliers };
   risk: RiskConfig;
   macro: MacroConfig;
+  plan: PlanConfig;
 }
 
 export const DEFAULT_ENSEMBLE: EnsembleConfig = {
@@ -57,6 +62,7 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
     conflictDowngrade: true,
     conflictThreshold: 0.5,
   },
+  plan: { validCandles: 3 },
 };
 
 interface RawRegimeMult {
@@ -72,6 +78,7 @@ interface RawConfig {
   external_weights?: Record<string, number>;
   regime?: { adx_threshold?: number; trend?: RawRegimeMult; range?: RawRegimeMult };
   risk?: { atr_stop_mult?: number; tp_r_multiple?: number; risk_pct?: number };
+  plan?: { valid_candles?: number };
   macro?: {
     enabled?: boolean;
     w_macro?: number;
@@ -120,6 +127,7 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
       conflictDowngrade: raw.macro?.conflict_downgrade ?? d.macro.conflictDowngrade,
       conflictThreshold: raw.macro?.conflict_threshold ?? d.macro.conflictThreshold,
     },
+    plan: { validCandles: raw.plan?.valid_candles ?? d.plan.validCandles },
   };
 }
 

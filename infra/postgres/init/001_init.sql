@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   plan_take_profit DOUBLE PRECISION,
   plan_size        DOUBLE PRECISION,
   plan_rr          DOUBLE PRECISION,
+  valid_until      TIMESTAMPTZ,
   outcome_result   TEXT,
   outcome_return_r DOUBLE PRECISION,
   outcome_mfe      DOUBLE PRECISION,

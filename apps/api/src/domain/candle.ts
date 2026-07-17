@@ -3,6 +3,21 @@ import { z } from 'zod';
 export const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'] as const;
 export type Interval = (typeof INTERVALS)[number];
 
+export const INTERVAL_MS: Record<Interval, number> = {
+  '1m': 60_000,
+  '5m': 300_000,
+  '15m': 900_000,
+  '30m': 1_800_000,
+  '1h': 3_600_000,
+  '4h': 14_400_000,
+  '1d': 86_400_000,
+  '1w': 604_800_000,
+};
+
+export function intervalMs(interval: Interval): number {
+  return INTERVAL_MS[interval];
+}
+
 export function isInterval(value: string): value is Interval {
   return (INTERVALS as readonly string[]).includes(value);
 }

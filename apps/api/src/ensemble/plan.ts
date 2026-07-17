@@ -9,6 +9,7 @@ export interface PlanInput {
   confidence: number;
   risk: RiskConfig;
   equity: number;
+  validUntil?: string;
 }
 
 export interface PlanLevels {
@@ -86,6 +87,13 @@ export function buildPlan(input: PlanInput): PlanStep[] {
       step: 5,
       title: 'Tamaño de posición',
       detail: `${levels.size.toFixed(6)} u (~${fmt(notional)}) · riesgo ${(risk.riskPct * 100).toFixed(1)}% = ${fmt(equity * risk.riskPct)}`,
+    },
+    {
+      step: 6,
+      title: 'Validez de la entrada',
+      detail: input.validUntil
+        ? `Operar antes de ${new Date(input.validUntil).toLocaleString('es')} o se descarta.`
+        : 'Ventana de entrada limitada.',
     },
   ];
 }

@@ -15,7 +15,8 @@
     "probs",
     "action",
     "confidence",
-    "direction"
+    "direction",
+    "valid_until"
   ],
   "properties": {
     "version": {
@@ -126,6 +127,11 @@
           "type": "boolean"
         }
       }
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Instante hasta el cual la entrada del plan es v\u00e1lida."
     }
   },
   "$defs": {

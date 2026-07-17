@@ -76,6 +76,7 @@ describe('buildSignal con macro', () => {
       votes: uptrend,
       config: DEFAULT_ENSEMBLE,
       equity: 10_000,
+      interval: '1m',
     });
     expect(s.action).toBe('BUY');
     expect(s.direction).toBe('LONG');
@@ -89,6 +90,7 @@ describe('buildSignal con macro', () => {
       votes: uptrend,
       config: DEFAULT_ENSEMBLE,
       equity: 10_000,
+      interval: '1m',
       macro: macro(0.8),
     });
     expect(s.direction).toBe('LONG');
@@ -102,6 +104,7 @@ describe('buildSignal con macro', () => {
       votes: uptrend,
       config: DEFAULT_ENSEMBLE,
       equity: 10_000,
+      interval: '1m',
       macro: macro(-0.8),
     });
     expect(s.action).toBe('HOLD');

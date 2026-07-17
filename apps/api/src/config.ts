@@ -16,6 +16,7 @@ const EnvSchema = z.object({
   // CORS: lista de orígenes separada por comas; vacío = permitir cualquiera (dev).
   CORS_ORIGIN: z.string().optional(),
   ENSEMBLE_CONFIG: z.string().default('artifacts/ensemble.yaml'),
+  MIGRATIONS_DIR: z.string().default('infra/postgres/migrations'),
   ACCOUNT_EQUITY: z.coerce.number().positive().default(10_000),
 });
 

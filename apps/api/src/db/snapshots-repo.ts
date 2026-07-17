@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import type { Signal } from '../domain/signal.js';
 import type { PlanLevels } from '../ensemble/plan.js';
+import type { SnapshotRow } from '../snapshots/tracking.js';
 
 function score(signal: Signal, key: string): number | null {
   return signal.votes.find((v) => v.key === key)?.score ?? null;
@@ -26,7 +27,7 @@ export class SnapshotsRepo {
         macro_bias, funding_rate, weekly_trend, macro_label, confluence,
         ema_cross_score, macd_score, rsi14_score, rsi14_value, bbands_score,
         stoch14_score, adx14_value, atr14_value, reditum_sniper_score, reditum_poc_score,
-        plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr,
+        plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr, valid_until,
         model_version, source, note, raw_signal
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
@@ -34,8 +35,8 @@ export class SnapshotsRepo {
         $14,$15,$16,$17,$18,
         $19,$20,$21,$22,$23,
         $24,$25,$26,$27,$28,
-        $29,$30,$31,$32,$33,
-        $34,'manual',$35,$36
+        $29,$30,$31,$32,$33,$34,
+        $35,'manual',$36,$37
       ) RETURNING id`,
       [
         signal.symbol,
@@ -71,11 +72,23 @@ export class SnapshotsRepo {
         levels?.takeProfit ?? null,
         levels?.size ?? null,
         levels?.rr ?? null,
+        signal.valid_until,
         signal.model_version,
         note ?? null,
         JSON.stringify(signal),
       ],
     );
     return res.rows[0]?.id ?? '';
+  }
+
+  async list(symbol: string, limit: number): Promise<SnapshotRow[]> {
+    const res = await this.pool.query<SnapshotRow>(
+      `SELECT id, captured_at, symbol, interval, action, direction, price, confidence,
+              macro_bias, plan_entry, plan_stop, plan_take_profit, plan_rr, valid_until,
+              outcome_result, outcome_return_r
+       FROM snapshots WHERE symbol = $1 ORDER BY captured_at DESC LIMIT $2`,
+      [symbol.toUpperCase(), limit],
+    );
+    return res.rows;
   }
 }

@@ -44,6 +44,7 @@ export interface Signal {
   confidence: number;
   macro?: Macro;
   plan: PlanStep[];
+  valid_until: string;
   atr: number;
   model_version: string;
 }

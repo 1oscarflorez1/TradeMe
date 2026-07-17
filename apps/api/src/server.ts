@@ -7,6 +7,7 @@ import { createPool } from './db/pool.js';
 import { CandlesRepo } from './db/candles-repo.js';
 import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
+import { runMigrations } from './db/migrate.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
 import { CandleBuffer } from './indicators/buffer.js';
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
     recordSnapshot: snapshotsRepo
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
+    listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
     tvSecret: env.TV_WEBHOOK_SECRET,
     onExternalVote: (symbol: string) => broadcast(symbol),
     recordExternal: externalRepo
@@ -100,6 +102,8 @@ async function main(): Promise<void> {
         votes,
         config: ensemble,
         equity: env.ACCOUNT_EQUITY,
+        interval: iv,
+        macro: macroStore.get(symbol),
       });
       hub.broadcastSignal(symbol, iv, signal);
     }
@@ -135,6 +139,11 @@ async function main(): Promise<void> {
   }
 
   await app.ready();
+  if (pool) {
+    await runMigrations(pool, env.MIGRATIONS_DIR, (m) => app.log.info(m)).catch((err: unknown) =>
+      app.log.error({ err: String(err) }, 'fallo al aplicar migraciones'),
+    );
+  }
   attachStream(app.server, hub);
   await app.listen({ host: env.API_HOST, port: env.API_PORT });
 

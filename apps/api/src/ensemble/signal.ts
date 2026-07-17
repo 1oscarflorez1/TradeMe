@@ -1,5 +1,6 @@
 import type { Vote } from '../indicators/types.js';
 import type { Action, Direction, Macro, Signal } from '../domain/signal.js';
+import { intervalMs, type Interval } from '../domain/candle.js';
 import type { EnsembleConfig } from './config.js';
 import { aggregate } from './aggregate.js';
 import { confluence, inferProbs, pickAction } from './inference.js';
@@ -11,6 +12,7 @@ export interface BuildSignalParams {
   votes: Vote[];
   config: EnsembleConfig;
   equity: number;
+  interval: Interval;
   macro?: Macro;
   ts?: string;
 }
@@ -23,6 +25,10 @@ function directionOf(action: Action): Direction {
 
 /** Construye el objeto Signal completo a partir de los votos y la config del ensemble. */
 export function buildSignal(params: BuildSignalParams): Signal {
+  const ts = params.ts ?? new Date().toISOString();
+  const validUntil = new Date(
+    Date.parse(ts) + params.config.plan.validCandles * intervalMs(params.interval),
+  ).toISOString();
   const { net, regime, votes, atr } = aggregate(params.votes, params.config);
   const macroCfg = params.config.macro;
   const macroInput =
@@ -55,12 +61,13 @@ export function buildSignal(params: BuildSignalParams): Signal {
     confidence,
     risk: params.config.risk,
     equity: params.equity,
+    validUntil,
   });
 
   return {
     version: '1.0.0',
     symbol: params.symbol,
-    ts: params.ts ?? new Date().toISOString(),
+    ts,
     price: params.price,
     regime,
     votes,
@@ -71,6 +78,7 @@ export function buildSignal(params: BuildSignalParams): Signal {
     confidence,
     macro: macroOut,
     plan,
+    valid_until: validUntil,
     atr,
     model_version: params.config.version,
   };
