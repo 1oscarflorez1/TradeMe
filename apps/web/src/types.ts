@@ -108,3 +108,30 @@ export interface SnapshotsResponse {
   currentPrice: number;
   snapshots: SnapshotRow[];
 }
+
+export interface BacktestTrade {
+  index: number;
+  direction: Direction;
+  entry: number;
+  stop: number;
+  take_profit: number;
+  result: 'tp' | 'sl' | 'timeout';
+  r: number;
+  bars: number;
+}
+
+export interface BacktestResult {
+  id: string;
+  symbol: string;
+  interval: Interval;
+  n_trades: number | null;
+  win_rate: number | null;
+  expectancy: number | null;
+  profit_factor: number | null;
+  max_drawdown: number | null;
+  sharpe: number | null;
+  oos_win_rate: number | null;
+  oos_expectancy: number | null;
+  equity_curve: number[];
+  trades: BacktestTrade[];
+}
