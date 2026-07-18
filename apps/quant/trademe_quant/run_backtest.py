@@ -40,8 +40,11 @@ def main() -> None:
     )
 
     save_backtest(dsn, symbol, interval, result)
-    n = evaluate_snapshot_outcomes(dsn)
-    print(f"backtest guardado; {n} snapshots evaluados")
+    try:
+        n = evaluate_snapshot_outcomes(dsn)
+        print(f"backtest guardado; {n} snapshots evaluados")
+    except Exception as err:  # noqa: BLE001 - paso secundario, no debe tumbar el CLI
+        print(f"backtest guardado; evaluacion de snapshots omitida ({err})")
 
 
 if __name__ == "__main__":
