@@ -571,3 +571,67 @@ pre.hint {
   padding: 0.5rem 0.7rem;
   overflow-x: auto;
 }
+
+/* ---- M6: guía explicativa del backtest ---- */
+.bt-layout {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.bt-layout > .panel {
+  margin: 0;
+  flex: 1 1 520px;
+}
+
+.bt-guide {
+  flex: 1 1 340px;
+  max-width: 420px;
+}
+
+.bt-guide h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.bt-guide h4 {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.9rem;
+  color: var(--fg);
+}
+
+.bt-guide p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin: 0 0 0.7rem;
+}
+
+.bt-defs {
+  margin: 0;
+}
+
+.bt-def {
+  margin: 0 0 0.6rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--border);
+}
+
+.bt-def dt {
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.bt-def dd {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.bt-note {
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  font-style: italic;
+}
