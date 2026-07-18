@@ -8,6 +8,7 @@ import { DEFAULT_ENSEMBLE } from '../src/ensemble/config.js';
 import { IndicatorRegistry } from '../src/indicators/registry.js';
 import { buildSignal } from '../src/ensemble/signal.js';
 import { computePlanLevels } from '../src/ensemble/plan.js';
+import { applyCalibrator, type Calibrator } from '../src/calibration/apply.js';
 import type { Macro } from '../src/domain/signal.js';
 import type { Candle } from '../src/domain/candle.js';
 
@@ -160,6 +161,22 @@ const decisionVectors = [
   decisionVector(mkMacro(0.6)),
 ];
 
+// ---- Vectores de paridad del calibrador (applier idéntico Node<->Python) ----
+const calibrators: Record<string, Calibrator> = {
+  identity: { method: 'identity' },
+  isotonic: { method: 'isotonic', x: [0.2, 0.5, 0.8], y: [0.1, 0.4, 0.75] },
+  platt: { method: 'platt', w: 2.5, c: -1.5 },
+};
+const calInputs = [0.0, 0.15, 0.35, 0.5, 0.65, 0.9, 1.0];
+const calibrationVectors = Object.entries(calibrators).flatMap(([name, cal]) =>
+  calInputs.map((p) => ({
+    calibrator: name,
+    cal,
+    input: p,
+    expected: round(applyCalibrator(cal, p)),
+  })),
+);
+
 writeFileSync(
   new URL('../../../packages/core-signals/parity/macro_vectors.json', import.meta.url),
   JSON.stringify(
@@ -171,6 +188,7 @@ writeFileSync(
       macro_bias: macroBiasVectors,
       inference: inferenceVectors,
       decision: decisionVectors,
+      calibration: calibrationVectors,
     },
     null,
     2,

@@ -1,6 +1,7 @@
 import json
 import pathlib
 
+from trademe_quant.calibration import apply_calibrator
 from trademe_quant.decision import decide
 from trademe_quant.ensemble import load_ensemble
 from trademe_quant.indicators import compute_readings
@@ -93,3 +94,10 @@ def test_parity_decision() -> None:
             assert abs(got["levels"]["entry"] - exp["levels"]["entry"]) < 0.05
             assert abs(got["levels"]["stop"] - exp["levels"]["stop"]) < 0.05
             assert abs(got["levels"]["take_profit"] - exp["levels"]["take_profit"]) < 0.05
+
+
+def test_parity_calibration() -> None:
+    """El applier del calibrador debe coincidir Node<->Python (identidad/isotónica/Platt)."""
+    for v in MACRO["calibration"]:
+        got = apply_calibrator(v["cal"], float(v["input"]))
+        assert abs(got - v["expected"]) < 1e-6, (v["calibrator"], v["input"], got, v["expected"])

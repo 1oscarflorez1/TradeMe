@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
-import { fetchBacktest } from './api';
-import type { BacktestResult, Interval } from './types';
+import { fetchBacktest, fetchCalibration } from './api';
+import type {
+  BacktestResult,
+  CalibrationMeta,
+  Interval,
+  RegimeCalibrator,
+  ReliabilityBin,
+} from './types';
 
 function pct(n: number | null): string {
   return n === null ? '—' : `${(n * 100).toFixed(1)}%`;
@@ -54,14 +60,17 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   if (loading) return <p className="muted">Cargando backtest…</p>;
   if (!bt) {
     return (
-      <section className="panel">
-        <p className="muted">
-          Aún no hay backtest para {symbol} · {interval}. Ejecútalo desde quant:
-        </p>
-        <pre className="hint">
-          python -m trademe_quant.run_backtest {symbol} {interval}
-        </pre>
-      </section>
+      <>
+        <section className="panel">
+          <p className="muted">
+            Aún no hay backtest para {symbol} · {interval}. Ejecútalo desde quant:
+          </p>
+          <pre className="hint">
+            python -m trademe_quant.run_backtest {symbol} {interval}
+          </pre>
+        </section>
+        <CalibrationSection />
+      </>
     );
   }
 
@@ -77,6 +86,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   ];
 
   return (
+    <>
     <div className="bt-layout">
       <section className="panel">
         <div className="chart-head">
@@ -101,6 +111,8 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
       </section>
       <BacktestGuide />
     </div>
+    <CalibrationSection />
+    </>
   );
 }
 
@@ -173,5 +185,96 @@ function BacktestGuide() {
         purga/embargo) llega en M7.
       </p>
     </aside>
+  );
+}
+
+function ReliabilityDiagram({ bins }: { bins: ReliabilityBin[] }) {
+  const s = 150;
+  const pad = 6;
+  const X = (p: number) => pad + p * (s - 2 * pad);
+  const Y = (p: number) => s - pad - p * (s - 2 * pad);
+  return (
+    <svg viewBox={`0 0 ${s} ${s}`} className="calib-plot">
+      <rect x={pad} y={pad} width={s - 2 * pad} height={s - 2 * pad} fill="none" stroke="#232b38" />
+      <line x1={X(0)} y1={Y(0)} x2={X(1)} y2={Y(1)} stroke="#3a4658" strokeDasharray="3 3" />
+      <polyline
+        points={bins.map((b) => `${X(b.p_pred)},${Y(b.p_true)}`).join(' ')}
+        fill="none"
+        stroke="#4da3ff"
+        strokeWidth="1.5"
+      />
+      {bins.map((b, i) => (
+        <circle
+          key={i}
+          cx={X(b.p_pred)}
+          cy={Y(b.p_true)}
+          r={Math.max(1.5, Math.min(5, Math.sqrt(b.n)))}
+          fill="#4da3ff"
+        />
+      ))}
+    </svg>
+  );
+}
+
+function CalibrationSection() {
+  const [cal, setCal] = useState<CalibrationMeta | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCalibration().then((r) => {
+      if (!cancelled) {
+        setCal(r);
+        setLoaded(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!loaded) return null;
+  const regimes: Array<[string, RegimeCalibrator]> = cal ? Object.entries(cal.regimes) : [];
+  const trained = regimes.some(([, c]) => c.method !== 'identity');
+
+  return (
+    <section className="panel calib-panel">
+      <div className="chart-head">
+        <strong>Calibración de probabilidades</strong>
+        <span className="muted">
+          · diagrama de fiabilidad{cal?.version ? ` · ${cal.version}` : ''}
+        </span>
+      </div>
+      {!trained ? (
+        <p className="muted">
+          Aún sin calibrador entrenado. Genera uno desde quant:{' '}
+          <code>python -m trademe_quant.run_calibration BTCUSDT 5m</code>, y recarga la API con{' '}
+          <code>POST /reload</code>.
+        </p>
+      ) : (
+        <div className="calib-grid">
+          {regimes.map(([name, c]) => (
+            <div key={name} className="calib-card">
+              <div className="calib-title">
+                <strong>{name}</strong>
+                <span className="muted">
+                  {c.method} · n={c.n ?? 0} · Brier {c.brier != null ? c.brier.toFixed(3) : '—'}
+                </span>
+              </div>
+              {c.reliability && c.reliability.length > 0 ? (
+                <ReliabilityDiagram bins={c.reliability} />
+              ) : (
+                <p className="muted">sin datos suficientes</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="muted calib-legend">
+        La diagonal punteada es la calibración perfecta (probabilidad prevista = frecuencia real de
+        acierto). Cuanto más pegados los puntos a ella, más honestas las probabilidades; un Brier más
+        bajo es mejor.
+      </p>
+    </section>
   );
 }

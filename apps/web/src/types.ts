@@ -135,3 +135,23 @@ export interface BacktestResult {
   equity_curve: number[];
   trades: BacktestTrade[];
 }
+
+
+export interface ReliabilityBin {
+  p_pred: number;
+  p_true: number;
+  n: number;
+}
+
+export interface RegimeCalibrator {
+  method: 'identity' | 'isotonic' | 'platt';
+  n?: number;
+  brier?: number;
+  reliability?: ReliabilityBin[];
+}
+
+export interface CalibrationMeta {
+  version: string;
+  created_at?: string;
+  regimes: Record<string, RegimeCalibrator>;
+}
