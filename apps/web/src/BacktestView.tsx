@@ -18,24 +18,90 @@ function num(n: number | null, d = 2): string {
 
 function EquityCurve({ equity }: { equity: number[] }) {
   if (equity.length < 2) return <p className="muted">Sin suficientes trades para la curva.</p>;
-  const w = 600;
-  const h = 160;
+  const h = 190;
+  const padT = 26;
+  const padB = 22;
+  const wpx = Math.max(640, (equity.length - 1) * 14);
   const min = Math.min(0, ...equity);
   const max = Math.max(0, ...equity);
   const range = max - min || 1;
-  const pts = equity
-    .map((v, i) => {
-      const x = (i / (equity.length - 1)) * w;
-      const y = h - ((v - min) / range) * h;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  const zeroY = h - ((0 - min) / range) * h;
+  const X = (i: number) => 24 + (i / (equity.length - 1)) * (wpx - 48);
+  const Y = (v: number) => padT + (1 - (v - min) / range) * (h - padT - padB);
+
+  let peakIdx = 0;
+  equity.forEach((v, i) => {
+    if (v > equity[peakIdx]!) peakIdx = i;
+  });
+  let run = -Infinity;
+  let curPeak = 0;
+  let worst = 0;
+  let troughIdx = 0;
+  let ddPeakIdx = 0;
+  equity.forEach((v, i) => {
+    if (v > run) {
+      run = v;
+      curPeak = i;
+    }
+    const dd = run - v;
+    if (dd > worst) {
+      worst = dd;
+      troughIdx = i;
+      ddPeakIdx = curPeak;
+    }
+  });
+
+  const pts = equity.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const zeroY = Y(0);
+  const last = equity.length - 1;
+  const finalV = equity[last]!;
+  const fmt = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}R`;
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="equity" preserveAspectRatio="none">
-      <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="#232b38" strokeWidth="1" />
-      <polyline points={pts} fill="none" stroke="#4da3ff" strokeWidth="2" />
-    </svg>
+    <div className="equity-scroll">
+      <svg width={wpx} height={h} viewBox={`0 0 ${wpx} ${h}`} className="equity">
+        <line x1={24} y1={zeroY} x2={wpx - 24} y2={zeroY} stroke="#2c3644" strokeDasharray="3 3" />
+        <text x={26} y={zeroY - 3} className="eq-annot">
+          0 R
+        </text>
+        {worst > 0 && (
+          <rect
+            x={X(ddPeakIdx)}
+            y={padT}
+            width={Math.max(0, X(troughIdx) - X(ddPeakIdx))}
+            height={h - padT - padB}
+            fill="rgba(224,100,95,0.10)"
+          />
+        )}
+        <polyline points={pts} fill="none" stroke="#4da3ff" strokeWidth="2" />
+        <circle cx={X(peakIdx)} cy={Y(equity[peakIdx]!)} r={3.2} fill="#2ecc71" />
+        <text x={X(peakIdx)} y={Y(equity[peakIdx]!) - 7} className="eq-annot eq-up" textAnchor="middle">
+          Pico {fmt(equity[peakIdx]!)}
+        </text>
+        {worst > 0 && (
+          <>
+            <circle cx={X(troughIdx)} cy={Y(equity[troughIdx]!)} r={3.2} fill="#e0645f" />
+            <text
+              x={X(troughIdx)}
+              y={Y(equity[troughIdx]!) + 14}
+              className="eq-annot eq-down"
+              textAnchor="middle"
+            >
+              Máx. drawdown −{worst.toFixed(1)}R
+            </text>
+          </>
+        )}
+        <circle cx={X(last)} cy={Y(finalV)} r={3.2} fill="#4da3ff" />
+        <text x={X(last)} y={Y(finalV) - 7} className="eq-annot" textAnchor="end">
+          Final {fmt(finalV)}
+        </text>
+        <text x={24} y={h - 6} className="eq-annot">
+          Operación 1
+        </text>
+        <text x={wpx - 24} y={h - 6} className="eq-annot" textAnchor="end">
+          Operación {equity.length}
+        </text>
+      </svg>
+    </div>
   );
 }
 
@@ -110,7 +176,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         </div>
         <div className="chart-head">
           <strong title="Suma acumulada del resultado de cada operación en R. Si sube de forma sostenida, el sistema aporta ventaja.">Curva de equity</strong>
-          <span className="muted">· R acumulado</span>
+          <span className="muted">· R acumulado · desliza para recorrerla · pico, máx. drawdown y final marcados</span>
         </div>
         <EquityCurve equity={bt.equity_curve} />
       </section>
