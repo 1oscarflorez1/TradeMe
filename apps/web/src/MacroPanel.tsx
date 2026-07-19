@@ -18,7 +18,10 @@ export function MacroPanel({ macro }: { macro?: Macro }) {
     (macro.bias ?? 0) > 0.05 ? 'wh-long' : (macro.bias ?? 0) < -0.05 ? 'wh-short' : 'wh-flat';
   return (
     <div className="macro">
-      <div className="macro-bias">
+      <div
+        className="macro-bias"
+        title="Sesgo macro fundamental (funding + tendencia semanal), de −1 (muy bajista) a +1 (muy alcista). Modula la decisión: negativo empuja a SHORT, positivo a LONG."
+      >
         <span className={biasClass}>{macro.label.toUpperCase()}</span>
         <span className="macro-val">
           {typeof macro.bias === 'number' && macro.bias >= 0 ? '+' : ''}

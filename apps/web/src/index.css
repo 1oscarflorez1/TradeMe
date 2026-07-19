@@ -1142,10 +1142,12 @@ pre.hint {
   gap: 0.7rem;
 }
 .panel-view .signal-panel {
+  flex: 0 0 auto;
+}
+.panel-view .webhooks-panel {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  overflow: hidden;
 }
 .panel-view .indicators-row {
   margin-top: 0;
@@ -1436,4 +1438,17 @@ pre.hint {
 }
 .report-acc-body {
   margin-top: 0.6rem;
+}
+
+/* ---- Backtest: informe conciso de la curva ---- */
+.eq-report {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0.6rem 0 0;
+  border-left: 2px solid var(--border);
+  padding-left: 0.7rem;
+}
+.eq-report strong {
+  color: var(--fg);
 }
