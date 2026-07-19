@@ -35,6 +35,45 @@ function ProbBar({ b, h, s }: { b: number | null; h: number | null; s: number | 
   );
 }
 
+const HEADERS: Array<[string, string]> = [
+  ['Fecha y hora', 'Momento exacto en que capturaste la decisión con 📸.'],
+  ['Temporalidad', 'Marco temporal de las velas con que se decidió (1m, 5m, 15m, …).'],
+  ['Régimen', 'Estado del mercado según ADX: tendencia o rango. Ajusta los pesos del ensemble.'],
+  ['Acción', 'Sugerencia del modelo: COMPRAR, MANTENER o VENDER.'],
+  ['Dirección', 'Orientación operativa: LONG (al alza), SHORT (a la baja) o FLAT (fuera).'],
+  ['Confianza', 'Probabilidad de la acción elegida (0–100%), calibrada por régimen si hay calibrador.'],
+  [
+    'Probabilidades',
+    'Reparto de probabilidad entre Compra / Mantener / Vender. La mini-barra muestra su proporción (verde/gris/rojo).',
+  ],
+  ['Precio de captura', 'Precio del activo en el instante en que se guardó la decisión.'],
+  ['Entrada', 'Precio al que el plan propone entrar en la operación.'],
+  ['Stop de pérdida', 'Precio de salida con pérdida (protección). Distancia ≈ 1.5×ATR desde la entrada.'],
+  ['Objetivo de ganancia', 'Precio de salida con ganancia (take-profit), situado a 2R de la entrada.'],
+  ['Riesgo : Beneficio', 'Relación entre lo que arriesgas y lo que buscas ganar (p. ej. 1:2).'],
+  [
+    'Estado',
+    'Seguimiento en vivo comparando el precio actual con el plan: En curso, ✓ TP (tocó objetivo) o ✗ SL (tocó stop). «(exp)» = validez vencida.',
+  ],
+  ['R en vivo', 'Resultado actual en múltiplos de R (unidad de riesgo). Positivo = a favor; negativo = en contra.'],
+  ['Resultado evaluado', 'Desenlace ya cerrado por el evaluador (TP/SL) y su retorno en R. «—» si aún no hay velas suficientes.'],
+  ['Sesgo macro', 'Sesgo fundamental (funding + tendencia semanal): valor positivo = alcista, negativo = bajista.'],
+  ['Válido hasta', 'Hora límite del plan; superada, la entrada caduca (validez de N velas de la temporalidad).'],
+];
+
+function Th({ label, tip }: { label: string; tip: string }) {
+  return (
+    <th>
+      <span className="th-label">
+        {label}
+        <span className="th-tip" role="tooltip">
+          {tip}
+        </span>
+      </span>
+    </th>
+  );
+}
+
 export function SnapshotsView({ symbol }: { symbol: string }) {
   const [rows, setRows] = useState<SnapshotRow[]>([]);
   const [price, setPrice] = useState<number>(0);
@@ -108,23 +147,9 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
           <table className="snap-table">
             <thead>
               <tr>
-                <th>Fecha / hora</th>
-                <th>TF</th>
-                <th>Régimen</th>
-                <th>Acción</th>
-                <th>Dir</th>
-                <th>Confianza</th>
-                <th>Prob. B/H/S</th>
-                <th>Precio</th>
-                <th>Entrada</th>
-                <th>Stop</th>
-                <th>Objetivo</th>
-                <th>R:R</th>
-                <th>Estado</th>
-                <th>R en vivo</th>
-                <th>Resultado</th>
-                <th>Macro</th>
-                <th>Validez</th>
+                {HEADERS.map(([label, tip]) => (
+                  <Th key={label} label={label} tip={tip} />
+                ))}
               </tr>
             </thead>
             <tbody>
