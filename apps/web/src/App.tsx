@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CandleChart } from './CandleChart';
 import { VotesHeatmap } from './VotesHeatmap';
 import { ConfidenceRing } from './ConfidenceRing';
@@ -49,6 +49,7 @@ export function App() {
   const [alerts, setAlerts] = useState<Record<string, TfAlert>>({});
   const [thresholds, setThresholds] = useState<Record<string, number>>(loadThresholds);
   const [showGear, setShowGear] = useState(false);
+  const tfRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -77,6 +78,14 @@ export function App() {
       clearInterval(pid);
     };
   }, [symbol, intervals]);
+
+  // Barra de temporalidades: mostrar 30m en adelante por defecto (las menores, deslizando a la izq.).
+  useEffect(() => {
+    const el = tfRef.current;
+    if (!el) return;
+    const btn = el.querySelector<HTMLElement>('[data-tf="30m"]');
+    if (btn) el.scrollLeft = Math.max(0, btn.offsetLeft - el.offsetLeft);
+  }, [intervals]);
 
   useEffect(() => {
     fetchSymbols()
@@ -216,21 +225,22 @@ export function App() {
           </label>
 
           <div className="tf-alert-wrap">
-            <div className="tf-group" role="group" aria-label="Temporalidad">
+            <div className="tf-group" role="group" aria-label="Temporalidad" ref={tfRef}>
               {intervals.map((it) => (
                 <button
                   key={it}
                   type="button"
+                  data-tf={it}
                   className={it === tf ? 'tf active' : 'tf'}
                   onClick={() => setTf(it)}
+                  title={
+                    alerts[it]
+                      ? `${ACT_ES[alerts[it]!.action] ?? alerts[it]!.action} · ${(alerts[it]!.conf * 100).toFixed(0)}% (umbral ${thr(it)}%)`
+                      : 'Sin datos de decisión aún'
+                  }
                 >
                   {it}
                   {isAlert(it) && <span className="tf-dot" aria-label="alerta activa" />}
-                  <span className="tf-hint">
-                    {alerts[it]
-                      ? `${ACT_ES[alerts[it]!.action] ?? alerts[it]!.action} · ${(alerts[it]!.conf * 100).toFixed(0)}%`
-                      : 'sin datos aún'}
-                  </span>
                 </button>
               ))}
             </div>

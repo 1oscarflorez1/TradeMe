@@ -121,7 +121,18 @@ body {
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 22rem;
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+}
+.tf-group::-webkit-scrollbar {
+  height: 5px;
+}
+.tf-group::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .tf {
@@ -1090,24 +1101,3 @@ pre.hint {
   background: #e0645f;
 }
 
-/* ---- Tooltip de decisión por temporalidad ---- */
-.tf-group .tf .tf-hint {
-  display: none;
-  position: absolute;
-  top: 115%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 60;
-  white-space: nowrap;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--fg);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
-}
-.tf-group .tf:hover .tf-hint {
-  display: block;
-}
