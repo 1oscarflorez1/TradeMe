@@ -17,7 +17,7 @@ import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 
 export interface AppDeps {
-  getHistory: (symbol: string, interval: string, limit: number) => Promise<Candle[]>;
+  getHistory: (symbol: string, interval: string, limit: number, endTime?: number) => Promise<Candle[]>;
   symbols: string[];
   registry: IndicatorRegistry;
   externalStore: ExternalSignalStore;
@@ -39,6 +39,7 @@ export interface AppDeps {
     note?: string,
   ) => Promise<string>;
   listSnapshots?: (symbol: string, limit: number) => Promise<SnapshotRow[]>;
+  deleteSnapshot?: (id: string) => Promise<boolean>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -66,6 +67,7 @@ const CandlesQuery = z.object({
   symbol: z.string().min(1),
   interval: z.string().default('1m'),
   limit: z.coerce.number().int().min(1).max(1000).default(300),
+  to: z.coerce.number().int().optional(),
 });
 
 const TvHookBody = z.object({
@@ -104,12 +106,12 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     if (!parsed.success) {
       return reply.status(400).send({ error: 'parámetros inválidos', detail: parsed.error.issues });
     }
-    const { symbol, interval, limit } = parsed.data;
+    const { symbol, interval, limit, to } = parsed.data;
     if (!isInterval(interval)) {
       return reply.status(400).send({ error: `interval no soportado: ${interval}` });
     }
     try {
-      const candles = await deps.getHistory(symbol.toUpperCase(), interval, limit);
+      const candles = await deps.getHistory(symbol.toUpperCase(), interval, limit, to);
       return { symbol: symbol.toUpperCase(), interval, candles };
     } catch (err) {
       request.log.warn({ err: String(err) }, 'fallo al obtener histórico del proveedor');
@@ -202,6 +204,17 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       payload,
     });
     return { accepted: true, vote };
+  });
+
+  // Eliminar un snapshot por id.
+  app.delete('/snapshots/:id', async (request, reply) => {
+    if (!deps.deleteSnapshot) {
+      return reply.status(503).send({ error: 'persistencia no disponible' });
+    }
+    const { id } = request.params as { id: string };
+    const ok = await deps.deleteSnapshot(id);
+    if (!ok) return reply.status(404).send({ error: 'snapshot no encontrado' });
+    return { deleted: true, id };
   });
 
   // Último backtest guardado (lo produce apps/quant).

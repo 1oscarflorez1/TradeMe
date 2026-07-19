@@ -96,8 +96,14 @@ export class BinanceAdapter implements DataAdapter {
     this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 
-  async getHistory(symbol: string, interval: Interval, limit: number): Promise<Candle[]> {
-    const url = `${this.restBase}?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
+  async getHistory(
+    symbol: string,
+    interval: Interval,
+    limit: number,
+    endTime?: number,
+  ): Promise<Candle[]> {
+    const end = endTime ? `&endTime=${endTime}` : '';
+    const url = `${this.restBase}?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}${end}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Binance REST ${res.status} en ${url}`);
     const rows = (await res.json()) as BinanceRestKline[];

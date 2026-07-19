@@ -5,6 +5,20 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Fase presentación (UX)
+
+- **Temporalidades:** nuevo intervalo **Mes (1M)** y barra deslizable (muestra 30m en adelante por
+  defecto; las menores, deslizando a la izquierda). Tooltip con la decisión y % actual por TF.
+- **Panel en una sola vista:** grid a pantalla completa sin scroll vertical (gráfico, decisión/plan/
+  webhooks e indicadores compactos).
+- **Gráfico local principal + lápiz:** capa de dibujo (colores/grosores/borrar) sobre el gráfico en
+  vivo; TradingView queda como pestaña opcional.
+- **Captura por snapshot:** botón 📈 en cada registro que abre el gráfico reconstruido de ese momento
+  (velas hasta la captura + niveles del plan) y sirve de pizarra con lápiz.
+- **Backtest:** tooltips en métricas y títulos; acordeón profundo (Calibración y Optimización). Fix:
+  el panel de Optimización también aparece cuando hay backtest.
+- **api:** `/candles?to=<ms>` (histórico hasta un instante) y `DELETE /snapshots/:id`.
+
 ### Added — M7 · Optimización (Slice B)
 
 - `apps/quant`: **Optuna** (TPE) optimiza pesos de indicadores y multiplicadores de régimen

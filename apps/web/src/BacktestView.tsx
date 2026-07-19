@@ -79,15 +79,15 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
     );
   }
 
-  const cards: Array<[string, string]> = [
-    ['Trades', String(bt.n_trades ?? 0)],
-    ['Win rate', pct(bt.win_rate)],
-    ['Expectancy', `${num(bt.expectancy, 3)} R`],
-    ['Profit factor', num(bt.profit_factor)],
-    ['Max drawdown', `${num(bt.max_drawdown, 2)} R`],
-    ['Sharpe', num(bt.sharpe)],
-    ['Win rate OOS', pct(bt.oos_win_rate)],
-    ['Expectancy OOS', `${num(bt.oos_expectancy, 3)} R`],
+  const cards: Array<[string, string, string]> = [
+    ['Trades', String(bt.n_trades ?? 0), 'Operaciones simuladas sobre el histórico. Cuantas más, más fiable la estadística.'],
+    ['Win rate', pct(bt.win_rate), 'Porcentaje de operaciones ganadoras. Por sí solo no dice si el sistema gana dinero.'],
+    ['Expectancy', `${num(bt.expectancy, 3)} R`, 'Ganancia media por operación en R (riesgo por trade). Positiva = hay ventaja. Es la métrica clave.'],
+    ['Profit factor', num(bt.profit_factor), 'Ganancias brutas ÷ pérdidas brutas. >1 rentable; cerca de 1 = ventaja pequeña.'],
+    ['Max drawdown', `${num(bt.max_drawdown, 2)} R`, 'Peor caída acumulada (en R) desde un pico. Mide cuánto duele la peor racha.'],
+    ['Sharpe', num(bt.sharpe), 'Rentabilidad ajustada a la volatilidad: cuánto ganas por unidad de riesgo. Mayor = más estable.'],
+    ['Win rate OOS', pct(bt.oos_win_rate), 'Win rate en el 30% final reservado (out-of-sample). Si se parece al resto, no hay sobreajuste.'],
+    ['Expectancy OOS', `${num(bt.oos_expectancy, 3)} R`, 'Expectancy en el tramo out-of-sample. Prueba de honestidad frente al sobreajuste.'],
   ];
 
   return (
@@ -95,26 +95,27 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
       <div className="bt-main">
       <section className="panel">
         <div className="chart-head">
-          <strong>Backtest</strong>
+          <strong title="Simulación de la lógica de decisión sobre el histórico, sin usar datos futuros (sin look-ahead) y asumiendo la pérdida si en una vela se tocan stop y objetivo (peor caso SL).">Backtest</strong>
           <span className="muted">
             · {bt.symbol} · {bt.interval} · sin look-ahead · peor caso SL
           </span>
         </div>
         <div className="bt-cards">
-          {cards.map(([k, v]) => (
-            <div key={k} className="bt-card">
+          {cards.map(([k, v, tip]) => (
+            <div key={k} className="bt-card" title={tip}>
               <span className="bt-k">{k}</span>
               <span className="bt-v">{v}</span>
             </div>
           ))}
         </div>
         <div className="chart-head">
-          <strong>Curva de equity</strong>
+          <strong title="Suma acumulada del resultado de cada operación en R. Si sube de forma sostenida, el sistema aporta ventaja.">Curva de equity</strong>
           <span className="muted">· R acumulado</span>
         </div>
         <EquityCurve equity={bt.equity_curve} />
       </section>
       <CalibrationSection />
+      <OptimizationSection />
       </div>
       <BacktestGuide />
     </div>
@@ -198,6 +199,71 @@ function BacktestGuide() {
           </p>
         </div>
       </details>
+
+      <div className="bt-acc-group">
+        <h4>Calibración de probabilidades · pulsa para desplegar</h4>
+        <details className="bt-acc">
+          <summary>¿Qué es calibrar?</summary>
+          <div className="bt-acc-body">
+            <p>
+              Ajusta la confianza del modelo para que refleje la frecuencia real de acierto: que
+              cuando diga «70%», acierte ~70% de las veces. Se hace por régimen (tendencia/rango).
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Diagrama de fiabilidad</summary>
+          <div className="bt-acc-body">
+            <p>
+              Probabilidad prevista (eje X) frente a frecuencia real de acierto (eje Y). La diagonal
+              es la calibración perfecta: cuanto más pegados los puntos a ella, más honestas las
+              probabilidades.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Brier score</summary>
+          <div className="bt-acc-body">
+            <p>
+              Error cuadrático medio entre la probabilidad y el resultado (0/1). Más bajo = mejor
+              calibración. Se elige entre isotónica y Platt el de menor Brier.
+            </p>
+          </div>
+        </details>
+      </div>
+
+      <div className="bt-acc-group">
+        <h4>Optimización de pesos · pulsa para desplegar</h4>
+        <details className="bt-acc">
+          <summary>Optuna</summary>
+          <div className="bt-acc-body">
+            <p>
+              Buscador bayesiano (TPE) que prueba combinaciones de pesos de los indicadores y
+              multiplicadores de régimen para maximizar la ventaja, de forma más eficiente que
+              probar al azar.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Walk-forward (purga/embargo)</summary>
+          <div className="bt-acc-body">
+            <p>
+              Validación temporal por bloques hacia adelante. La «purga» descarta trades cuyo
+              horizonte cruza el borde del bloque y el «embargo» separa bloques, evitando fuga
+              temporal entre entrenamiento y prueba.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Hold-out y promoción</summary>
+          <div className="bt-acc-body">
+            <p>
+              Se reserva un tramo final (nunca usado en la búsqueda). El candidato optimizado solo
+              se promociona si supera al base en ese hold-out: así se evita el sobreajuste.
+            </p>
+          </div>
+        </details>
+      </div>
     </aside>
   );
 }

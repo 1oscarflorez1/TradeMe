@@ -91,8 +91,8 @@ async function main(): Promise<void> {
   }
 
   const app = buildApp({
-    getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
-      adapter.getHistory(symbol, interval as Interval, limit),
+    getHistory: (symbol: string, interval: string, limit: number, endTime?: number): Promise<Candle[]> =>
+      adapter.getHistory(symbol, interval as Interval, limit, endTime),
     symbols: parseSymbols(env),
     registry,
     externalStore,
@@ -107,6 +107,7 @@ async function main(): Promise<void> {
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
+    deleteSnapshot: snapshotsRepo ? (id) => snapshotsRepo.delete(id) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
       : undefined,

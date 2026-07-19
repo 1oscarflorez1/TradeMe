@@ -18,7 +18,21 @@ function toBar(candle: Candle): CandlestickData {
   };
 }
 
-export function CandleChart({ candles, last }: { candles: Candle[]; last: Candle | null }) {
+export interface PlanLevels {
+  entry: number;
+  stop: number;
+  tp: number;
+}
+
+export function CandleChart({
+  candles,
+  last,
+  levels,
+}: {
+  candles: Candle[];
+  last: Candle | null;
+  levels?: PlanLevels | null;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -56,6 +70,17 @@ export function CandleChart({ candles, last }: { candles: Candle[]; last: Candle
   useEffect(() => {
     if (last) seriesRef.current?.update(toBar(last));
   }, [last]);
+
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series || !levels) return;
+    const lines = [
+      series.createPriceLine({ price: levels.entry, color: '#4da3ff', lineWidth: 1, title: 'Entrada' }),
+      series.createPriceLine({ price: levels.stop, color: '#ff5c5c', lineWidth: 1, title: 'Stop' }),
+      series.createPriceLine({ price: levels.tp, color: '#2ecc71', lineWidth: 1, title: 'Objetivo' }),
+    ];
+    return () => lines.forEach((l) => series.removePriceLine(l));
+  }, [levels, candles]);
 
   return <div className="chart" ref={containerRef} />;
 }

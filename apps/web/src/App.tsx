@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CandleChart } from './CandleChart';
 import { VotesHeatmap } from './VotesHeatmap';
 import { ConfidenceRing } from './ConfidenceRing';
@@ -10,11 +10,13 @@ import { MacroPanel } from './MacroPanel';
 import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
 import { BacktestView } from './BacktestView';
+import { DrawingLayer } from './DrawingLayer';
 import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
 const TF_ALERT_KEY = 'trademe.tfAlertThresholds';
 type TfAlert = { action: string; conf: number };
+const ACT_ES: Record<string, string> = { BUY: 'Compra', SELL: 'Venta', HOLD: 'Mantener' };
 function loadThresholds(): Record<string, number> {
   try {
     return JSON.parse(localStorage.getItem(TF_ALERT_KEY) ?? '{}') as Record<string, number>;
@@ -48,6 +50,7 @@ export function App() {
   const [alerts, setAlerts] = useState<Record<string, TfAlert>>({});
   const [thresholds, setThresholds] = useState<Record<string, number>>(loadThresholds);
   const [showGear, setShowGear] = useState(false);
+  const tfRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -65,7 +68,7 @@ export function App() {
       if (cancelled) return;
       const next: Record<string, TfAlert> = {};
       for (const [iv, sig] of entries) {
-        if (sig) next[iv] = { action: sig.action, conf: sig.calibrated_confidence ?? sig.confidence };
+        if (sig) next[iv] = { action: sig.action, conf: sig.confidence };
       }
       setAlerts(next);
     };
@@ -76,6 +79,14 @@ export function App() {
       clearInterval(pid);
     };
   }, [symbol, intervals]);
+
+  // Barra de temporalidades: mostrar 30m en adelante por defecto (las menores, deslizando a la izq.).
+  useEffect(() => {
+    const el = tfRef.current;
+    if (!el) return;
+    const btn = el.querySelector<HTMLElement>('[data-tf="30m"]');
+    if (btn) el.scrollLeft = Math.max(0, btn.offsetLeft - el.offsetLeft);
+  }, [intervals]);
 
   useEffect(() => {
     fetchSymbols()
@@ -215,23 +226,22 @@ export function App() {
           </label>
 
           <div className="tf-alert-wrap">
-            <div className="tf-group" role="group" aria-label="Temporalidad">
+            <div className="tf-group" role="group" aria-label="Temporalidad" ref={tfRef}>
               {intervals.map((it) => (
                 <button
                   key={it}
                   type="button"
+                  data-tf={it}
                   className={it === tf ? 'tf active' : 'tf'}
                   onClick={() => setTf(it)}
+                  title={
+                    alerts[it]
+                      ? `${ACT_ES[alerts[it]!.action] ?? alerts[it]!.action} · ${(alerts[it]!.conf * 100).toFixed(0)}% (umbral ${thr(it)}%)`
+                      : 'Sin datos de decisión aún'
+                  }
                 >
                   {it}
-                  {isAlert(it) && (
-                    <span
-                      className="tf-alert"
-                      title={`Decisión ${alerts[it]?.action} ${((alerts[it]?.conf ?? 0) * 100).toFixed(0)}% ≥ ${thr(it)}%`}
-                    >
-                      ⚠
-                    </span>
-                  )}
+                  {isAlert(it) && <span className="tf-dot" aria-label="alerta activa" />}
                 </button>
               ))}
             </div>
@@ -285,7 +295,7 @@ export function App() {
             <p className="hint">¿Está la API en marcha? (`pnpm --filter @trademe/api dev`)</p>
           </div>
         ) : (
-          <>
+          <div className="panel-view">
             <div className="grid-top">
               <section className="panel chart-panel">
                 <div className="chart-head">
@@ -308,11 +318,13 @@ export function App() {
                     </button>
                   </div>
                 </div>
-                {chartTab === 'local' ? (
-                  <CandleChart candles={candles} last={last} />
-                ) : (
-                  <TradingViewChart symbol={symbol} interval={tf} />
-                )}
+                <DrawingLayer>
+                  {chartTab === 'local' ? (
+                    <CandleChart candles={candles} last={last} />
+                  ) : (
+                    <TradingViewChart symbol={symbol} interval={tf} />
+                  )}
+                </DrawingLayer>
               </section>
 
               <div className="side">
@@ -372,7 +384,7 @@ export function App() {
               </div>
               <VotesHeatmap votes={votes} />
             </section>
-          </>
+          </div>
         )}
       </main>
 

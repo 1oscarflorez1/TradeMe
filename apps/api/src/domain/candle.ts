@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'] as const;
+export const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'] as const;
 export type Interval = (typeof INTERVALS)[number];
 
 export const INTERVAL_MS: Record<Interval, number> = {
@@ -12,6 +12,7 @@ export const INTERVAL_MS: Record<Interval, number> = {
   '4h': 14_400_000,
   '1d': 86_400_000,
   '1w': 604_800_000,
+  '1M': 2_592_000_000,
 };
 
 export function intervalMs(interval: Interval): number {
