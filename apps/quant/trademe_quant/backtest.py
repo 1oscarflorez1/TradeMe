@@ -118,6 +118,8 @@ def run_backtest(
                 {
                     "index": t,
                     "direction": d["direction"],
+                    "regime": d["regime"],
+                    "confidence": d["confidence"],
                     "entry": levels["entry"],
                     "stop": levels["stop"],
                     "take_profit": levels["take_profit"],

@@ -89,7 +89,6 @@ CREATE TABLE IF NOT EXISTS snapshots (
   note             TEXT,
   raw_signal       JSONB NOT NULL
 );
-SELECT create_hypertable('snapshots', 'captured_at', if_not_exists => TRUE);
 
 -- Resultados de backtest (M6). Los escribe apps/quant; los sirve apps/api.
 CREATE TABLE IF NOT EXISTS backtests (
@@ -109,4 +108,3 @@ CREATE TABLE IF NOT EXISTS backtests (
   trades         JSONB,
   equity_curve   JSONB
 );
-SELECT create_hypertable('backtests', 'created_at', if_not_exists => TRUE);

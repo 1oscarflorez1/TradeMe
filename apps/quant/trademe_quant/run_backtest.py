@@ -6,6 +6,7 @@ Uso: python -m trademe_quant.run_backtest BTCUSDT 5m
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 
 from .backtest import run_backtest
@@ -26,7 +27,11 @@ def main() -> None:
     low = [c.low for c in candles]
     close = [c.close for c in candles]
 
-    config = load_ensemble("artifacts/ensemble.yaml")
+    ensemble_path = os.environ.get(
+        "ENSEMBLE_CONFIG",
+        str(pathlib.Path(__file__).resolve().parents[3] / "artifacts/ensemble.yaml"),
+    )
+    config = load_ensemble(ensemble_path)
     result = run_backtest(high, low, close, config)
     print(
         f"trades={result['metrics']['n_trades']} "
@@ -35,8 +40,11 @@ def main() -> None:
     )
 
     save_backtest(dsn, symbol, interval, result)
-    n = evaluate_snapshot_outcomes(dsn)
-    print(f"backtest guardado; {n} snapshots evaluados")
+    try:
+        n = evaluate_snapshot_outcomes(dsn)
+        print(f"backtest guardado; {n} snapshots evaluados")
+    except Exception as err:  # noqa: BLE001 - paso secundario, no debe tumbar el CLI
+        print(f"backtest guardado; evaluacion de snapshots omitida ({err})")
 
 
 if __name__ == "__main__":

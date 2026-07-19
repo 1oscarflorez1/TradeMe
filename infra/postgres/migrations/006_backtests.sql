@@ -18,4 +18,4 @@ CREATE TABLE IF NOT EXISTS backtests (
   trades         JSONB,
   equity_curve   JSONB
 );
-SELECT create_hypertable('backtests', 'created_at', if_not_exists => TRUE);
+CREATE INDEX IF NOT EXISTS backtests_symbol_created_idx ON backtests (symbol, interval, created_at DESC);

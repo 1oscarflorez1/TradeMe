@@ -10,6 +10,7 @@ import type { ExternalSignalStore } from './signals/external-store.js';
 import type { ExternalMapper } from './signals/external-mapper.js';
 import type { EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import type { Calibrators } from './calibration/load.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
 import { trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
 import type { BacktestRow } from './db/backtests-repo.js';
@@ -23,6 +24,7 @@ export interface AppDeps {
   mapper: ExternalMapper;
   ensemble: EnsembleConfig;
   equity: number;
+  calibrators?: Calibrators;
   getMacro?: (symbol: string) => Macro | undefined;
   recordSnapshot?: (
     signal: Signal,
@@ -150,6 +152,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),
+        calibrators: deps.calibrators,
       });
       return { interval, signal };
     } catch (err) {
@@ -213,6 +216,18 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     return bt;
   });
 
+  // Metadatos de calibración (fiabilidad + Brier por régimen) para el dashboard.
+  app.get('/calibration', async () => {
+    const meta = deps.calibrators?.meta() ?? null;
+    return { calibration: meta };
+  });
+
+  // Recarga en caliente de artefactos (calibradores) tras publicarlos desde quant.
+  app.post('/reload', async () => {
+    const ok = deps.calibrators?.reload() ?? false;
+    return { reloaded: ok, calibration_version: deps.calibrators?.version ?? null };
+  });
+
   // Listado de snapshots con seguimiento en vivo (precio actual vs niveles).
   app.get('/snapshots', async (request, reply) => {
     if (!deps.listSnapshots) {
@@ -270,6 +285,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),
+        calibrators: deps.calibrators,
       });
       const levels = computePlanLevels(
         signal.action,

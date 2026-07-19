@@ -5,6 +5,19 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M7 · Calibración (Slice A)
+
+- `apps/quant`: módulo `calibration.py` con calibradores por régimen **isotónica (PAVA)** y **Platt**
+  (elige el de menor **Brier**), a mano en numpy; CLI `python -m trademe_quant.run_calibration` que
+  exporta `artifacts/calibrators.json`. El backtest guarda `regime` y `confidence` por trade.
+- `apps/api`: applier del calibrador (**paridad** Node≡Python), campos `calibrated_confidence` y
+  `calibration_version` en la señal, `GET /calibration` (fiabilidad + Brier) y `POST /reload`
+  (recarga en caliente de artefactos).
+- `apps/web`: panel **Calibración** en la pestaña Backtest (diagrama de fiabilidad por régimen + Brier).
+- `infra`: volumen compartido `artifacts/` entre `quant` (escribe) y `api` (lee).
+- Contrato: `calibrated_confidence`/`calibration_version` en el esquema; vectores de paridad del
+  calibrador en `macro_vectors.json`.
+
 ### Added — M6 · Backtesting
 
 - `apps/quant`: mirror de la decisión (`decision.py`, agregación + plan) con **paridad** ampliada;

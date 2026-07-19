@@ -78,6 +78,16 @@
       "minimum": 0,
       "maximum": 1
     },
+    "calibrated_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confianza calibrada por r\u00e9gimen (M7). Ausente si no hay calibrador cargado."
+    },
+    "calibration_version": {
+      "type": "string",
+      "description": "Versi\u00f3n del artefacto de calibradores aplicado."
+    },
     "plan": {
       "type": "array",
       "items": {

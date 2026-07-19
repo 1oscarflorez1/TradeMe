@@ -78,6 +78,15 @@ La API (`apps/api`) sirve, además de `/health`:
 - `POST /snapshots` — instantánea del escenario para análisis/entrenamiento de IA (ver [`docs/macro.md`](docs/macro.md)).
 - `GET /snapshots?symbol=BTCUSDT` — lista de snapshots con seguimiento en vivo (precio actual vs niveles).
 - `GET /backtest?symbol=BTCUSDT&interval=5m` — último backtest (métricas + curva de equity). Ver [`docs/backtesting.md`](docs/backtesting.md).
+- `GET /calibration` — calibradores por régimen (fiabilidad + Brier). Ver [`docs/calibracion.md`](docs/calibracion.md).
+- `POST /reload` — recarga en caliente de artefactos (calibradores) publicados por quant.
+
+Calibración de probabilidades (M7):
+
+```bash
+docker compose -f infra/docker-compose.yml run --rm quant python -m trademe_quant.run_calibration BTCUSDT 5m
+curl -X POST http://localhost:3001/reload   # la señal expone calibrated_confidence
+```
 - `GET /signal?symbol=BTCUSDT&interval=1m` — señal completa del ensemble (acción, probabilidades,
   régimen, votos ponderados). El WS emite también `{ type: 'signal', ... }`. Ver [`docs/ensemble.md`](docs/ensemble.md).
 

@@ -17,6 +17,7 @@ import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
 import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import { Calibrators } from './calibration/load.js';
 import { MacroStore } from './macro/store.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
@@ -50,6 +51,7 @@ async function main(): Promise<void> {
   const buffer = new CandleBuffer(300);
   const externalStore = new ExternalSignalStore();
   const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
+  const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
 
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
   const repo = pool ? new CandlesRepo(pool) : null;
@@ -66,6 +68,7 @@ async function main(): Promise<void> {
     externalStore,
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
     ensemble,
+    calibrators,
     equity: env.ACCOUNT_EQUITY,
     getMacro: (symbol: string) => macroStore.get(symbol),
     recordSnapshot: snapshotsRepo
@@ -109,6 +112,7 @@ async function main(): Promise<void> {
         equity: env.ACCOUNT_EQUITY,
         interval: iv,
         macro: macroStore.get(symbol),
+        calibrators,
       });
       hub.broadcastSignal(symbol, iv, signal);
     }
