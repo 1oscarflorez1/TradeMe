@@ -13,6 +13,16 @@ import { BacktestView } from './BacktestView';
 import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
+const TF_ALERT_KEY = 'trademe.tfAlertThresholds';
+type TfAlert = { action: string; conf: number };
+function loadThresholds(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(TF_ALERT_KEY) ?? '{}') as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
 const STATUS_LABEL: Record<ConnectionStatus, string> = {
   connecting: 'Conectando…',
   connected: 'En vivo',
@@ -35,11 +45,37 @@ export function App() {
   const [chartTab, setChartTab] = useState<'local' | 'tv'>('local');
   const [now, setNow] = useState<number>(Date.now());
   const [view, setView] = useState<View>('panel');
+  const [alerts, setAlerts] = useState<Record<string, TfAlert>>({});
+  const [thresholds, setThresholds] = useState<Record<string, number>>(loadThresholds);
+  const [showGear, setShowGear] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Alertas por temporalidad: consulta la decisión de cada TF y marca las accionables >= umbral.
+  useEffect(() => {
+    if (!symbol || intervals.length === 0) return;
+    let cancelled = false;
+    const poll = async () => {
+      const entries = await Promise.all(
+        intervals.map(async (iv) => [iv, await fetchSignal(symbol, iv)] as const),
+      );
+      if (cancelled) return;
+      const next: Record<string, TfAlert> = {};
+      for (const [iv, sig] of entries) {
+        if (sig) next[iv] = { action: sig.action, conf: sig.calibrated_confidence ?? sig.confidence };
+      }
+      setAlerts(next);
+    };
+    void poll();
+    const pid = setInterval(() => void poll(), 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(pid);
+    };
+  }, [symbol, intervals]);
 
   useEffect(() => {
     fetchSymbols()
@@ -109,6 +145,24 @@ export function App() {
     };
   }, [symbol, tf]);
 
+  const thr = (iv: string): number => thresholds[iv] ?? 50;
+  const isAlert = (iv: string): boolean => {
+    const a = alerts[iv];
+    return !!a && (a.action === 'BUY' || a.action === 'SELL') && a.conf * 100 >= thr(iv);
+  };
+  const setThreshold = (iv: string, value: number): void => {
+    const v = Math.max(0, Math.min(100, value));
+    setThresholds((prev) => {
+      const next = { ...prev, [iv]: v };
+      try {
+        localStorage.setItem(TF_ALERT_KEY, JSON.stringify(next));
+      } catch {
+        /* almacenamiento no disponible */
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="app">
       <header className="topbar">
@@ -160,17 +214,57 @@ export function App() {
             </select>
           </label>
 
-          <div className="tf-group" role="group" aria-label="Temporalidad">
-            {intervals.map((it) => (
-              <button
-                key={it}
-                type="button"
-                className={it === tf ? 'tf active' : 'tf'}
-                onClick={() => setTf(it)}
-              >
-                {it}
-              </button>
-            ))}
+          <div className="tf-alert-wrap">
+            <div className="tf-group" role="group" aria-label="Temporalidad">
+              {intervals.map((it) => (
+                <button
+                  key={it}
+                  type="button"
+                  className={it === tf ? 'tf active' : 'tf'}
+                  onClick={() => setTf(it)}
+                >
+                  {it}
+                  {isAlert(it) && (
+                    <span
+                      className="tf-alert"
+                      title={`Decisión ${alerts[it]?.action} ${((alerts[it]?.conf ?? 0) * 100).toFixed(0)}% ≥ ${thr(it)}%`}
+                    >
+                      ⚠
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="gear-btn"
+              aria-label="Configurar alertas"
+              title="Configurar alertas de temporalidad"
+              onClick={() => setShowGear((v) => !v)}
+            >
+              ⚙
+            </button>
+            {showGear && (
+              <div className="gear-pop" role="dialog" aria-label="Umbrales de alerta">
+                <div className="gear-head">Umbral de alerta por temporalidad</div>
+                {intervals.map((iv) => (
+                  <label key={iv} className="gear-row">
+                    <span className="gear-tf">{iv}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={thr(iv)}
+                      onChange={(e) => setThreshold(iv, Number(e.target.value))}
+                    />
+                    <span className="muted">%</span>
+                  </label>
+                ))}
+                <p className="gear-note">
+                  Aparece ⚠ cuando hay una decisión COMPRAR o VENDER con confianza ≥ umbral.
+                </p>
+              </div>
+            )}
           </div>
 
           <span className={`status status-${status}`}>

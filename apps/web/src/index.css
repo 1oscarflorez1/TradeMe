@@ -868,3 +868,88 @@ pre.hint {
 .snap-table th .th-label:hover .th-tip {
   display: block;
 }
+
+/* ---- Alertas por temporalidad + engranaje de configuración ---- */
+.tf-alert-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tf-group .tf {
+  position: relative;
+}
+
+.tf-alert {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 0.7rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+  pointer-events: none;
+}
+
+.gear-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+.gear-btn:hover {
+  border-color: #4da3ff;
+}
+
+.gear-pop {
+  position: absolute;
+  top: 2.4rem;
+  right: 0;
+  z-index: 50;
+  width: 220px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.gear-head {
+  font-weight: 700;
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+}
+
+.gear-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+.gear-tf {
+  width: 2.4rem;
+  color: var(--muted);
+}
+
+.gear-row input {
+  width: 4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.gear-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
