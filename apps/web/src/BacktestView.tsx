@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { fetchBacktest, fetchCalibration } from './api';
+import { fetchBacktest, fetchCalibration, fetchEnsemble } from './api';
 import type {
   BacktestResult,
   CalibrationMeta,
+  EnsembleMeta,
   Interval,
   RegimeCalibrator,
   ReliabilityBin,
@@ -71,6 +72,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
             </pre>
           </section>
           <CalibrationSection />
+          <OptimizationSection />
         </div>
         <BacktestGuide />
       </div>
@@ -287,6 +289,87 @@ function CalibrationSection() {
         acierto). Cuanto más pegados los puntos a ella, más honestas las probabilidades; un Brier más
         bajo es mejor.
       </p>
+    </section>
+  );
+}
+
+function fmtR(n: number | undefined): string {
+  return n == null ? '—' : `${n.toFixed(3)} R`;
+}
+
+function OptimizationSection() {
+  const [meta, setMeta] = useState<EnsembleMeta | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchEnsemble().then((r) => {
+      if (!cancelled) {
+        setMeta(r);
+        setLoaded(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!loaded) return null;
+  const report = meta?.report ?? null;
+
+  return (
+    <section className="panel opt-panel">
+      <div className="chart-head">
+        <strong>Optimización de pesos</strong>
+        <span className="muted">
+          · Optuna + walk-forward{meta?.version ? ` · activo: ${meta.version}` : ''}
+        </span>
+      </div>
+      {!report ? (
+        <p className="muted">
+          Aún sin optimización. Ejecútala desde quant:{' '}
+          <code>python -m trademe_quant.run_optimize BTCUSDT 5m</code>, y recarga con{' '}
+          <code>POST /reload</code>.
+        </p>
+      ) : (
+        <>
+          <div className="opt-verdict">
+            {report.promoted ? (
+              <span className="opt-badge opt-ok">✓ Promovido (gana en hold-out)</span>
+            ) : (
+              <span className="opt-badge opt-no">Base mantenido (no supera el hold-out)</span>
+            )}
+            <span className="muted">
+              {report.n_trials} trials · score val. {report.validation_score.toFixed(3)}
+            </span>
+          </div>
+          <table className="opt-table">
+            <thead>
+              <tr>
+                <th>Hold-out</th>
+                <th>Expectancy</th>
+                <th>Trades</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Base</td>
+                <td>{fmtR(report.holdout.base_expectancy)}</td>
+                <td>{report.holdout.base_trades}</td>
+              </tr>
+              <tr className={report.promoted ? 'opt-win' : ''}>
+                <td>Optimizado</td>
+                <td>{fmtR(report.holdout.optimized_expectancy)}</td>
+                <td>{report.holdout.optimized_trades}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="muted calib-legend">
+            El candidato solo se promociona si su expectancy en el tramo hold-out (nunca usado en la
+            búsqueda) supera al base. Así se evita el sobreajuste.
+          </p>
+        </>
+      )}
     </section>
   );
 }

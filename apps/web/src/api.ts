@@ -2,6 +2,7 @@ import type {
   BacktestResult,
   CalibrationMeta,
   Candle,
+  EnsembleMeta,
   Interval,
   Signal,
   SnapshotsResponse,
@@ -103,6 +104,16 @@ export async function fetchCalibration(): Promise<CalibrationMeta | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as { calibration: CalibrationMeta | null };
     return data.calibration;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchEnsemble(): Promise<EnsembleMeta | null> {
+  try {
+    const res = await fetch(`${API_URL}/ensemble`);
+    if (!res.ok) return null;
+    return (await res.json()) as EnsembleMeta;
   } catch {
     return null;
   }

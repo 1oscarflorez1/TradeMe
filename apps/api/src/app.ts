@@ -25,6 +25,12 @@ export interface AppDeps {
   ensemble: EnsembleConfig;
   equity: number;
   calibrators?: Calibrators;
+  reloadArtifacts?: () => {
+    ensembleVersion: string;
+    ensembleOptimized: boolean;
+    calibrationVersion: string | null;
+  };
+  ensembleMeta?: () => { version: string; optimized: boolean; report: unknown };
   getMacro?: (symbol: string) => Macro | undefined;
   recordSnapshot?: (
     signal: Signal,
@@ -222,8 +228,24 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     return { calibration: meta };
   });
 
-  // Recarga en caliente de artefactos (calibradores) tras publicarlos desde quant.
+  // Metadatos del ensemble activo (base vs optimizado) para el comparador.
+  app.get('/ensemble', async () => {
+    return (
+      deps.ensembleMeta?.() ?? { version: deps.ensemble.version, optimized: false, report: null }
+    );
+  });
+
+  // Recarga en caliente de artefactos (ensemble optimizado + calibradores) desde quant.
   app.post('/reload', async () => {
+    if (deps.reloadArtifacts) {
+      const r = deps.reloadArtifacts();
+      return {
+        reloaded: true,
+        ensemble_version: r.ensembleVersion,
+        ensemble_optimized: r.ensembleOptimized,
+        calibration_version: r.calibrationVersion,
+      };
+    }
     const ok = deps.calibrators?.reload() ?? false;
     return { reloaded: ok, calibration_version: deps.calibrators?.version ?? null };
   });

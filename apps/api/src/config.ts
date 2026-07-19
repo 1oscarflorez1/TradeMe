@@ -17,6 +17,8 @@ const EnvSchema = z.object({
   CORS_ORIGIN: z.string().optional(),
   ENSEMBLE_CONFIG: z.string().default('artifacts/ensemble.yaml'),
   CALIBRATORS_PATH: z.string().default('artifacts/calibrators.json'),
+  OPTIMIZED_ENSEMBLE: z.string().default('artifacts/ensemble.optimized.yaml'),
+  OPT_REPORT_PATH: z.string().default('artifacts/optimization_report.json'),
   MIGRATIONS_DIR: z.string().default('infra/postgres/migrations'),
   ACCOUNT_EQUITY: z.coerce.number().positive().default(10_000),
 });

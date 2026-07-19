@@ -752,3 +752,14 @@ pre.hint {
   color: var(--muted);
   margin: 0.7rem 0 0.15rem;
 }
+
+/* ---- M7 Slice B: comparador de optimización ---- */
+.opt-panel { margin-top: 0; }
+.opt-verdict { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0; flex-wrap: wrap; }
+.opt-badge { font-size: 0.78rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+.opt-ok { color: #1b7a3d; background: rgba(27, 122, 61, 0.15); }
+.opt-no { color: #b26a00; background: rgba(178, 106, 0, 0.15); }
+.opt-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.4rem 0; }
+.opt-table th, .opt-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
+.opt-table th { color: var(--muted); font-weight: 600; }
+.opt-table tr.opt-win td { color: #4da3ff; font-weight: 700; }

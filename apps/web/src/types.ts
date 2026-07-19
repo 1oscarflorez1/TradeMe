@@ -155,3 +155,26 @@ export interface CalibrationMeta {
   created_at?: string;
   regimes: Record<string, RegimeCalibrator>;
 }
+
+
+export interface OptimizationReport {
+  version: string;
+  created_at?: string;
+  symbol?: string;
+  interval?: string;
+  promoted: boolean;
+  validation_score: number;
+  n_trials: number;
+  holdout: {
+    base_expectancy: number;
+    base_trades: number;
+    optimized_expectancy: number;
+    optimized_trades: number;
+  };
+}
+
+export interface EnsembleMeta {
+  version: string;
+  optimized: boolean;
+  report: OptimizationReport | null;
+}
