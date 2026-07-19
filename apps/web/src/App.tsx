@@ -10,6 +10,7 @@ import { MacroPanel } from './MacroPanel';
 import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
 import { BacktestView } from './BacktestView';
+import { DrawingLayer } from './DrawingLayer';
 import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
@@ -294,7 +295,7 @@ export function App() {
             <p className="hint">¿Está la API en marcha? (`pnpm --filter @trademe/api dev`)</p>
           </div>
         ) : (
-          <>
+          <div className="panel-view">
             <div className="grid-top">
               <section className="panel chart-panel">
                 <div className="chart-head">
@@ -317,11 +318,13 @@ export function App() {
                     </button>
                   </div>
                 </div>
-                {chartTab === 'local' ? (
-                  <CandleChart candles={candles} last={last} />
-                ) : (
-                  <TradingViewChart symbol={symbol} interval={tf} />
-                )}
+                <DrawingLayer>
+                  {chartTab === 'local' ? (
+                    <CandleChart candles={candles} last={last} />
+                  ) : (
+                    <TradingViewChart symbol={symbol} interval={tf} />
+                  )}
+                </DrawingLayer>
               </section>
 
               <div className="side">
@@ -381,7 +384,7 @@ export function App() {
               </div>
               <VotesHeatmap votes={votes} />
             </section>
-          </>
+          </div>
         )}
       </main>
 

@@ -27,7 +27,7 @@ body {
 }
 
 .app {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -74,7 +74,9 @@ body {
 
 .content {
   flex: 1;
-  padding: 1.5rem 1.25rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
 }
 
 .panel {
@@ -1101,3 +1103,121 @@ pre.hint {
   background: #e0645f;
 }
 
+
+/* ---- Fase presentación: Panel en una sola vista ---- */
+.panel-view {
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.85rem;
+}
+.panel-view .grid-top {
+  min-height: 0;
+  grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr);
+  gap: 0.85rem;
+}
+.panel-view .chart-panel {
+  min-height: 0;
+}
+.panel-view .side {
+  min-height: 0;
+  overflow-y: auto;
+  gap: 0.7rem;
+}
+.panel-view .indicators-row {
+  margin-top: 0;
+}
+.panel-view .panel {
+  padding: 0.7rem 0.9rem;
+}
+.panel-view .chart,
+.panel-view .tv-chart {
+  height: 100%;
+}
+.panel-view .ring {
+  width: 104px;
+  height: 104px;
+}
+.panel-view .indicators-row .heatmap {
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 0.4rem;
+}
+
+/* ---- Capa de dibujo (lápiz sobre el gráfico) ---- */
+.draw-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.draw-wrap > .chart,
+.draw-wrap > .tv-chart {
+  flex: 1;
+  min-height: 0;
+}
+.draw-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.draw-wrap.drawing .draw-canvas {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.draw-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(20, 25, 33, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 6px;
+}
+.draw-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 6px;
+}
+.draw-btn.on {
+  background: rgba(77, 163, 255, 0.25);
+}
+.draw-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.draw-color.sel {
+  border-color: #fff;
+}
+.draw-size {
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.draw-size.sel {
+  border-color: #4da3ff;
+}
+.draw-size span {
+  display: block;
+  background: var(--fg);
+  border-radius: 50%;
+}
