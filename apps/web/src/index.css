@@ -516,13 +516,13 @@ body {
 .snap-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
 }
 
 .snap-table th,
 .snap-table td {
   text-align: left;
-  padding: 0.4rem 0.6rem;
+  padding: 0.55rem 0.7rem;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -763,3 +763,77 @@ pre.hint {
 .opt-table th, .opt-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
 .opt-table th { color: var(--muted); font-weight: 600; }
 .opt-table tr.opt-win td { color: #4da3ff; font-weight: 700; }
+
+/* ---- Registros: ancho completo, intro, resumen y mini-probabilidades ---- */
+.registros {
+  max-width: none;
+  width: 100%;
+}
+
+.reg-head h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.15rem;
+}
+
+.reg-intro {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 0 0 0.9rem;
+  max-width: 70ch;
+}
+
+.reg-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.reg-chip {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.reg-chip strong {
+  color: var(--fg);
+}
+
+.reg-chip-ok {
+  border-color: rgba(27, 122, 61, 0.5);
+}
+.reg-chip-ok strong {
+  color: #2fbf6b;
+}
+.reg-chip-bad {
+  border-color: rgba(200, 60, 60, 0.5);
+}
+.reg-chip-bad strong {
+  color: #e0645f;
+}
+
+.prob-mini {
+  display: inline-flex;
+  width: 84px;
+  height: 12px;
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+  border: 1px solid var(--border);
+}
+.prob-mini span {
+  display: block;
+  height: 100%;
+}
+.pm-buy {
+  background: #2fbf6b;
+}
+.pm-hold {
+  background: #6b7683;
+}
+.pm-sell {
+  background: #e0645f;
+}

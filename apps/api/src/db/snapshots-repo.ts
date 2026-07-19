@@ -84,6 +84,7 @@ export class SnapshotsRepo {
   async list(symbol: string, limit: number): Promise<SnapshotRow[]> {
     const res = await this.pool.query<SnapshotRow>(
       `SELECT id, captured_at, symbol, interval, action, direction, price, confidence,
+              regime_label, net, prob_buy, prob_hold, prob_sell,
               macro_bias, plan_entry, plan_stop, plan_take_profit, plan_rr, valid_until,
               outcome_result, outcome_return_r
        FROM snapshots WHERE symbol = $1 ORDER BY captured_at DESC LIMIT $2`,
