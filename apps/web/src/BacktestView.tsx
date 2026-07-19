@@ -16,6 +16,41 @@ function num(n: number | null, d = 2): string {
   return n === null ? '—' : n.toFixed(d);
 }
 
+function EquityReport({ bt }: { bt: BacktestResult }) {
+  const eq = bt.equity_curve;
+  if (eq.length < 2) return null;
+  const finalR = eq[eq.length - 1]!;
+  const n = bt.n_trades ?? eq.length;
+  const wr = bt.win_rate != null ? `${(bt.win_rate * 100).toFixed(0)}%` : '—';
+  const exp = bt.expectancy != null ? `${bt.expectancy.toFixed(3)} R` : '—';
+  const dd = bt.max_drawdown != null ? `${bt.max_drawdown.toFixed(1)} R` : '—';
+  const rumbo =
+    finalR > 0.5 ? 'termina en positivo' : finalR < -0.5 ? 'termina en negativo' : 'termina plano';
+  let oos = '';
+  if (bt.oos_expectancy != null && bt.expectancy != null) {
+    const diff = bt.oos_expectancy - bt.expectancy;
+    oos =
+      Math.abs(diff) < 0.03
+        ? ' La expectancy out-of-sample es parecida a la del conjunto: señal de robustez (poco sobreajuste).'
+        : diff < 0
+          ? ' La expectancy cae en out-of-sample: posible sobreajuste, conviene cautela.'
+          : ' La expectancy mejora en out-of-sample: buen comportamiento fuera de muestra.';
+  }
+  const veredicto =
+    (bt.expectancy ?? 0) > 0 && (bt.profit_factor ?? 0) > 1
+      ? 'muestra una ligera ventaja estadística'
+      : 'no muestra ventaja clara todavía';
+
+  return (
+    <p className="eq-report">
+      En <strong>{n}</strong> operaciones la equity <strong>{rumbo}</strong> (
+      {finalR >= 0 ? '+' : ''}
+      {finalR.toFixed(1)} R acumulados), con win rate {wr}, expectancy {exp} y una peor caída de {dd}.
+      El sistema {veredicto}.{oos}
+    </p>
+  );
+}
+
 function EquityCurve({ equity }: { equity: number[] }) {
   if (equity.length < 2) return <p className="muted">Sin suficientes trades para la curva.</p>;
   const h = 190;
@@ -179,6 +214,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
           <span className="muted">· R acumulado · desliza para recorrerla · pico, máx. drawdown y final marcados</span>
         </div>
         <EquityCurve equity={bt.equity_curve} />
+        <EquityReport bt={bt} />
       </section>
       <CalibrationSection />
       <OptimizationSection />

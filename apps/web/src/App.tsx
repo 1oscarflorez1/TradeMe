@@ -11,7 +11,8 @@ import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
 import { BacktestView } from './BacktestView';
 import { DrawingLayer } from './DrawingLayer';
-import { fetchCandles, fetchSignal, fetchSymbols, fetchVotes, streamUrl } from './api';
+import { fetchCandles, fetchSignal, fetchSnapshots, fetchSymbols, fetchVotes, streamUrl } from './api';
+import { AlertCenter, useAlerts } from './AlertCenter';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
 const TF_ALERT_KEY = 'trademe.tfAlertThresholds';
@@ -51,6 +52,17 @@ export function App() {
   const [thresholds, setThresholds] = useState<Record<string, number>>(loadThresholds);
   const [showGear, setShowGear] = useState(false);
   const tfRef = useRef<HTMLDivElement>(null);
+  const { alerts: alertHistory, unread, create: createAlert, markRead } = useAlerts();
+  const [cooldownMin, setCooldownMin] = useState<number>(() =>
+    Number(localStorage.getItem('trademe.alertCooldownMin') ?? 5),
+  );
+  const lastFired = useRef<Record<string, number>>({});
+  const prevTfAlert = useRef<Set<string>>(new Set());
+  const prevDir = useRef<string | null>(null);
+  const prevMacroSign = useRef<number>(0);
+  const prevReditum = useRef<number>(-1);
+  const snapStatus = useRef<Record<string, string>>({});
+  const snapMilestone = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -154,6 +166,154 @@ export function App() {
     const a = alerts[iv];
     return !!a && (a.action === 'BUY' || a.action === 'SELL') && a.conf * 100 >= thr(iv);
   };
+  const setCooldown = (v: number): void => {
+    const n = Math.max(0, Math.min(120, v));
+    setCooldownMin(n);
+    try {
+      localStorage.setItem('trademe.alertCooldownMin', String(n));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  };
+  const fireAlert = (key: string, input: Parameters<typeof createAlert>[0]): void => {
+    const now = Date.now();
+    if (now - (lastFired.current[key] ?? 0) < cooldownMin * 60000) return;
+    lastFired.current[key] = now;
+    void createAlert(input);
+  };
+
+  // Regla: decisión accionable >= umbral por temporalidad.
+  useEffect(() => {
+    const next = new Set<string>();
+    for (const iv of intervals) {
+      if (isAlert(iv)) {
+        next.add(iv);
+        if (!prevTfAlert.current.has(iv)) {
+          const a = alerts[iv]!;
+          fireAlert(`decision:${symbol}:${iv}`, {
+            type: 'decision',
+            severity: 'info',
+            symbol,
+            interval: iv,
+            title: `Decisión ${ACT_ES[a.action] ?? a.action}`,
+            message: `${symbol} ${iv}: confianza ${(a.conf * 100).toFixed(0)}% ≥ ${thr(iv)}%`,
+          });
+        }
+      }
+    }
+    prevTfAlert.current = next;
+  }, [alerts]);
+
+  // Regla: cambio de dirección / sesgo macro.
+  useEffect(() => {
+    if (!signal) return;
+    if (prevDir.current && signal.direction !== prevDir.current && signal.direction !== 'FLAT') {
+      fireAlert(`dir:${symbol}:${tf}`, {
+        type: 'macro',
+        severity: 'info',
+        symbol,
+        interval: tf,
+        title: `Cambio de dirección: ${signal.direction}`,
+        message: `${symbol} ${tf}: ahora ${signal.direction}.`,
+      });
+    }
+    prevDir.current = signal.direction;
+    const sign = signal.macro ? Math.sign(signal.macro.bias) : 0;
+    if (prevMacroSign.current !== 0 && sign !== 0 && sign !== prevMacroSign.current) {
+      fireAlert(`macro:${symbol}`, {
+        type: 'macro',
+        severity: 'info',
+        symbol,
+        title: `Sesgo macro ${sign > 0 ? 'alcista' : 'bajista'}`,
+        message: `El sesgo macro de ${symbol} cambió de signo.`,
+      });
+    }
+    if (sign !== 0) prevMacroSign.current = sign;
+  }, [signal]);
+
+  // Regla: señal Reditum recibida (nuevos votos tradingview).
+  useEffect(() => {
+    const tv = votes.filter((v) => v.source === 'tradingview').length;
+    if (prevReditum.current >= 0 && tv > prevReditum.current) {
+      fireAlert(`reditum:${symbol}`, {
+        type: 'reditum',
+        severity: 'info',
+        symbol,
+        title: 'Señal Reditum recibida',
+        message: `Nueva alerta de TradingView/Reditum en ${symbol}.`,
+      });
+    }
+    prevReditum.current = tv;
+  }, [votes]);
+
+  // Regla: snapshots que tocan TP/SL y avance cada 10% al objetivo.
+  useEffect(() => {
+    if (!symbol) return;
+    let cancelled = false;
+    const poll = async () => {
+      const r = await fetchSnapshots(symbol);
+      if (cancelled || !r) return;
+      for (const snap of r.snapshots) {
+        const st = snap.tracking?.status ?? '';
+        const prev = snapStatus.current[snap.id];
+        if (st && prev !== undefined && st !== prev) {
+          if (st === 'tp') {
+            fireAlert(`out:${snap.id}`, {
+              type: 'outcome',
+              severity: 'success',
+              symbol,
+              interval: snap.interval,
+              title: 'Objetivo alcanzado (✓ TP)',
+              message: `Un registro ${snap.direction} de ${symbol} ${snap.interval} tocó su objetivo.`,
+            });
+          } else if (st === 'sl') {
+            fireAlert(`out:${snap.id}`, {
+              type: 'outcome',
+              severity: 'warning',
+              symbol,
+              interval: snap.interval,
+              title: 'Stop tocado (✗ SL)',
+              message: `Un registro ${snap.direction} de ${symbol} ${snap.interval} tocó su stop.`,
+            });
+          }
+        }
+        snapStatus.current[snap.id] = st;
+        if (
+          snap.tracking?.status === 'en_curso' &&
+          snap.plan_entry !== null &&
+          snap.plan_take_profit !== null &&
+          snap.direction !== 'FLAT'
+        ) {
+          const entry = snap.plan_entry;
+          const tp = snap.plan_take_profit;
+          const prog =
+            snap.direction === 'LONG'
+              ? (r.currentPrice - entry) / (tp - entry || 1)
+              : (entry - r.currentPrice) / (entry - tp || 1);
+          const m = Math.floor(Math.max(0, Math.min(1, prog)) * 10);
+          const prevM = snapMilestone.current[snap.id] ?? 0;
+          if (m > prevM && m > 0 && m < 10) {
+            fireAlert(`prog:${snap.id}:${m}`, {
+              type: 'progress',
+              severity: 'info',
+              symbol,
+              interval: snap.interval,
+              title: `Avance ${m * 10}% al objetivo`,
+              message: `Un registro ${snap.direction} de ${symbol} ${snap.interval} lleva ${m * 10}% del camino al objetivo.`,
+            });
+          }
+          snapMilestone.current[snap.id] = Math.max(prevM, m);
+        }
+      }
+    };
+    void poll();
+    const id = setInterval(() => void poll(), 12000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [symbol]);
+
   const setThreshold = (iv: string, value: number): void => {
     const v = Math.max(0, Math.min(100, value));
     setThresholds((prev) => {
@@ -270,6 +430,17 @@ export function App() {
                   Aparece un <span className="dot-inline" /> punto verde cuando hay una decisión
                   COMPRAR o VENDER con confianza ≥ umbral.
                 </p>
+                <label className="gear-row gear-cooldown">
+                  <span className="gear-tf">Cooldown</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={cooldownMin}
+                    onChange={(e) => setCooldown(Number(e.target.value))}
+                  />
+                  <span className="muted">min entre alertas iguales</span>
+                </label>
                 <div className="gear-actions">
                   <button type="button" className="gear-save" onClick={() => setShowGear(false)}>
                     Guardar
@@ -278,6 +449,8 @@ export function App() {
               </div>
             )}
           </div>
+
+          <AlertCenter alerts={alertHistory} unread={unread} onMarkRead={markRead} />
 
           <span className={`status status-${status}`}>
             <span className="dot" aria-hidden />

@@ -81,6 +81,7 @@ La API (`apps/api`) sirve, además de `/health`:
 - `GET /calibration` — calibradores por régimen (fiabilidad + Brier). Ver [`docs/calibracion.md`](docs/calibracion.md).
 - `GET /ensemble` — ensemble activo (base/optimizado) + informe de optimización. Ver [`docs/optimizacion.md`](docs/optimizacion.md).
 - `POST /reload` — recarga en caliente de artefactos (ensemble optimizado + calibradores) publicados por quant.
+- `GET /alerts`, `POST /alerts`, `POST /alerts/read` — centro de notificaciones (M8). Ver [`docs/notificaciones.md`](docs/notificaciones.md).
 
 Calibración de probabilidades (M7):
 
