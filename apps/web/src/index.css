@@ -685,3 +685,70 @@ pre.hint {
   padding: 0.05rem 0.3rem;
   font-size: 0.78rem;
 }
+
+/* ---- fix: layout Backtest en dos columnas + guía en acordeón ---- */
+.bt-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1 1 520px;
+  min-width: 0;
+}
+
+.bt-main > .panel,
+.bt-main > .calib-panel {
+  margin: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.bt-guide details.bt-acc {
+  border-bottom: 1px solid var(--border);
+}
+
+.bt-guide summary {
+  cursor: pointer;
+  padding: 0.55rem 0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bt-guide summary::-webkit-details-marker {
+  display: none;
+}
+
+.bt-guide summary::after {
+  content: '+';
+  color: #4da3ff;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.bt-guide details[open] > summary::after {
+  content: '−';
+}
+
+.bt-acc-body p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 0.6rem;
+}
+
+.bt-acc-group {
+  margin: 0.3rem 0;
+}
+
+.bt-acc-group h4 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin: 0.7rem 0 0.15rem;
+}

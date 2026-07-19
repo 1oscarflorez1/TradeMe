@@ -60,17 +60,20 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   if (loading) return <p className="muted">Cargando backtest…</p>;
   if (!bt) {
     return (
-      <>
-        <section className="panel">
-          <p className="muted">
-            Aún no hay backtest para {symbol} · {interval}. Ejecútalo desde quant:
-          </p>
-          <pre className="hint">
-            python -m trademe_quant.run_backtest {symbol} {interval}
-          </pre>
-        </section>
-        <CalibrationSection />
-      </>
+      <div className="bt-layout">
+        <div className="bt-main">
+          <section className="panel">
+            <p className="muted">
+              Aún no hay backtest para {symbol} · {interval}. Ejecútalo desde quant:
+            </p>
+            <pre className="hint">
+              python -m trademe_quant.run_backtest {symbol} {interval}
+            </pre>
+          </section>
+          <CalibrationSection />
+        </div>
+        <BacktestGuide />
+      </div>
     );
   }
 
@@ -86,8 +89,8 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   ];
 
   return (
-    <>
     <div className="bt-layout">
+      <div className="bt-main">
       <section className="panel">
         <div className="chart-head">
           <strong>Backtest</strong>
@@ -109,10 +112,10 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         </div>
         <EquityCurve equity={bt.equity_curve} />
       </section>
+      <CalibrationSection />
+      </div>
       <BacktestGuide />
     </div>
-    <CalibrationSection />
-    </>
   );
 }
 
@@ -150,40 +153,49 @@ const DEFINITIONS: Array<[string, string]> = [
 function BacktestGuide() {
   return (
     <aside className="panel bt-guide">
-      <h3>¿Qué es un backtest?</h3>
-      <p>
-        Reproduce la lógica de decisión de TradeMe sobre el histórico real, operación por
-        operación, para responder una pregunta <strong>antes de arriesgar dinero</strong>: ¿esta
-        forma de decidir tiene ventaja estadística o es solo suerte?
-      </p>
-      <p>
-        Se hace <strong>sin look-ahead</strong> (nunca usa información futura que no existiría en
-        vivo) y en <strong>peor caso SL</strong> (si en una misma vela se tocan el stop y el
-        objetivo, se asume la pérdida). Así los resultados son conservadores y creíbles.
-      </p>
+      <details className="bt-acc" open>
+        <summary>¿Qué es un backtest?</summary>
+        <div className="bt-acc-body">
+          <p>
+            Reproduce la lógica de decisión de TradeMe sobre el histórico real, operación por
+            operación, para responder una pregunta <strong>antes de arriesgar dinero</strong>:
+            ¿esta forma de decidir tiene ventaja estadística o es solo suerte?
+          </p>
+          <p>
+            Se hace <strong>sin look-ahead</strong> (nunca usa información futura que no existiría
+            en vivo) y en <strong>peor caso SL</strong> (si en una misma vela se tocan el stop y el
+            objetivo, se asume la pérdida). Así los resultados son conservadores y creíbles.
+          </p>
+        </div>
+      </details>
 
-      <h4>Qué significa cada término</h4>
-      <dl className="bt-defs">
+      <div className="bt-acc-group">
+        <h4>Términos · pulsa para desplegar</h4>
         {DEFINITIONS.map(([term, desc]) => (
-          <div key={term} className="bt-def">
-            <dt>{term}</dt>
-            <dd>{desc}</dd>
-          </div>
+          <details key={term} className="bt-acc">
+            <summary>{term}</summary>
+            <div className="bt-acc-body">
+              <p>{desc}</p>
+            </div>
+          </details>
         ))}
-      </dl>
+      </div>
 
-      <h4>Cómo leer estos resultados</h4>
-      <p>
-        La regla base: <strong>Expectancy &gt; 0</strong> y <strong>Profit factor &gt; 1</strong>{' '}
-        indican ventaja; el <strong>Max drawdown</strong> te dice el precio en riesgo por esa
-        ventaja; y las métricas <strong>OOS</strong> parecidas a las del resto confirman que no hay
-        sobreajuste. La curva de equity ascendente refuerza lo mismo de forma visual.
-      </p>
-      <p className="bt-note">
-        Es una herramienta de validación y apoyo a la decisión, no una promesa de rentabilidad. El
-        rendimiento pasado no asegura resultados futuros. La calibración rigurosa (walk-forward con
-        purga/embargo) llega en M7.
-      </p>
+      <details className="bt-acc">
+        <summary>Cómo leer estos resultados</summary>
+        <div className="bt-acc-body">
+          <p>
+            La regla base: <strong>Expectancy &gt; 0</strong> y{' '}
+            <strong>Profit factor &gt; 1</strong> indican ventaja; el <strong>Max drawdown</strong>{' '}
+            te dice el precio en riesgo por esa ventaja; y las métricas <strong>OOS</strong>{' '}
+            parecidas a las del resto confirman que no hay sobreajuste.
+          </p>
+          <p className="bt-note">
+            Herramienta de validación y apoyo a la decisión, no una promesa de rentabilidad. El
+            rendimiento pasado no asegura resultados futuros.
+          </p>
+        </div>
+      </details>
     </aside>
   );
 }
