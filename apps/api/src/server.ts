@@ -91,8 +91,8 @@ async function main(): Promise<void> {
   }
 
   const app = buildApp({
-    getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
-      adapter.getHistory(symbol, interval as Interval, limit),
+    getHistory: (symbol: string, interval: string, limit: number, endTime?: number): Promise<Candle[]> =>
+      adapter.getHistory(symbol, interval as Interval, limit, endTime),
     symbols: parseSymbols(env),
     registry,
     externalStore,

@@ -128,6 +128,24 @@ export async function deleteSnapshot(id: string): Promise<boolean> {
   }
 }
 
+export async function fetchCandlesUntil(
+  symbol: string,
+  interval: Interval,
+  endMs: number,
+  limit = 150,
+): Promise<Candle[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/candles?symbol=${symbol}&interval=${interval}&limit=${limit}&to=${endMs}`,
+    );
+    if (!res.ok) return [];
+    const body = (await res.json()) as { candles: Candle[] };
+    return body.candles;
+  } catch {
+    return [];
+  }
+}
+
 export function streamUrl(symbol: string, interval: Interval): string {
   const url = new URL(API_URL);
   const proto = url.protocol === 'https:' ? 'wss:' : 'ws:';

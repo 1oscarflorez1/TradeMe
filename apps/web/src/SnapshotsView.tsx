@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useState } from 'react';
-import { deleteSnapshot, fetchSnapshots } from './api';
-import type { SnapshotRow, SnapshotTracking } from './types';
+import { deleteSnapshot, fetchCandlesUntil, fetchSnapshots } from './api';
+import type { Candle, SnapshotRow, SnapshotTracking } from './types';
+import { CandleChart } from './CandleChart';
+import { DrawingLayer } from './DrawingLayer';
 
 const STATUS_LABEL: Record<SnapshotTracking['status'], string> = {
   tp: '✓ TP',
@@ -86,6 +88,9 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [chartFor, setChartFor] = useState<SnapshotRow | null>(null);
+  const [chartCandles, setChartCandles] = useState<Candle[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
 
   const load = () =>
     fetchSnapshots(symbol).then((r) => {
@@ -109,6 +114,24 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
       clearInterval(id);
     };
   }, [symbol]);
+
+  useEffect(() => {
+    if (!chartFor) return;
+    let cancelled = false;
+    setChartLoading(true);
+    setChartCandles([]);
+    fetchCandlesUntil(chartFor.symbol, chartFor.interval, Date.parse(chartFor.captured_at)).then(
+      (c) => {
+        if (!cancelled) {
+          setChartCandles(c);
+          setChartLoading(false);
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [chartFor]);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -225,6 +248,15 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                       <td className="cell-del">
                         <button
                           type="button"
+                          className="row-chart"
+                          aria-label="Ver gráfico del momento"
+                          title="Ver el gráfico de cuando se guardó (con pizarra)"
+                          onClick={() => setChartFor(r)}
+                        >
+                          📈
+                        </button>
+                        <button
+                          type="button"
                           className="row-del"
                           aria-label="Eliminar registro"
                           title="Eliminar registro"
@@ -271,6 +303,57 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {chartFor && (
+        <div className="modal-overlay" onClick={() => setChartFor(null)}>
+          <div
+            className="modal modal-chart"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="chart-head">
+              <strong>Gráfico del snapshot</strong>
+              <span className="muted">
+                · {chartFor.symbol} · {chartFor.interval} ·{' '}
+                {new Date(chartFor.captured_at).toLocaleString('es')}
+              </span>
+              <button type="button" className="modal-x" aria-label="Cerrar" onClick={() => setChartFor(null)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-chart-body">
+              {chartLoading ? (
+                <p className="muted">Cargando gráfico…</p>
+              ) : chartCandles.length === 0 ? (
+                <p className="muted">No se pudo reconstruir el gráfico de ese momento.</p>
+              ) : (
+                <DrawingLayer>
+                  <CandleChart
+                    candles={chartCandles}
+                    last={null}
+                    levels={
+                      chartFor.plan_entry !== null &&
+                      chartFor.plan_stop !== null &&
+                      chartFor.plan_take_profit !== null
+                        ? {
+                            entry: chartFor.plan_entry,
+                            stop: chartFor.plan_stop,
+                            tp: chartFor.plan_take_profit,
+                          }
+                        : null
+                    }
+                  />
+                </DrawingLayer>
+              )}
+            </div>
+            <p className="muted">
+              Niveles del plan marcados (entrada/stop/objetivo). Usa el ✏️ para dibujar sobre el
+              gráfico.
+            </p>
+          </div>
         </div>
       )}
 

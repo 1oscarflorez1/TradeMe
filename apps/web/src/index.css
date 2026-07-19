@@ -1221,3 +1221,45 @@ pre.hint {
   background: var(--fg);
   border-radius: 50%;
 }
+
+/* ---- Registros: botón de gráfico y modal con pizarra ---- */
+.cell-del {
+  white-space: nowrap;
+}
+.row-chart {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.15rem 0.3rem;
+  margin-right: 0.2rem;
+  border-radius: 6px;
+}
+.row-chart:hover {
+  background: var(--bg);
+}
+
+.modal-chart {
+  width: min(780px, 94vw);
+}
+.modal-chart-body {
+  height: 400px;
+  display: flex;
+  margin: 0.6rem 0;
+}
+.modal-chart-body .chart {
+  height: 100%;
+}
+.modal-x {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.modal-x:hover {
+  color: var(--fg);
+}
