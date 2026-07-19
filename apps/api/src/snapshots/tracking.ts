@@ -7,6 +7,11 @@ export interface SnapshotRow {
   direction: 'LONG' | 'SHORT' | 'FLAT';
   price: number;
   confidence: number | null;
+  regime_label: string | null;
+  net: number | null;
+  prob_buy: number | null;
+  prob_hold: number | null;
+  prob_sell: number | null;
   macro_bias: number | null;
   plan_entry: number | null;
   plan_stop: number | null;
