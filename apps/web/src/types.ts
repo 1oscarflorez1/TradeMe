@@ -185,3 +185,27 @@ export interface EnsembleMeta {
   optimized: boolean;
   report: OptimizationReport | null;
 }
+
+
+export interface Alert {
+  id: string;
+  created_at: string;
+  symbol: string | null;
+  interval: string | null;
+  type: string;
+  severity: 'info' | 'success' | 'warning';
+  title: string;
+  message: string | null;
+  meta: unknown;
+  read: boolean;
+}
+
+export interface AlertInputWeb {
+  symbol?: string;
+  interval?: string;
+  type: string;
+  severity?: 'info' | 'success' | 'warning';
+  title: string;
+  message?: string;
+  meta?: unknown;
+}

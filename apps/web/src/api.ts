@@ -1,6 +1,8 @@
 import type {
   BacktestResult,
   CalibrationMeta,
+  Alert,
+  AlertInputWeb,
   Candle,
   EnsembleMeta,
   Interval,
@@ -143,6 +145,39 @@ export async function fetchCandlesUntil(
     return body.candles;
   } catch {
     return [];
+  }
+}
+
+export async function fetchAlerts(limit = 50): Promise<{ alerts: Alert[]; unread: number }> {
+  try {
+    const res = await fetch(`${API_URL}/alerts?limit=${limit}`);
+    if (!res.ok) return { alerts: [], unread: 0 };
+    return (await res.json()) as { alerts: Alert[]; unread: number };
+  } catch {
+    return { alerts: [], unread: 0 };
+  }
+}
+
+export async function postAlert(a: AlertInputWeb): Promise<Alert | null> {
+  try {
+    const res = await fetch(`${API_URL}/alerts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(a),
+    });
+    if (!res.ok) return null;
+    return ((await res.json()) as { alert: Alert }).alert;
+  } catch {
+    return null;
+  }
+}
+
+export async function markAlertsRead(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/alerts/read`, { method: 'POST' });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

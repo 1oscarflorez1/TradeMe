@@ -13,6 +13,7 @@ import { buildSignal } from './ensemble/signal.js';
 import type { Calibrators } from './calibration/load.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
 import { trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
+import type { AlertRow, AlertInput } from './db/alerts-repo.js';
 import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 
@@ -40,6 +41,9 @@ export interface AppDeps {
   ) => Promise<string>;
   listSnapshots?: (symbol: string, limit: number) => Promise<SnapshotRow[]>;
   deleteSnapshot?: (id: string) => Promise<boolean>;
+  createAlert?: (a: AlertInput) => Promise<AlertRow>;
+  listAlerts?: (limit: number) => Promise<{ alerts: AlertRow[]; unread: number }>;
+  markAlertsRead?: () => Promise<number>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -246,6 +250,39 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     return (
       deps.ensembleMeta?.() ?? { version: deps.ensemble.version, optimized: false, report: null }
     );
+  });
+
+  // ---- M8: alertas / notificaciones ----
+  app.get('/alerts', async (request, reply) => {
+    if (!deps.listAlerts) return reply.status(503).send({ error: 'persistencia no disponible' });
+    const q = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }).parse(
+      request.query,
+    );
+    return deps.listAlerts(q.limit);
+  });
+
+  app.post('/alerts', async (request, reply) => {
+    if (!deps.createAlert) return reply.status(503).send({ error: 'persistencia no disponible' });
+    const body = z
+      .object({
+        symbol: z.string().optional(),
+        interval: z.string().optional(),
+        type: z.string().min(1),
+        severity: z.enum(['info', 'success', 'warning']).default('info'),
+        title: z.string().min(1),
+        message: z.string().optional(),
+        meta: z.unknown().optional(),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: 'alerta inválida' });
+    const row = await deps.createAlert(body.data);
+    return { created: true, alert: row };
+  });
+
+  app.post('/alerts/read', async (_request, reply) => {
+    if (!deps.markAlertsRead) return reply.status(503).send({ error: 'persistencia no disponible' });
+    const n = await deps.markAlertsRead();
+    return { ok: true, marked: n };
   });
 
   // Recarga en caliente de artefactos (ensemble optimizado + calibradores) desde quant.

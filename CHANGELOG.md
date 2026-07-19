@@ -5,6 +5,14 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M8 · Notificaciones
+
+- **api:** tabla `alerts` (historial) + endpoints `GET /alerts`, `POST /alerts`, `POST /alerts/read`.
+- **web:** **centro de alertas** (campana con no-leídas + historial) y **notificaciones del navegador**;
+  **motor de reglas en el cliente** (decisión ≥ umbral, señal Reditum, snapshot TP/SL, cambio de
+  dirección/macro, avance 10% al objetivo) con **cooldown configurable** en el engranaje.
+- El push móvil real (FCM/APNs) queda para M9 (requiere la app móvil).
+
 ### Added — Fase presentación (UX)
 
 - **Temporalidades:** nuevo intervalo **Mes (1M)** y barra deslizable (muestra 30m en adelante por

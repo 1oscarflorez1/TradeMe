@@ -9,6 +9,7 @@ import { CandlesRepo } from './db/candles-repo.js';
 import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { BacktestsRepo } from './db/backtests-repo.js';
+import { AlertsRepo } from './db/alerts-repo.js';
 import { runMigrations } from './db/migrate.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
   const macroStore = new MacroStore();
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
+  const alertsRepo = pool ? new AlertsRepo(pool) : null;
 
   function reloadArtifacts(): {
     ensembleVersion: string;
@@ -108,6 +110,9 @@ async function main(): Promise<void> {
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
     deleteSnapshot: snapshotsRepo ? (id) => snapshotsRepo.delete(id) : undefined,
+    createAlert: alertsRepo ? (a) => alertsRepo.create(a) : undefined,
+    listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
+    markAlertsRead: alertsRepo ? () => alertsRepo.markAllRead() : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
       : undefined,
