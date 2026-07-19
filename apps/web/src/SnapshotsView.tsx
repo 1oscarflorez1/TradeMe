@@ -94,7 +94,6 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const [chartFor, setChartFor] = useState<SnapshotRow | null>(null);
   const [chartCandles, setChartCandles] = useState<Candle[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
-  const [reportFor, setReportFor] = useState<SnapshotRow | null>(null);
 
   const load = () =>
     fetchSnapshots(symbol).then((r) => {
@@ -245,15 +244,6 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                         <button
                           type="button"
                           className="row-btn"
-                          aria-label="Informe de la decisión"
-                          title="Ver informe de estado y trayectoria"
-                          onClick={() => setReportFor(r)}
-                        >
-                          📋
-                        </button>
-                        <button
-                          type="button"
-                          className="row-btn"
                           aria-label="Ver gráfico del momento"
                           title="Ver el gráfico de cuando se guardó (con pizarra)"
                           onClick={() => setChartFor(r)}
@@ -304,6 +294,10 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                                 : '—'}
                             </DetailField>
                           </div>
+                          <details className="report-acc">
+                            <summary>Informe completo de la decisión</summary>
+                            <div className="report-acc-body">{buildReport(r, price)}</div>
+                          </details>
                         </td>
                       </tr>
                     )}
@@ -312,28 +306,6 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
               })}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {reportFor && (
-        <div className="modal-overlay" onClick={() => setReportFor(null)}>
-          <div
-            className="modal modal-report"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="chart-head">
-              <strong>Informe de la decisión</strong>
-              <span className="muted">
-                · {reportFor.symbol} · {reportFor.interval}
-              </span>
-              <button type="button" className="modal-x" aria-label="Cerrar" onClick={() => setReportFor(null)}>
-                ✕
-              </button>
-            </div>
-            {buildReport(reportFor, price)}
-          </div>
         </div>
       )}
 

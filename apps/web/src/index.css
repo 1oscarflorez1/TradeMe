@@ -1118,16 +1118,23 @@ pre.hint {
 .panel-view {
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 0.85rem;
-}
-.panel-view .grid-top {
-  min-height: 0;
   grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0.85rem;
 }
-.panel-view .chart-panel {
+.panel-left {
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.panel-left .chart-panel {
+  flex: 1;
+  min-height: 0;
+}
+.panel-left .indicators-row {
+  flex: none;
+  margin-top: 0;
 }
 .panel-view .side {
   min-height: 0;
@@ -1402,4 +1409,31 @@ pre.hint {
 }
 .eq-down {
   fill: #e0645f;
+}
+
+/* ---- Registros: informe como despliegue dentro del detalle ---- */
+.report-acc {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+}
+.report-acc > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  list-style: none;
+}
+.report-acc > summary::-webkit-details-marker {
+  display: none;
+}
+.report-acc > summary::before {
+  content: '▸';
+  margin-right: 0.4rem;
+  color: #4da3ff;
+}
+.report-acc[open] > summary::before {
+  content: '▾';
+}
+.report-acc-body {
+  margin-top: 0.6rem;
 }
