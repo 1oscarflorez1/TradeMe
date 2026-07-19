@@ -15,6 +15,7 @@ import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
 const TF_ALERT_KEY = 'trademe.tfAlertThresholds';
 type TfAlert = { action: string; conf: number };
+const ACT_ES: Record<string, string> = { BUY: 'Compra', SELL: 'Venta', HOLD: 'Mantener' };
 function loadThresholds(): Record<string, number> {
   try {
     return JSON.parse(localStorage.getItem(TF_ALERT_KEY) ?? '{}') as Record<string, number>;
@@ -224,13 +225,12 @@ export function App() {
                   onClick={() => setTf(it)}
                 >
                   {it}
-                  {isAlert(it) && (
-                    <span
-                      className="tf-dot"
-                      title={`Decisión ${alerts[it]?.action} ${((alerts[it]?.conf ?? 0) * 100).toFixed(0)}% ≥ ${thr(it)}%`}
-                      aria-label="alerta activa"
-                    />
-                  )}
+                  {isAlert(it) && <span className="tf-dot" aria-label="alerta activa" />}
+                  <span className="tf-hint">
+                    {alerts[it]
+                      ? `${ACT_ES[alerts[it]!.action] ?? alerts[it]!.action} · ${(alerts[it]!.conf * 100).toFixed(0)}%`
+                      : 'sin datos aún'}
+                  </span>
                 </button>
               ))}
             </div>
