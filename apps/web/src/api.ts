@@ -119,6 +119,15 @@ export async function fetchEnsemble(): Promise<EnsembleMeta | null> {
   }
 }
 
+export async function deleteSnapshot(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/snapshots/${id}`, { method: 'DELETE' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function streamUrl(symbol: string, interval: Interval): string {
   const url = new URL(API_URL);
   const proto = url.protocol === 'https:' ? 'wss:' : 'ws:';

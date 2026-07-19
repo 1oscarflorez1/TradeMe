@@ -107,6 +107,7 @@ async function main(): Promise<void> {
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
+    deleteSnapshot: snapshotsRepo ? (id) => snapshotsRepo.delete(id) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
       : undefined,

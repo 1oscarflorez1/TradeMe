@@ -65,7 +65,7 @@ export function App() {
       if (cancelled) return;
       const next: Record<string, TfAlert> = {};
       for (const [iv, sig] of entries) {
-        if (sig) next[iv] = { action: sig.action, conf: sig.calibrated_confidence ?? sig.confidence };
+        if (sig) next[iv] = { action: sig.action, conf: sig.confidence };
       }
       setAlerts(next);
     };
@@ -226,11 +226,10 @@ export function App() {
                   {it}
                   {isAlert(it) && (
                     <span
-                      className="tf-alert"
+                      className="tf-dot"
                       title={`Decisión ${alerts[it]?.action} ${((alerts[it]?.conf ?? 0) * 100).toFixed(0)}% ≥ ${thr(it)}%`}
-                    >
-                      ⚠
-                    </span>
+                      aria-label="alerta activa"
+                    />
                   )}
                 </button>
               ))}

@@ -92,4 +92,9 @@ export class SnapshotsRepo {
     );
     return res.rows;
   }
+
+  async delete(id: string): Promise<boolean> {
+    const res = await this.pool.query('DELETE FROM snapshots WHERE id = $1', [id]);
+    return (res.rowCount ?? 0) > 0;
+  }
 }

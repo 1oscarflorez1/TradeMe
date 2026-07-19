@@ -39,6 +39,7 @@ export interface AppDeps {
     note?: string,
   ) => Promise<string>;
   listSnapshots?: (symbol: string, limit: number) => Promise<SnapshotRow[]>;
+  deleteSnapshot?: (id: string) => Promise<boolean>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -202,6 +203,17 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       payload,
     });
     return { accepted: true, vote };
+  });
+
+  // Eliminar un snapshot por id.
+  app.delete('/snapshots/:id', async (request, reply) => {
+    if (!deps.deleteSnapshot) {
+      return reply.status(503).send({ error: 'persistencia no disponible' });
+    }
+    const { id } = request.params as { id: string };
+    const ok = await deps.deleteSnapshot(id);
+    if (!ok) return reply.status(404).send({ error: 'snapshot no encontrado' });
+    return { deleted: true, id };
   });
 
   // Último backtest guardado (lo produce apps/quant).

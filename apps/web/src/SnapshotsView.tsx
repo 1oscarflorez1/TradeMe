@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { fetchSnapshots } from './api';
+import { Fragment, useEffect, useState } from 'react';
+import { deleteSnapshot, fetchSnapshots } from './api';
 import type { SnapshotRow, SnapshotTracking } from './types';
 
 const STATUS_LABEL: Record<SnapshotTracking['status'], string> = {
@@ -22,43 +22,30 @@ function pct(n: number | null | undefined): string {
   return n === null || n === undefined ? '—' : `${(n * 100).toFixed(0)}%`;
 }
 
-/** Mini barra apilada con las probabilidades BUY / HOLD / SELL. */
 function ProbBar({ b, h, s }: { b: number | null; h: number | null; s: number | null }) {
   if (b === null || h === null || s === null) return <span className="muted">—</span>;
   const total = b + h + s || 1;
   return (
-    <div className="prob-mini" title={`Compra ${pct(b)} · Mantener ${pct(h)} · Vender ${pct(s)}`}>
+    <span className="prob-mini" title={`Compra ${pct(b)} · Mantener ${pct(h)} · Vender ${pct(s)}`}>
       <span className="pm-buy" style={{ width: `${(b / total) * 100}%` }} />
       <span className="pm-hold" style={{ width: `${(h / total) * 100}%` }} />
       <span className="pm-sell" style={{ width: `${(s / total) * 100}%` }} />
-    </div>
+    </span>
   );
 }
 
+// Columnas siempre visibles (caben a lo ancho). El resto va en el detalle plegable.
 const HEADERS: Array<[string, string]> = [
   ['Fecha y hora', 'Momento exacto en que capturaste la decisión con 📸.'],
   ['Temporalidad', 'Marco temporal de las velas con que se decidió (1m, 5m, 15m, …).'],
-  ['Régimen', 'Estado del mercado según ADX: tendencia o rango. Ajusta los pesos del ensemble.'],
   ['Acción', 'Sugerencia del modelo: COMPRAR, MANTENER o VENDER.'],
   ['Dirección', 'Orientación operativa: LONG (al alza), SHORT (a la baja) o FLAT (fuera).'],
   ['Confianza', 'Probabilidad de la acción elegida (0–100%), calibrada por régimen si hay calibrador.'],
   [
-    'Probabilidades',
-    'Reparto de probabilidad entre Compra / Mantener / Vender. La mini-barra muestra su proporción (verde/gris/rojo).',
-  ],
-  ['Precio de captura', 'Precio del activo en el instante en que se guardó la decisión.'],
-  ['Entrada', 'Precio al que el plan propone entrar en la operación.'],
-  ['Stop de pérdida', 'Precio de salida con pérdida (protección). Distancia ≈ 1.5×ATR desde la entrada.'],
-  ['Objetivo de ganancia', 'Precio de salida con ganancia (take-profit), situado a 2R de la entrada.'],
-  ['Riesgo : Beneficio', 'Relación entre lo que arriesgas y lo que buscas ganar (p. ej. 1:2).'],
-  [
     'Estado',
-    'Seguimiento en vivo comparando el precio actual con el plan: En curso, ✓ TP (tocó objetivo) o ✗ SL (tocó stop). «(exp)» = validez vencida.',
+    'Seguimiento en vivo comparando el precio actual con el plan: En curso, ✓ TP o ✗ SL. «(exp)» = validez vencida.',
   ],
-  ['R en vivo', 'Resultado actual en múltiplos de R (unidad de riesgo). Positivo = a favor; negativo = en contra.'],
-  ['Resultado evaluado', 'Desenlace ya cerrado por el evaluador (TP/SL) y su retorno en R. «—» si aún no hay velas suficientes.'],
-  ['Sesgo macro', 'Sesgo fundamental (funding + tendencia semanal): valor positivo = alcista, negativo = bajista.'],
-  ['Válido hasta', 'Hora límite del plan; superada, la entrada caduca (validez de N velas de la temporalidad).'],
+  ['R en vivo', 'Resultado actual en múltiplos de R (unidad de riesgo). Positivo = a favor.'],
 ];
 
 function Th({ label, tip }: { label: string; tip: string }) {
@@ -74,29 +61,69 @@ function Th({ label, tip }: { label: string; tip: string }) {
   );
 }
 
+const CHIP_TIPS = {
+  precio: 'Precio de mercado actual del activo, con el que se sigue cada registro en vivo.',
+  total: 'Número total de registros (snapshots) guardados para este activo.',
+  enCurso: 'Registros cuya operación sigue abierta: el precio aún no ha tocado ni objetivo ni stop.',
+  tp: 'Registros que alcanzaron su objetivo de ganancia (take-profit).',
+  sl: 'Registros que tocaron su stop de pérdida.',
+  expirados: 'Registros cuya validez temporal ya venció (la entrada caducó sin activarse a tiempo).',
+  refresh: 'La tabla vuelve a consultar el precio y el estado cada 5 segundos.',
+};
+
+function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="det-field">
+      <span className="det-label">{label}</span>
+      <span className="det-value">{children}</span>
+    </div>
+  );
+}
+
 export function SnapshotsView({ symbol }: { symbol: string }) {
   const [rows, setRows] = useState<SnapshotRow[]>([]);
   const [price, setPrice] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const load = () =>
+    fetchSnapshots(symbol).then((r) => {
+      if (r) {
+        setRows(r.snapshots);
+        setPrice(r.currentPrice);
+        setLoading(false);
+      }
+    });
 
   useEffect(() => {
     if (!symbol) return;
     let cancelled = false;
-    const load = () =>
-      fetchSnapshots(symbol).then((r) => {
-        if (!cancelled && r) {
-          setRows(r.snapshots);
-          setPrice(r.currentPrice);
-          setLoading(false);
-        }
-      });
-    void load();
-    const id = setInterval(() => void load(), 5000);
+    const run = () => {
+      if (!cancelled) void load();
+    };
+    run();
+    const id = setInterval(run, 5000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
   }, [symbol]);
+
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const doDelete = async () => {
+    if (!confirmId) return;
+    await deleteSnapshot(confirmId);
+    setConfirmId(null);
+    await load();
+  };
 
   if (loading) return <p className="muted">Cargando registros…</p>;
 
@@ -104,6 +131,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const tp = rows.filter((r) => r.tracking?.status === 'tp' || r.outcome_result === 'tp').length;
   const sl = rows.filter((r) => r.tracking?.status === 'sl' || r.outcome_result === 'sl').length;
   const expirados = rows.filter((r) => r.tracking?.expired).length;
+  const COLS = HEADERS.length + 2;
 
   return (
     <section className="panel registros">
@@ -115,29 +143,32 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
           objetivo) y marca si va <strong>En curso</strong>, alcanzó <strong>✓ TP</strong> o tocó{' '}
           <strong>✗ SL</strong>. El objetivo: medir cómo se comportan de verdad las decisiones del
           copiloto (test hacia adelante) y alimentar el dataset que calibra y optimiza el modelo.
+          Pulsa la flecha de cada fila para ver todos los datos, o la ✕ para eliminar el registro.
         </p>
       </div>
 
       <div className="reg-summary">
-        <span className="reg-chip">
+        <span className="reg-chip" title={CHIP_TIPS.precio}>
           Precio {symbol} <strong>{price.toFixed(2)}</strong>
         </span>
-        <span className="reg-chip">
+        <span className="reg-chip" title={CHIP_TIPS.total}>
           Total <strong>{rows.length}</strong>
         </span>
-        <span className="reg-chip">
+        <span className="reg-chip" title={CHIP_TIPS.enCurso}>
           En curso <strong>{enCurso}</strong>
         </span>
-        <span className="reg-chip reg-chip-ok">
+        <span className="reg-chip reg-chip-ok" title={CHIP_TIPS.tp}>
           ✓ TP <strong>{tp}</strong>
         </span>
-        <span className="reg-chip reg-chip-bad">
+        <span className="reg-chip reg-chip-bad" title={CHIP_TIPS.sl}>
           ✗ SL <strong>{sl}</strong>
         </span>
-        <span className="reg-chip">
+        <span className="reg-chip" title={CHIP_TIPS.expirados}>
           Expirados <strong>{expirados}</strong>
         </span>
-        <span className="reg-chip muted">actualiza cada 5s</span>
+        <span className="reg-chip muted" title={CHIP_TIPS.refresh}>
+          actualiza cada 5s
+        </span>
       </div>
 
       {rows.length === 0 ? (
@@ -147,14 +178,17 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
           <table className="snap-table">
             <thead>
               <tr>
+                <th aria-label="desplegar" />
                 {HEADERS.map(([label, tip]) => (
                   <Th key={label} label={label} tip={tip} />
                 ))}
+                <th aria-label="eliminar" />
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
                 const t = r.tracking;
+                const open = expanded.has(r.id);
                 const dirClass =
                   r.direction === 'LONG'
                     ? 'wh-long'
@@ -164,40 +198,96 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                 const actClass =
                   r.action === 'BUY' ? 'wh-long' : r.action === 'SELL' ? 'wh-short' : 'muted';
                 return (
-                  <tr key={r.id}>
-                    <td>{new Date(r.captured_at).toLocaleString('es')}</td>
-                    <td>{r.interval}</td>
-                    <td className="muted">{r.regime_label ?? '—'}</td>
-                    <td className={actClass}>{r.action}</td>
-                    <td className={dirClass}>{r.direction}</td>
-                    <td>{pct(r.confidence)}</td>
-                    <td>
-                      <ProbBar b={r.prob_buy} h={r.prob_hold} s={r.prob_sell} />
-                    </td>
-                    <td>{num(r.price)}</td>
-                    <td>{num(r.plan_entry)}</td>
-                    <td className="wh-short">{num(r.plan_stop)}</td>
-                    <td className="wh-long">{num(r.plan_take_profit)}</td>
-                    <td>{r.plan_rr ? `1:${r.plan_rr.toFixed(1)}` : '—'}</td>
-                    <td className={t ? STATUS_CLASS[t.status] : ''}>
-                      {t ? STATUS_LABEL[t.status] : '—'}
-                      {t?.expired ? ' (exp)' : ''}
-                    </td>
-                    <td className={(t?.liveR ?? 0) >= 0 ? 'wh-long' : 'wh-short'}>
-                      {num(t?.liveR ?? null)}
-                    </td>
-                    <td>
-                      {r.outcome_result
-                        ? `${r.outcome_result.toUpperCase()} (${num(r.outcome_return_r)}R)`
-                        : '—'}
-                    </td>
-                    <td>{num(r.macro_bias)}</td>
-                    <td>{r.valid_until ? new Date(r.valid_until).toLocaleTimeString('es') : '—'}</td>
-                  </tr>
+                  <Fragment key={r.id}>
+                    <tr className={open ? 'row-open' : ''}>
+                      <td className="cell-toggle">
+                        <button
+                          type="button"
+                          className={`row-arrow ${open ? 'open' : ''}`}
+                          aria-label={open ? 'Contraer' : 'Desplegar'}
+                          onClick={() => toggle(r.id)}
+                        >
+                          ⌄
+                        </button>
+                      </td>
+                      <td>{new Date(r.captured_at).toLocaleString('es')}</td>
+                      <td>{r.interval}</td>
+                      <td className={actClass}>{r.action}</td>
+                      <td className={dirClass}>{r.direction}</td>
+                      <td>{pct(r.confidence)}</td>
+                      <td className={t ? STATUS_CLASS[t.status] : ''}>
+                        {t ? STATUS_LABEL[t.status] : '—'}
+                        {t?.expired ? ' (exp)' : ''}
+                      </td>
+                      <td className={(t?.liveR ?? 0) >= 0 ? 'wh-long' : 'wh-short'}>
+                        {num(t?.liveR ?? null)}
+                      </td>
+                      <td className="cell-del">
+                        <button
+                          type="button"
+                          className="row-del"
+                          aria-label="Eliminar registro"
+                          title="Eliminar registro"
+                          onClick={() => setConfirmId(r.id)}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="detail-row">
+                        <td colSpan={COLS}>
+                          <div className="det-grid">
+                            <DetailField label="Régimen">{r.regime_label ?? '—'}</DetailField>
+                            <DetailField label="Probabilidades B/H/S">
+                              <ProbBar b={r.prob_buy} h={r.prob_hold} s={r.prob_sell} />
+                            </DetailField>
+                            <DetailField label="Precio de captura">{num(r.price)}</DetailField>
+                            <DetailField label="Entrada">{num(r.plan_entry)}</DetailField>
+                            <DetailField label="Stop de pérdida">{num(r.plan_stop)}</DetailField>
+                            <DetailField label="Objetivo de ganancia">
+                              {num(r.plan_take_profit)}
+                            </DetailField>
+                            <DetailField label="Riesgo : Beneficio">
+                              {r.plan_rr ? `1:${r.plan_rr.toFixed(1)}` : '—'}
+                            </DetailField>
+                            <DetailField label="Resultado evaluado">
+                              {r.outcome_result
+                                ? `${r.outcome_result.toUpperCase()} (${num(r.outcome_return_r)}R)`
+                                : '—'}
+                            </DetailField>
+                            <DetailField label="Sesgo macro">{num(r.macro_bias)}</DetailField>
+                            <DetailField label="Válido hasta">
+                              {r.valid_until
+                                ? new Date(r.valid_until).toLocaleTimeString('es')
+                                : '—'}
+                            </DetailField>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {confirmId && (
+        <div className="modal-overlay" onClick={() => setConfirmId(null)}>
+          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-title">¿Eliminar este registro?</p>
+            <p className="muted">Esta acción no se puede deshacer.</p>
+            <div className="modal-actions">
+              <button type="button" className="btn-ghost" onClick={() => setConfirmId(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn-danger" onClick={() => void doDelete()}>
+                Eliminar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
