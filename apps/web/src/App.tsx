@@ -298,7 +298,7 @@ export function App() {
           </div>
         ) : (
           <div className="panel-view">
-            <div className="grid-top">
+            <div className="panel-left">
               <section className="panel chart-panel">
                 <div className="chart-head">
                   <strong>{symbol || '—'}</strong>
@@ -328,6 +328,14 @@ export function App() {
                   )}
                 </DrawingLayer>
               </section>
+            <section className="panel indicators-row">
+              <div className="chart-head">
+                <strong>Indicadores</strong>
+                <span className="muted">· voto normalizado [-1, +1]</span>
+              </div>
+              <VotesHeatmap votes={votes} />
+            </section>
+            </div>
 
               <div className="side">
                 <section className="panel signal-panel">
@@ -377,15 +385,6 @@ export function App() {
                   <WebhookStatus votes={votes} now={now} />
                 </section>
               </div>
-            </div>
-
-            <section className="panel indicators-row">
-              <div className="chart-head">
-                <strong>Indicadores</strong>
-                <span className="muted">· voto normalizado [-1, +1]</span>
-              </div>
-              <VotesHeatmap votes={votes} />
-            </section>
           </div>
         )}
       </main>
