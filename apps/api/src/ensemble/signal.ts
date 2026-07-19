@@ -5,6 +5,8 @@ import type { EnsembleConfig } from './config.js';
 import { aggregate } from './aggregate.js';
 import { confluence, inferProbs, pickAction } from './inference.js';
 import { buildPlan } from './plan.js';
+import { applyCalibrator } from '../calibration/apply.js';
+import type { Calibrators } from '../calibration/load.js';
 
 export interface BuildSignalParams {
   symbol: string;
@@ -15,6 +17,7 @@ export interface BuildSignalParams {
   interval: Interval;
   macro?: Macro;
   ts?: string;
+  calibrators?: Calibrators;
 }
 
 function directionOf(action: Action): Direction {
@@ -53,6 +56,9 @@ export function buildSignal(params: BuildSignalParams): Signal {
     macroOut = { ...params.macro, confluence: conf };
   }
   const direction = directionOf(action);
+  const calibratedConfidence = params.calibrators
+    ? applyCalibrator(params.calibrators.forRegime(regime.label), confidence)
+    : undefined;
   const plan = buildPlan({
     action,
     price: params.price,
@@ -76,6 +82,8 @@ export function buildSignal(params: BuildSignalParams): Signal {
     action,
     direction,
     confidence,
+    calibrated_confidence: calibratedConfidence,
+    calibration_version: params.calibrators?.version ?? undefined,
     macro: macroOut,
     plan,
     valid_until: validUntil,

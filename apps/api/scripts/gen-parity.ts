@@ -5,6 +5,11 @@ import { BUILTIN_INDICATORS } from '../src/indicators/builtin.js';
 import { computeMacroBias } from '../src/macro/bias.js';
 import { inferProbs, pickAction } from '../src/ensemble/inference.js';
 import { DEFAULT_ENSEMBLE } from '../src/ensemble/config.js';
+import { IndicatorRegistry } from '../src/indicators/registry.js';
+import { buildSignal } from '../src/ensemble/signal.js';
+import { computePlanLevels } from '../src/ensemble/plan.js';
+import { applyCalibrator, type Calibrator } from '../src/calibration/apply.js';
+import type { Macro } from '../src/domain/signal.js';
 import type { Candle } from '../src/domain/candle.js';
 
 function genCandles(n: number): Candle[] {
@@ -114,6 +119,64 @@ const inferenceVectors = inferInputs.map((c) => {
     expected: { BUY: round(probs.BUY), HOLD: round(probs.HOLD), SELL: round(probs.SELL), action },
   };
 });
+const registry = new IndicatorRegistry();
+const decVotes = registry.computeVotes(candles);
+const decPrice = candles[candles.length - 1]!.close;
+function decisionVector(macro?: Macro) {
+  const sig = buildSignal({
+    symbol: 'BTCUSDT',
+    price: decPrice,
+    votes: decVotes,
+    config: DEFAULT_ENSEMBLE,
+    equity: 10_000,
+    interval: '1m',
+    macro,
+  });
+  const lv = computePlanLevels(sig.action, sig.price, sig.atr, DEFAULT_ENSEMBLE.risk, 10_000);
+  return {
+    macroBias: macro ? macro.bias : null,
+    expected: {
+      net: round(sig.net),
+      action: sig.action,
+      direction: sig.direction,
+      levels: lv
+        ? { entry: round(lv.entry), stop: round(lv.stop), take_profit: round(lv.takeProfit) }
+        : null,
+    },
+  };
+}
+function mkMacro(bias: number): Macro {
+  return {
+    bias,
+    funding: 0,
+    weekly_trend: bias,
+    label: bias > 0.2 ? 'alcista' : bias < -0.2 ? 'bajista' : 'neutral',
+    confluence: 'neutral',
+    applied: true,
+  };
+}
+const decisionVectors = [
+  decisionVector(undefined),
+  decisionVector(mkMacro(-0.5)),
+  decisionVector(mkMacro(0.6)),
+];
+
+// ---- Vectores de paridad del calibrador (applier idéntico Node<->Python) ----
+const calibrators: Record<string, Calibrator> = {
+  identity: { method: 'identity' },
+  isotonic: { method: 'isotonic', x: [0.2, 0.5, 0.8], y: [0.1, 0.4, 0.75] },
+  platt: { method: 'platt', w: 2.5, c: -1.5 },
+};
+const calInputs = [0.0, 0.15, 0.35, 0.5, 0.65, 0.9, 1.0];
+const calibrationVectors = Object.entries(calibrators).flatMap(([name, cal]) =>
+  calInputs.map((p) => ({
+    calibrator: name,
+    cal,
+    input: p,
+    expected: round(applyCalibrator(cal, p)),
+  })),
+);
+
 writeFileSync(
   new URL('../../../packages/core-signals/parity/macro_vectors.json', import.meta.url),
   JSON.stringify(
@@ -124,6 +187,8 @@ writeFileSync(
       tolerance: 0.001,
       macro_bias: macroBiasVectors,
       inference: inferenceVectors,
+      decision: decisionVectors,
+      calibration: calibrationVectors,
     },
     null,
     2,

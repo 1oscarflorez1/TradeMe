@@ -42,6 +42,8 @@ export interface Signal {
   action: Action;
   direction: Direction;
   confidence: number;
+  calibrated_confidence?: number;
+  calibration_version?: string;
   macro?: Macro;
   plan: PlanStep[];
   valid_until: string;

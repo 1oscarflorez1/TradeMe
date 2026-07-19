@@ -7,6 +7,7 @@ import { createPool } from './db/pool.js';
 import { CandlesRepo } from './db/candles-repo.js';
 import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
+import { BacktestsRepo } from './db/backtests-repo.js';
 import { runMigrations } from './db/migrate.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
@@ -16,6 +17,7 @@ import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
 import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import { Calibrators } from './calibration/load.js';
 import { MacroStore } from './macro/store.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
@@ -49,12 +51,14 @@ async function main(): Promise<void> {
   const buffer = new CandleBuffer(300);
   const externalStore = new ExternalSignalStore();
   const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
+  const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
 
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
   const repo = pool ? new CandlesRepo(pool) : null;
   const externalRepo = pool ? new ExternalSignalsRepo(pool) : null;
   const macroStore = new MacroStore();
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
+  const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
 
   const app = buildApp({
     getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
@@ -64,12 +68,16 @@ async function main(): Promise<void> {
     externalStore,
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
     ensemble,
+    calibrators,
     equity: env.ACCOUNT_EQUITY,
     getMacro: (symbol: string) => macroStore.get(symbol),
     recordSnapshot: snapshotsRepo
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
+    getBacktest: backtestsRepo
+      ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
+      : undefined,
     tvSecret: env.TV_WEBHOOK_SECRET,
     onExternalVote: (symbol: string) => broadcast(symbol),
     recordExternal: externalRepo
@@ -104,6 +112,7 @@ async function main(): Promise<void> {
         equity: env.ACCOUNT_EQUITY,
         interval: iv,
         macro: macroStore.get(symbol),
+        calibrators,
       });
       hub.broadcastSignal(symbol, iv, signal);
     }

@@ -10,8 +10,10 @@ import type { ExternalSignalStore } from './signals/external-store.js';
 import type { ExternalMapper } from './signals/external-mapper.js';
 import type { EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import type { Calibrators } from './calibration/load.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
 import { trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
+import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 
 export interface AppDeps {
@@ -22,6 +24,7 @@ export interface AppDeps {
   mapper: ExternalMapper;
   ensemble: EnsembleConfig;
   equity: number;
+  calibrators?: Calibrators;
   getMacro?: (symbol: string) => Macro | undefined;
   recordSnapshot?: (
     signal: Signal,
@@ -30,6 +33,7 @@ export interface AppDeps {
     note?: string,
   ) => Promise<string>;
   listSnapshots?: (symbol: string, limit: number) => Promise<SnapshotRow[]>;
+  getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -148,6 +152,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),
+        calibrators: deps.calibrators,
       });
       return { interval, signal };
     } catch (err) {
@@ -191,6 +196,36 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       payload,
     });
     return { accepted: true, vote };
+  });
+
+  // Último backtest guardado (lo produce apps/quant).
+  app.get('/backtest', async (request, reply) => {
+    if (!deps.getBacktest) {
+      return reply.status(503).send({ error: 'persistencia no disponible' });
+    }
+    const q = z
+      .object({
+        symbol: z.string().default(deps.symbols[0] ?? 'BTCUSDT'),
+        interval: z.string().default('5m'),
+      })
+      .parse(request.query);
+    const bt = await deps.getBacktest(q.symbol.toUpperCase(), q.interval);
+    if (!bt) {
+      return reply.status(404).send({ error: 'sin backtest; ejecuta el CLI de quant' });
+    }
+    return bt;
+  });
+
+  // Metadatos de calibración (fiabilidad + Brier por régimen) para el dashboard.
+  app.get('/calibration', async () => {
+    const meta = deps.calibrators?.meta() ?? null;
+    return { calibration: meta };
+  });
+
+  // Recarga en caliente de artefactos (calibradores) tras publicarlos desde quant.
+  app.post('/reload', async () => {
+    const ok = deps.calibrators?.reload() ?? false;
+    return { reloaded: ok, calibration_version: deps.calibrators?.version ?? null };
   });
 
   // Listado de snapshots con seguimiento en vivo (precio actual vs niveles).
@@ -250,6 +285,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),
+        calibrators: deps.calibrators,
       });
       const levels = computePlanLevels(
         signal.action,

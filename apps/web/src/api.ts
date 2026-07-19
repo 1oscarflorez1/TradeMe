@@ -1,4 +1,12 @@
-import type { Candle, Interval, Signal, SnapshotsResponse, Vote } from './types';
+import type {
+  BacktestResult,
+  CalibrationMeta,
+  Candle,
+  Interval,
+  Signal,
+  SnapshotsResponse,
+  Vote,
+} from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -71,6 +79,30 @@ export async function fetchSnapshots(symbol: string): Promise<SnapshotsResponse 
     const res = await fetch(`${API_URL}/snapshots?symbol=${symbol}&limit=50`);
     if (!res.ok) return null;
     return (await res.json()) as SnapshotsResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchBacktest(
+  symbol: string,
+  interval: Interval,
+): Promise<BacktestResult | null> {
+  try {
+    const res = await fetch(`${API_URL}/backtest?symbol=${symbol}&interval=${interval}`);
+    if (!res.ok) return null;
+    return (await res.json()) as BacktestResult;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCalibration(): Promise<CalibrationMeta | null> {
+  try {
+    const res = await fetch(`${API_URL}/calibration`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { calibration: CalibrationMeta | null };
+    return data.calibration;
   } catch {
     return null;
   }

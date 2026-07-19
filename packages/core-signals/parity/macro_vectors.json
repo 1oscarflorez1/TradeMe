@@ -133,5 +133,292 @@
         "action": "HOLD"
       }
     }
+  ],
+  "decision": [
+    {
+      "macroBias": null,
+      "expected": {
+        "net": -0.104326,
+        "action": "HOLD",
+        "direction": "FLAT",
+        "levels": null
+      }
+    },
+    {
+      "macroBias": -0.5,
+      "expected": {
+        "net": -0.104326,
+        "action": "SELL",
+        "direction": "SHORT",
+        "levels": {
+          "entry": 110.876694,
+          "stop": 112.911332,
+          "take_profit": 106.807418
+        }
+      }
+    },
+    {
+      "macroBias": 0.6,
+      "expected": {
+        "net": -0.104326,
+        "action": "HOLD",
+        "direction": "FLAT",
+        "levels": null
+      }
+    }
+  ],
+  "calibration": [
+    {
+      "calibrator": "identity",
+      "cal": {
+        "method": "identity"
+      },
+      "input": 0,
+      "expected": 0
+    },
+    {
+      "calibrator": "identity",
+      "cal": {
+        "method": "identity"
+      },
+      "input": 0.15,
+      "expected": 0.15
+    },
+    {
+      "calibrator": "identity",
+      "cal": {
+        "method": "identity"
+      },
+      "input": 0.35,
+      "expected": 0.35
+    },
+    {
+      "calibrator": "identity",
+      "cal": {
+        "method": "identity"
+      },
+      "input": 0.5,
+      "expected": 0.5
+    },
+    {
+      "calibrator": "identity",
+      "cal": {
+        "method": "identity"
+      },
+      "input": 0.65,
+      "expected": 0.65
+    },
+    {
+      "calibrator": "identity",
+      "cal": {
+        "method": "identity"
+      },
+      "input": 0.9,
+      "expected": 0.9
+    },
+    {
+      "calibrator": "identity",
+      "cal": {
+        "method": "identity"
+      },
+      "input": 1,
+      "expected": 1
+    },
+    {
+      "calibrator": "isotonic",
+      "cal": {
+        "method": "isotonic",
+        "x": [
+          0.2,
+          0.5,
+          0.8
+        ],
+        "y": [
+          0.1,
+          0.4,
+          0.75
+        ]
+      },
+      "input": 0,
+      "expected": 0.1
+    },
+    {
+      "calibrator": "isotonic",
+      "cal": {
+        "method": "isotonic",
+        "x": [
+          0.2,
+          0.5,
+          0.8
+        ],
+        "y": [
+          0.1,
+          0.4,
+          0.75
+        ]
+      },
+      "input": 0.15,
+      "expected": 0.1
+    },
+    {
+      "calibrator": "isotonic",
+      "cal": {
+        "method": "isotonic",
+        "x": [
+          0.2,
+          0.5,
+          0.8
+        ],
+        "y": [
+          0.1,
+          0.4,
+          0.75
+        ]
+      },
+      "input": 0.35,
+      "expected": 0.25
+    },
+    {
+      "calibrator": "isotonic",
+      "cal": {
+        "method": "isotonic",
+        "x": [
+          0.2,
+          0.5,
+          0.8
+        ],
+        "y": [
+          0.1,
+          0.4,
+          0.75
+        ]
+      },
+      "input": 0.5,
+      "expected": 0.4
+    },
+    {
+      "calibrator": "isotonic",
+      "cal": {
+        "method": "isotonic",
+        "x": [
+          0.2,
+          0.5,
+          0.8
+        ],
+        "y": [
+          0.1,
+          0.4,
+          0.75
+        ]
+      },
+      "input": 0.65,
+      "expected": 0.575
+    },
+    {
+      "calibrator": "isotonic",
+      "cal": {
+        "method": "isotonic",
+        "x": [
+          0.2,
+          0.5,
+          0.8
+        ],
+        "y": [
+          0.1,
+          0.4,
+          0.75
+        ]
+      },
+      "input": 0.9,
+      "expected": 0.75
+    },
+    {
+      "calibrator": "isotonic",
+      "cal": {
+        "method": "isotonic",
+        "x": [
+          0.2,
+          0.5,
+          0.8
+        ],
+        "y": [
+          0.1,
+          0.4,
+          0.75
+        ]
+      },
+      "input": 1,
+      "expected": 0.75
+    },
+    {
+      "calibrator": "platt",
+      "cal": {
+        "method": "platt",
+        "w": 2.5,
+        "c": -1.5
+      },
+      "input": 0,
+      "expected": 0.182426
+    },
+    {
+      "calibrator": "platt",
+      "cal": {
+        "method": "platt",
+        "w": 2.5,
+        "c": -1.5
+      },
+      "input": 0.15,
+      "expected": 0.245085
+    },
+    {
+      "calibrator": "platt",
+      "cal": {
+        "method": "platt",
+        "w": 2.5,
+        "c": -1.5
+      },
+      "input": 0.35,
+      "expected": 0.348645
+    },
+    {
+      "calibrator": "platt",
+      "cal": {
+        "method": "platt",
+        "w": 2.5,
+        "c": -1.5
+      },
+      "input": 0.5,
+      "expected": 0.437823
+    },
+    {
+      "calibrator": "platt",
+      "cal": {
+        "method": "platt",
+        "w": 2.5,
+        "c": -1.5
+      },
+      "input": 0.65,
+      "expected": 0.531209
+    },
+    {
+      "calibrator": "platt",
+      "cal": {
+        "method": "platt",
+        "w": 2.5,
+        "c": -1.5
+      },
+      "input": 0.9,
+      "expected": 0.679179
+    },
+    {
+      "calibrator": "platt",
+      "cal": {
+        "method": "platt",
+        "w": 2.5,
+        "c": -1.5
+      },
+      "input": 1,
+      "expected": 0.731059
+    }
   ]
 }
