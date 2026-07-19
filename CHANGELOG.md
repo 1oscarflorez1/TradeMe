@@ -5,6 +5,19 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M7 · Optimización (Slice B)
+
+- `apps/quant`: **Optuna** (TPE) optimiza pesos de indicadores y multiplicadores de régimen
+  maximizando **expectancy penalizada** en **walk-forward con purga/embargo** (`walkforward.py`,
+  `optimize.py`); promoción **solo si gana en hold-out**. CLI `run_optimize` → `ensemble.optimized.yaml`
+  + `optimization_report.json`.
+- `apps/api`: `POST /reload` recarga también el ensemble (prefiere el optimizado si existe);
+  `GET /ensemble` con la versión activa y el informe base vs optimizado.
+- `apps/web`: comparador de **Optimización** en la pestaña Backtest (veredicto + hold-out base vs
+  optimizado). Además, layout de Backtest a dos columnas y guía en acordeón.
+- Sin cambios de contrato ni de la matemática de decisión (mismos campos del ensemble): la paridad
+  Node≡Python sigue vigente.
+
 ### Added — M7 · Calibración (Slice A)
 
 - `apps/quant`: módulo `calibration.py` con calibradores por régimen **isotónica (PAVA)** y **Platt**

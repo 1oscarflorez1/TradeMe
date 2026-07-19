@@ -685,3 +685,81 @@ pre.hint {
   padding: 0.05rem 0.3rem;
   font-size: 0.78rem;
 }
+
+/* ---- fix: layout Backtest en dos columnas + guía en acordeón ---- */
+.bt-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1 1 520px;
+  min-width: 0;
+}
+
+.bt-main > .panel,
+.bt-main > .calib-panel {
+  margin: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.bt-guide details.bt-acc {
+  border-bottom: 1px solid var(--border);
+}
+
+.bt-guide summary {
+  cursor: pointer;
+  padding: 0.55rem 0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bt-guide summary::-webkit-details-marker {
+  display: none;
+}
+
+.bt-guide summary::after {
+  content: '+';
+  color: #4da3ff;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.bt-guide details[open] > summary::after {
+  content: '−';
+}
+
+.bt-acc-body p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 0.6rem;
+}
+
+.bt-acc-group {
+  margin: 0.3rem 0;
+}
+
+.bt-acc-group h4 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin: 0.7rem 0 0.15rem;
+}
+
+/* ---- M7 Slice B: comparador de optimización ---- */
+.opt-panel { margin-top: 0; }
+.opt-verdict { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0; flex-wrap: wrap; }
+.opt-badge { font-size: 0.78rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+.opt-ok { color: #1b7a3d; background: rgba(27, 122, 61, 0.15); }
+.opt-no { color: #b26a00; background: rgba(178, 106, 0, 0.15); }
+.opt-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.4rem 0; }
+.opt-table th, .opt-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
+.opt-table th { color: var(--muted); font-weight: 600; }
+.opt-table tr.opt-win td { color: #4da3ff; font-weight: 700; }

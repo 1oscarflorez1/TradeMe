@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { fetchBacktest, fetchCalibration } from './api';
+import { fetchBacktest, fetchCalibration, fetchEnsemble } from './api';
 import type {
   BacktestResult,
   CalibrationMeta,
+  EnsembleMeta,
   Interval,
   RegimeCalibrator,
   ReliabilityBin,
@@ -60,17 +61,21 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   if (loading) return <p className="muted">Cargando backtest…</p>;
   if (!bt) {
     return (
-      <>
-        <section className="panel">
-          <p className="muted">
-            Aún no hay backtest para {symbol} · {interval}. Ejecútalo desde quant:
-          </p>
-          <pre className="hint">
-            python -m trademe_quant.run_backtest {symbol} {interval}
-          </pre>
-        </section>
-        <CalibrationSection />
-      </>
+      <div className="bt-layout">
+        <div className="bt-main">
+          <section className="panel">
+            <p className="muted">
+              Aún no hay backtest para {symbol} · {interval}. Ejecútalo desde quant:
+            </p>
+            <pre className="hint">
+              python -m trademe_quant.run_backtest {symbol} {interval}
+            </pre>
+          </section>
+          <CalibrationSection />
+          <OptimizationSection />
+        </div>
+        <BacktestGuide />
+      </div>
     );
   }
 
@@ -86,8 +91,8 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   ];
 
   return (
-    <>
     <div className="bt-layout">
+      <div className="bt-main">
       <section className="panel">
         <div className="chart-head">
           <strong>Backtest</strong>
@@ -109,10 +114,10 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         </div>
         <EquityCurve equity={bt.equity_curve} />
       </section>
+      <CalibrationSection />
+      </div>
       <BacktestGuide />
     </div>
-    <CalibrationSection />
-    </>
   );
 }
 
@@ -150,40 +155,49 @@ const DEFINITIONS: Array<[string, string]> = [
 function BacktestGuide() {
   return (
     <aside className="panel bt-guide">
-      <h3>¿Qué es un backtest?</h3>
-      <p>
-        Reproduce la lógica de decisión de TradeMe sobre el histórico real, operación por
-        operación, para responder una pregunta <strong>antes de arriesgar dinero</strong>: ¿esta
-        forma de decidir tiene ventaja estadística o es solo suerte?
-      </p>
-      <p>
-        Se hace <strong>sin look-ahead</strong> (nunca usa información futura que no existiría en
-        vivo) y en <strong>peor caso SL</strong> (si en una misma vela se tocan el stop y el
-        objetivo, se asume la pérdida). Así los resultados son conservadores y creíbles.
-      </p>
+      <details className="bt-acc" open>
+        <summary>¿Qué es un backtest?</summary>
+        <div className="bt-acc-body">
+          <p>
+            Reproduce la lógica de decisión de TradeMe sobre el histórico real, operación por
+            operación, para responder una pregunta <strong>antes de arriesgar dinero</strong>:
+            ¿esta forma de decidir tiene ventaja estadística o es solo suerte?
+          </p>
+          <p>
+            Se hace <strong>sin look-ahead</strong> (nunca usa información futura que no existiría
+            en vivo) y en <strong>peor caso SL</strong> (si en una misma vela se tocan el stop y el
+            objetivo, se asume la pérdida). Así los resultados son conservadores y creíbles.
+          </p>
+        </div>
+      </details>
 
-      <h4>Qué significa cada término</h4>
-      <dl className="bt-defs">
+      <div className="bt-acc-group">
+        <h4>Términos · pulsa para desplegar</h4>
         {DEFINITIONS.map(([term, desc]) => (
-          <div key={term} className="bt-def">
-            <dt>{term}</dt>
-            <dd>{desc}</dd>
-          </div>
+          <details key={term} className="bt-acc">
+            <summary>{term}</summary>
+            <div className="bt-acc-body">
+              <p>{desc}</p>
+            </div>
+          </details>
         ))}
-      </dl>
+      </div>
 
-      <h4>Cómo leer estos resultados</h4>
-      <p>
-        La regla base: <strong>Expectancy &gt; 0</strong> y <strong>Profit factor &gt; 1</strong>{' '}
-        indican ventaja; el <strong>Max drawdown</strong> te dice el precio en riesgo por esa
-        ventaja; y las métricas <strong>OOS</strong> parecidas a las del resto confirman que no hay
-        sobreajuste. La curva de equity ascendente refuerza lo mismo de forma visual.
-      </p>
-      <p className="bt-note">
-        Es una herramienta de validación y apoyo a la decisión, no una promesa de rentabilidad. El
-        rendimiento pasado no asegura resultados futuros. La calibración rigurosa (walk-forward con
-        purga/embargo) llega en M7.
-      </p>
+      <details className="bt-acc">
+        <summary>Cómo leer estos resultados</summary>
+        <div className="bt-acc-body">
+          <p>
+            La regla base: <strong>Expectancy &gt; 0</strong> y{' '}
+            <strong>Profit factor &gt; 1</strong> indican ventaja; el <strong>Max drawdown</strong>{' '}
+            te dice el precio en riesgo por esa ventaja; y las métricas <strong>OOS</strong>{' '}
+            parecidas a las del resto confirman que no hay sobreajuste.
+          </p>
+          <p className="bt-note">
+            Herramienta de validación y apoyo a la decisión, no una promesa de rentabilidad. El
+            rendimiento pasado no asegura resultados futuros.
+          </p>
+        </div>
+      </details>
     </aside>
   );
 }
@@ -275,6 +289,87 @@ function CalibrationSection() {
         acierto). Cuanto más pegados los puntos a ella, más honestas las probabilidades; un Brier más
         bajo es mejor.
       </p>
+    </section>
+  );
+}
+
+function fmtR(n: number | undefined): string {
+  return n == null ? '—' : `${n.toFixed(3)} R`;
+}
+
+function OptimizationSection() {
+  const [meta, setMeta] = useState<EnsembleMeta | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchEnsemble().then((r) => {
+      if (!cancelled) {
+        setMeta(r);
+        setLoaded(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!loaded) return null;
+  const report = meta?.report ?? null;
+
+  return (
+    <section className="panel opt-panel">
+      <div className="chart-head">
+        <strong>Optimización de pesos</strong>
+        <span className="muted">
+          · Optuna + walk-forward{meta?.version ? ` · activo: ${meta.version}` : ''}
+        </span>
+      </div>
+      {!report ? (
+        <p className="muted">
+          Aún sin optimización. Ejecútala desde quant:{' '}
+          <code>python -m trademe_quant.run_optimize BTCUSDT 5m</code>, y recarga con{' '}
+          <code>POST /reload</code>.
+        </p>
+      ) : (
+        <>
+          <div className="opt-verdict">
+            {report.promoted ? (
+              <span className="opt-badge opt-ok">✓ Promovido (gana en hold-out)</span>
+            ) : (
+              <span className="opt-badge opt-no">Base mantenido (no supera el hold-out)</span>
+            )}
+            <span className="muted">
+              {report.n_trials} trials · score val. {report.validation_score.toFixed(3)}
+            </span>
+          </div>
+          <table className="opt-table">
+            <thead>
+              <tr>
+                <th>Hold-out</th>
+                <th>Expectancy</th>
+                <th>Trades</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Base</td>
+                <td>{fmtR(report.holdout.base_expectancy)}</td>
+                <td>{report.holdout.base_trades}</td>
+              </tr>
+              <tr className={report.promoted ? 'opt-win' : ''}>
+                <td>Optimizado</td>
+                <td>{fmtR(report.holdout.optimized_expectancy)}</td>
+                <td>{report.holdout.optimized_trades}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="muted calib-legend">
+            El candidato solo se promociona si su expectancy en el tramo hold-out (nunca usado en la
+            búsqueda) supera al base. Así se evita el sobreajuste.
+          </p>
+        </>
+      )}
     </section>
   );
 }

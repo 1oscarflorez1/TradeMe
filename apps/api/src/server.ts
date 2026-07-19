@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { buildApp } from './app.js';
 import { attachStream } from './ws.js';
 import { buildSubscriptions, loadEnv, parseSymbols } from './config.js';
@@ -50,7 +51,8 @@ async function main(): Promise<void> {
   const registry = new IndicatorRegistry();
   const buffer = new CandleBuffer(300);
   const externalStore = new ExternalSignalStore();
-  const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
+  const ensemblePath = existsSync(env.OPTIMIZED_ENSEMBLE) ? env.OPTIMIZED_ENSEMBLE : env.ENSEMBLE_CONFIG;
+  const ensemble = loadEnsembleSafe(ensemblePath, (m) => console.warn(m));
   const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
 
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
@@ -59,6 +61,34 @@ async function main(): Promise<void> {
   const macroStore = new MacroStore();
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
+
+  function reloadArtifacts(): {
+    ensembleVersion: string;
+    ensembleOptimized: boolean;
+    calibrationVersion: string | null;
+  } {
+    const path = existsSync(env.OPTIMIZED_ENSEMBLE) ? env.OPTIMIZED_ENSEMBLE : env.ENSEMBLE_CONFIG;
+    const fresh = loadEnsembleSafe(path, (m) => console.warn(m));
+    Object.assign(ensemble, fresh);
+    calibrators.reload();
+    return {
+      ensembleVersion: ensemble.version,
+      ensembleOptimized: path === env.OPTIMIZED_ENSEMBLE,
+      calibrationVersion: calibrators.version,
+    };
+  }
+
+  function ensembleMeta(): { version: string; optimized: boolean; report: unknown } {
+    let report: unknown = null;
+    try {
+      if (existsSync(env.OPT_REPORT_PATH)) {
+        report = JSON.parse(readFileSync(env.OPT_REPORT_PATH, 'utf8'));
+      }
+    } catch {
+      report = null;
+    }
+    return { version: ensemble.version, optimized: existsSync(env.OPTIMIZED_ENSEMBLE), report };
+  }
 
   const app = buildApp({
     getHistory: (symbol: string, interval: string, limit: number): Promise<Candle[]> =>
@@ -69,6 +99,8 @@ async function main(): Promise<void> {
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
     ensemble,
     calibrators,
+    reloadArtifacts,
+    ensembleMeta,
     equity: env.ACCOUNT_EQUITY,
     getMacro: (symbol: string) => macroStore.get(symbol),
     recordSnapshot: snapshotsRepo
