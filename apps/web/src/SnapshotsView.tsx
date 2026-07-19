@@ -43,6 +43,9 @@ const HEADERS: Array<[string, string]> = [
   ['Acción', 'Sugerencia del modelo: COMPRAR, MANTENER o VENDER.'],
   ['Dirección', 'Orientación operativa: LONG (al alza), SHORT (a la baja) o FLAT (fuera).'],
   ['Confianza', 'Probabilidad de la acción elegida (0–100%), calibrada por régimen si hay calibrador.'],
+  ['Entrada', 'Precio al que el plan propone entrar en la operación.'],
+  ['Stop', 'Precio de salida con pérdida (protección). Distancia ≈ 1.5×ATR.'],
+  ['Objetivo', 'Precio de salida con ganancia (take-profit), a 2R de la entrada.'],
   [
     'Estado',
     'Seguimiento en vivo comparando el precio actual con el plan: En curso, ✓ TP o ✗ SL. «(exp)» = validez vencida.',
@@ -91,6 +94,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const [chartFor, setChartFor] = useState<SnapshotRow | null>(null);
   const [chartCandles, setChartCandles] = useState<Candle[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
+  const [reportFor, setReportFor] = useState<SnapshotRow | null>(null);
 
   const load = () =>
     fetchSnapshots(symbol).then((r) => {
@@ -154,7 +158,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const tp = rows.filter((r) => r.tracking?.status === 'tp' || r.outcome_result === 'tp').length;
   const sl = rows.filter((r) => r.tracking?.status === 'sl' || r.outcome_result === 'sl').length;
   const expirados = rows.filter((r) => r.tracking?.expired).length;
-  const COLS = HEADERS.length + 2;
+  const COLS = HEADERS.length + 1;
 
   return (
     <section className="panel registros">
@@ -201,11 +205,10 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
           <table className="snap-table">
             <thead>
               <tr>
-                <th aria-label="desplegar" />
                 {HEADERS.map(([label, tip]) => (
                   <Th key={label} label={label} tip={tip} />
                 ))}
-                <th aria-label="eliminar" />
+                <th aria-label="acciones" />
               </tr>
             </thead>
             <tbody>
@@ -223,21 +226,14 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                 return (
                   <Fragment key={r.id}>
                     <tr className={open ? 'row-open' : ''}>
-                      <td className="cell-toggle">
-                        <button
-                          type="button"
-                          className={`row-arrow ${open ? 'open' : ''}`}
-                          aria-label={open ? 'Contraer' : 'Desplegar'}
-                          onClick={() => toggle(r.id)}
-                        >
-                          ⌄
-                        </button>
-                      </td>
                       <td>{new Date(r.captured_at).toLocaleString('es')}</td>
                       <td>{r.interval}</td>
                       <td className={actClass}>{r.action}</td>
                       <td className={dirClass}>{r.direction}</td>
                       <td>{pct(r.confidence)}</td>
+                      <td>{num(r.plan_entry)}</td>
+                      <td className="wh-short">{num(r.plan_stop)}</td>
+                      <td className="wh-long">{num(r.plan_take_profit)}</td>
                       <td className={t ? STATUS_CLASS[t.status] : ''}>
                         {t ? STATUS_LABEL[t.status] : '—'}
                         {t?.expired ? ' (exp)' : ''}
@@ -245,10 +241,19 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                       <td className={(t?.liveR ?? 0) >= 0 ? 'wh-long' : 'wh-short'}>
                         {num(t?.liveR ?? null)}
                       </td>
-                      <td className="cell-del">
+                      <td className="cell-actions">
                         <button
                           type="button"
-                          className="row-chart"
+                          className="row-btn"
+                          aria-label="Informe de la decisión"
+                          title="Ver informe de estado y trayectoria"
+                          onClick={() => setReportFor(r)}
+                        >
+                          📋
+                        </button>
+                        <button
+                          type="button"
+                          className="row-btn"
                           aria-label="Ver gráfico del momento"
                           title="Ver el gráfico de cuando se guardó (con pizarra)"
                           onClick={() => setChartFor(r)}
@@ -257,7 +262,16 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                         </button>
                         <button
                           type="button"
-                          className="row-del"
+                          className={`row-btn row-arrow ${open ? 'open' : ''}`}
+                          aria-label={open ? 'Contraer' : 'Desplegar'}
+                          title={open ? 'Ocultar detalle' : 'Ver más datos'}
+                          onClick={() => toggle(r.id)}
+                        >
+                          ⌄
+                        </button>
+                        <button
+                          type="button"
+                          className="row-btn row-del"
                           aria-label="Eliminar registro"
                           title="Eliminar registro"
                           onClick={() => setConfirmId(r.id)}
@@ -275,11 +289,6 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                               <ProbBar b={r.prob_buy} h={r.prob_hold} s={r.prob_sell} />
                             </DetailField>
                             <DetailField label="Precio de captura">{num(r.price)}</DetailField>
-                            <DetailField label="Entrada">{num(r.plan_entry)}</DetailField>
-                            <DetailField label="Stop de pérdida">{num(r.plan_stop)}</DetailField>
-                            <DetailField label="Objetivo de ganancia">
-                              {num(r.plan_take_profit)}
-                            </DetailField>
                             <DetailField label="Riesgo : Beneficio">
                               {r.plan_rr ? `1:${r.plan_rr.toFixed(1)}` : '—'}
                             </DetailField>
@@ -303,6 +312,28 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {reportFor && (
+        <div className="modal-overlay" onClick={() => setReportFor(null)}>
+          <div
+            className="modal modal-report"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="chart-head">
+              <strong>Informe de la decisión</strong>
+              <span className="muted">
+                · {reportFor.symbol} · {reportFor.interval}
+              </span>
+              <button type="button" className="modal-x" aria-label="Cerrar" onClick={() => setReportFor(null)}>
+                ✕
+              </button>
+            </div>
+            {buildReport(reportFor, price)}
+          </div>
         </div>
       )}
 
@@ -374,5 +405,106 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
         </div>
       )}
     </section>
+  );
+}
+
+function buildReport(r: SnapshotRow, price: number) {
+  const t = r.tracking;
+  const hasPlan =
+    r.plan_entry !== null && r.plan_stop !== null && r.plan_take_profit !== null;
+  let progress = 0;
+  let toStop = 0;
+  let toTp = 0;
+  if (hasPlan) {
+    const entry = r.plan_entry!;
+    const stop = r.plan_stop!;
+    const tp = r.plan_take_profit!;
+    if (r.direction === 'LONG') {
+      progress = (price - entry) / (tp - entry || 1);
+      toStop = ((price - stop) / (entry - stop || 1)) * 100;
+      toTp = ((tp - price) / (tp - entry || 1)) * 100;
+    } else if (r.direction === 'SHORT') {
+      progress = (entry - price) / (entry - tp || 1);
+      toStop = ((stop - price) / (stop - entry || 1)) * 100;
+      toTp = ((price - tp) / (entry - tp || 1)) * 100;
+    }
+  }
+  const pctv = (n: number) => `${(n * 100).toFixed(0)}%`;
+  const estado =
+    r.outcome_result
+      ? r.outcome_result === 'tp'
+        ? 'Cerrada en objetivo (✓ TP)'
+        : r.outcome_result === 'sl'
+          ? 'Cerrada en stop (✗ SL)'
+          : 'Cerrada por tiempo'
+      : t?.status === 'tp'
+        ? 'Alcanzó el objetivo (✓ TP)'
+        : t?.status === 'sl'
+          ? 'Tocó el stop (✗ SL)'
+          : t?.status === 'en_curso'
+            ? 'En curso'
+            : 'Sin plan operable';
+
+  let trayectoria: string;
+  if (!hasPlan || r.direction === 'FLAT') {
+    trayectoria = 'La decisión fue MANTENER/FLAT: no hay una operación con niveles que seguir.';
+  } else if (r.outcome_result) {
+    trayectoria = `La operación ya cerró con un resultado de ${num(r.outcome_return_r)} R.`;
+  } else {
+    const dir = progress >= 0 ? 'a favor' : 'en contra';
+    trayectoria =
+      `El precio va ${dir}: ha recorrido ${pctv(Math.max(0, Math.min(1, progress)))} del camino al objetivo. ` +
+      `Queda ~${toTp.toFixed(0)}% hasta el objetivo y hay ~${toStop.toFixed(0)}% de margen antes del stop.` +
+      (t?.expired ? ' Además, la validez de la entrada ya venció.' : '');
+  }
+
+  return (
+    <div className="report-body">
+      <div className="report-grid">
+        <div>
+          <span className="det-label">Acción / Dirección</span>
+          <span className="det-value">
+            {r.action} · {r.direction}
+          </span>
+        </div>
+        <div>
+          <span className="det-label">Confianza</span>
+          <span className="det-value">{pct(r.confidence)}</span>
+        </div>
+        <div>
+          <span className="det-label">Precio actual</span>
+          <span className="det-value">{num(price)}</span>
+        </div>
+        <div>
+          <span className="det-label">Entrada</span>
+          <span className="det-value">{num(r.plan_entry)}</span>
+        </div>
+        <div>
+          <span className="det-label">Stop</span>
+          <span className="det-value wh-short">{num(r.plan_stop)}</span>
+        </div>
+        <div>
+          <span className="det-label">Objetivo</span>
+          <span className="det-value wh-long">{num(r.plan_take_profit)}</span>
+        </div>
+        <div>
+          <span className="det-label">R en vivo</span>
+          <span className={`det-value ${(t?.liveR ?? 0) >= 0 ? 'wh-long' : 'wh-short'}`}>
+            {num(t?.liveR ?? null)}
+          </span>
+        </div>
+        <div>
+          <span className="det-label">Estado</span>
+          <span className="det-value">{estado}</span>
+        </div>
+      </div>
+      <div className="report-progress">
+        <div
+          className="report-progress-fill"
+          style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }}
+        />
+      </div>
+      <p className="report-text">{trayectoria}</p>
+    </div>
   );
 }

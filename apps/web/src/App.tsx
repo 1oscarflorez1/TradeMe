@@ -80,13 +80,6 @@ export function App() {
     };
   }, [symbol, intervals]);
 
-  // Barra de temporalidades: mostrar 30m en adelante por defecto (las menores, deslizando a la izq.).
-  useEffect(() => {
-    const el = tfRef.current;
-    if (!el) return;
-    const btn = el.querySelector<HTMLElement>('[data-tf="30m"]');
-    if (btn) el.scrollLeft = Math.max(0, btn.offsetLeft - el.offsetLeft);
-  }, [intervals]);
 
   useEffect(() => {
     fetchSymbols()
@@ -240,8 +233,11 @@ export function App() {
                       : 'Sin datos de decisión aún'
                   }
                 >
-                  {it}
-                  {isAlert(it) && <span className="tf-dot" aria-label="alerta activa" />}
+                  <span className="tf-label">{it}</span>
+                  <span
+                    className={`tf-dot ${isAlert(it) ? 'on' : ''}`}
+                    aria-label={isAlert(it) ? 'alerta activa' : undefined}
+                  />
                 </button>
               ))}
             </div>
@@ -271,8 +267,14 @@ export function App() {
                   </label>
                 ))}
                 <p className="gear-note">
-                  Aparece ⚠ cuando hay una decisión COMPRAR o VENDER con confianza ≥ umbral.
+                  Aparece un <span className="dot-inline" /> punto verde cuando hay una decisión
+                  COMPRAR o VENDER con confianza ≥ umbral.
                 </p>
+                <div className="gear-actions">
+                  <button type="button" className="gear-save" onClick={() => setShowGear(false)}>
+                    Guardar
+                  </button>
+                </div>
               </div>
             )}
           </div>
