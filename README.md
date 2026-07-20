@@ -82,6 +82,7 @@ La API (`apps/api`) sirve, además de `/health`:
 - `GET /ensemble` — ensemble activo (base/optimizado) + informe de optimización. Ver [`docs/optimizacion.md`](docs/optimizacion.md).
 - `POST /reload` — recarga en caliente de artefactos (ensemble optimizado + calibradores) publicados por quant.
 - `GET /alerts`, `POST /alerts`, `POST /alerts/read` — centro de notificaciones (M8). Ver [`docs/notificaciones.md`](docs/notificaciones.md).
+- `GET /push/vapid`, `POST /push/subscribe` — PWA + Web Push en segundo plano (M9). Ver [`docs/pwa-push.md`](docs/pwa-push.md).
 
 Calibración de probabilidades (M7):
 

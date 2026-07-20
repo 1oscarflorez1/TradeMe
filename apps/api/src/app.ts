@@ -14,6 +14,7 @@ import type { Calibrators } from './calibration/load.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
 import { trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
 import type { AlertRow, AlertInput } from './db/alerts-repo.js';
+import type { PushSub } from './push/push.js';
 import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 
@@ -44,6 +45,8 @@ export interface AppDeps {
   createAlert?: (a: AlertInput) => Promise<AlertRow>;
   listAlerts?: (limit: number) => Promise<{ alerts: AlertRow[]; unread: number }>;
   markAlertsRead?: () => Promise<number>;
+  vapidPublicKey?: string;
+  savePushSub?: (sub: PushSub) => Promise<void>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -250,6 +253,22 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     return (
       deps.ensembleMeta?.() ?? { version: deps.ensemble.version, optimized: false, report: null }
     );
+  });
+
+  // ---- M9: Web Push ----
+  app.get('/push/vapid', async () => ({ publicKey: deps.vapidPublicKey ?? null }));
+
+  app.post('/push/subscribe', async (request, reply) => {
+    if (!deps.savePushSub) return reply.status(503).send({ error: 'push no disponible' });
+    const body = z
+      .object({
+        endpoint: z.string().url(),
+        keys: z.object({ p256dh: z.string(), auth: z.string() }),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: 'suscripción inválida' });
+    await deps.savePushSub(body.data);
+    return { ok: true };
   });
 
   // ---- M8: alertas / notificaciones ----

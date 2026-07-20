@@ -19,6 +19,12 @@ const EnvSchema = z.object({
   CALIBRATORS_PATH: z.string().default('artifacts/calibrators.json'),
   OPTIMIZED_ENSEMBLE: z.string().default('artifacts/ensemble.optimized.yaml'),
   OPT_REPORT_PATH: z.string().default('artifacts/optimization_report.json'),
+  VAPID_PUBLIC_KEY: z.string().default('BEg-pAQi-VrkEr0n9OpokYqzXsBq7Ub_ZqTpGkUrwPZSBb3PlMbj5Hb4qcjJGqydWcqcUnUFrO6EE5gnw0_BIss'),
+  VAPID_PRIVATE_KEY: z.string().default('dUfNiCSsZ-NL-v543jUw-cyRwPD0AX29bz9Jt12tbFI'),
+  VAPID_SUBJECT: z.string().default('mailto:trademe@example.com'),
+  PUSH_MIN_CONFIDENCE: z.coerce.number().default(0.65),
+  PUSH_COOLDOWN_MS: z.coerce.number().int().default(600000),
+
   MIGRATIONS_DIR: z.string().default('infra/postgres/migrations'),
   ACCOUNT_EQUITY: z.coerce.number().positive().default(10_000),
 });

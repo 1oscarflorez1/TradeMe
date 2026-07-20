@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchAlerts, markAlertsRead, postAlert } from './api';
+import { fetchAlerts, fetchVapidKey, markAlertsRead, postAlert, postPushSubscribe } from './api';
 import type { Alert, AlertInputWeb } from './types';
 
 function canNotify(): boolean {
@@ -53,6 +53,34 @@ const SEV_ICON: Record<Alert['severity'], string> = {
   warning: '⚠',
 };
 
+function urlB64ToUint8(base64: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+async function subscribePush(): Promise<'on' | 'denied' | 'unsupported' | 'error'> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return 'denied';
+    const key = await fetchVapidKey();
+    if (!key) return 'error';
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlB64ToUint8(key) as unknown as BufferSource,
+    });
+    const ok = await postPushSubscribe(sub.toJSON());
+    return ok ? 'on' : 'error';
+  } catch {
+    return 'error';
+  }
+}
+
 export function AlertCenter({
   alerts,
   unread,
@@ -63,9 +91,7 @@ export function AlertCenter({
   onMarkRead: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [perm, setPerm] = useState<string>(
-    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
-  );
+  const [pushState, setPushState] = useState<string>('idle');
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,9 +103,9 @@ export function AlertCenter({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  const requestPerm = () => {
-    if (typeof Notification === 'undefined') return;
-    void Notification.requestPermission().then(setPerm);
+  const activarPush = () => {
+    setPushState('working');
+    void subscribePush().then(setPushState);
   };
 
   return (
@@ -102,11 +128,22 @@ export function AlertCenter({
               Marcar leídas
             </button>
           </div>
-          {perm !== 'granted' && perm !== 'unsupported' && (
-            <button type="button" className="bell-perm" onClick={requestPerm}>
-              Activar notificaciones del navegador
-            </button>
-          )}
+          <button
+            type="button"
+            className="bell-perm"
+            onClick={activarPush}
+            disabled={pushState === 'working' || pushState === 'on'}
+          >
+            {pushState === 'on'
+              ? '✓ Push activado en este dispositivo'
+              : pushState === 'working'
+                ? 'Activando…'
+                : pushState === 'denied'
+                  ? 'Permiso denegado — actívalo en el navegador'
+                  : pushState === 'unsupported'
+                    ? 'Este navegador no soporta push'
+                    : 'Activar push en este dispositivo'}
+          </button>
           <div className="bell-list">
             {alerts.length === 0 ? (
               <p className="muted">Sin alertas todavía.</p>

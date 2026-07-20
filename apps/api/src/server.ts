@@ -10,6 +10,8 @@ import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { BacktestsRepo } from './db/backtests-repo.js';
 import { AlertsRepo } from './db/alerts-repo.js';
+import { PushSubsRepo } from './db/push-subs-repo.js';
+import { Pusher } from './push/push.js';
 import { runMigrations } from './db/migrate.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
@@ -19,6 +21,7 @@ import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
 import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import type { Signal } from './domain/signal.js';
 import { Calibrators } from './calibration/load.js';
 import { MacroStore } from './macro/store.js';
 import { computeMacroBias } from './macro/bias.js';
@@ -63,6 +66,9 @@ async function main(): Promise<void> {
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
+  const pushSubsRepo = pool ? new PushSubsRepo(pool) : null;
+  const pusher = new Pusher(env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT);
+  const pushCooldown = new Map<string, number>();
 
   function reloadArtifacts(): {
     ensembleVersion: string;
@@ -113,6 +119,8 @@ async function main(): Promise<void> {
     createAlert: alertsRepo ? (a) => alertsRepo.create(a) : undefined,
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
     markAlertsRead: alertsRepo ? () => alertsRepo.markAllRead() : undefined,
+    vapidPublicKey: env.VAPID_PUBLIC_KEY,
+    savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
       : undefined,
@@ -153,6 +161,29 @@ async function main(): Promise<void> {
         calibrators,
       });
       hub.broadcastSignal(symbol, iv, signal);
+      void maybePush(symbol, iv, signal);
+    }
+  }
+
+  // Regla en el servidor: push en segundo plano ante decisión accionable de alta confianza.
+  async function maybePush(symbol: string, iv: Interval, signal: Signal): Promise<void> {
+    if (!pushSubsRepo || !alertsRepo) return;
+    if (signal.action !== 'BUY' && signal.action !== 'SELL') return;
+    if (signal.confidence < env.PUSH_MIN_CONFIDENCE) return;
+    const key = `${symbol}:${iv}:${signal.action}`;
+    const now = Date.now();
+    if (now - (pushCooldown.get(key) ?? 0) < env.PUSH_COOLDOWN_MS) return;
+    pushCooldown.set(key, now);
+    const accion = signal.action === 'BUY' ? 'COMPRAR' : 'VENDER';
+    const title = `Decisión ${accion} · ${symbol} ${iv}`;
+    const body = `Confianza ${(signal.confidence * 100).toFixed(0)}% (dirección ${signal.direction}).`;
+    await alertsRepo
+      .create({ type: 'decision', severity: 'warning', symbol, interval: iv, title, message: body })
+      .catch(() => undefined);
+    const subs = await pushSubsRepo.list().catch(() => []);
+    for (const sub of subs) {
+      const ok = await pusher.send(sub, { title, body, url: '/', tag: key });
+      if (!ok) await pushSubsRepo.remove(sub.endpoint).catch(() => undefined);
     }
   }
 
