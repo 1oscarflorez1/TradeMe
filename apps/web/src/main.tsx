@@ -14,3 +14,11 @@ createRoot(container).render(
     </ErrorBoundary>
   </StrictMode>,
 );
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* el registro puede fallar en http o navegadores sin soporte */
+    });
+  });
+}

@@ -5,6 +5,15 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M9 · PWA + Web Push
+
+- **web:** PWA instalable (manifest, iconos, service worker) y registro del SW; la app se instala en
+  móvil/escritorio. Botón "Activar push en este dispositivo" (suscripción Web Push).
+- **api:** Web Push con VAPID — `GET /push/vapid`, `POST /push/subscribe`, tabla `push_subscriptions`;
+  **regla en el servidor** que envía push en segundo plano ante decisión accionable de alta confianza
+  (con cooldown). Dependencia `web-push`.
+- El push real completa el hueco dejado en M8 (avisos con la app cerrada).
+
 ### Added — M8 · Notificaciones
 
 - **api:** tabla `alerts` (historial) + endpoints `GET /alerts`, `POST /alerts`, `POST /alerts/read`.

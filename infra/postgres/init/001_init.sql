@@ -123,3 +123,10 @@ CREATE TABLE IF NOT EXISTS alerts (
   read        BOOLEAN NOT NULL DEFAULT false
 );
 CREATE INDEX IF NOT EXISTS alerts_created_idx ON alerts (created_at DESC);
+
+-- M9: suscripciones Web Push.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  endpoint    TEXT PRIMARY KEY,
+  sub         JSONB NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

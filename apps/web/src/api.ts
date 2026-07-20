@@ -181,6 +181,29 @@ export async function markAlertsRead(): Promise<boolean> {
   }
 }
 
+export async function fetchVapidKey(): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/push/vapid`);
+    if (!res.ok) return null;
+    return ((await res.json()) as { publicKey: string | null }).publicKey;
+  } catch {
+    return null;
+  }
+}
+
+export async function postPushSubscribe(sub: unknown): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/push/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function streamUrl(symbol: string, interval: Interval): string {
   const url = new URL(API_URL);
   const proto = url.protocol === 'https:' ? 'wss:' : 'ws:';
