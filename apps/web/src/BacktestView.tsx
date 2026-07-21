@@ -209,6 +209,13 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
             </div>
           ))}
         </div>
+        <p className="bt-note bt-trades-note">
+          Las <strong>{bt.n_trades ?? 0} operaciones</strong> no son un número fijo: es cuántas veces
+          la lógica señaló <strong>COMPRAR o VENDER</strong> (no MANTENER) sobre las ~1000 velas del
+          histórico de {bt.interval}, <strong>sin solapar</strong> operaciones (tras abrir una, se
+          salta hasta que cierra). Por eso cambia con la temporalidad —más en 1m, menos en 4h— y con
+          el tramo de mercado analizado.
+        </p>
         <div className="chart-head">
           <strong title="Suma acumulada del resultado de cada operación en R. Si sube de forma sostenida, el sistema aporta ventaja.">Curva de equity</strong>
           <span className="muted">· R acumulado · desliza para recorrerla · pico, máx. drawdown y final marcados</span>

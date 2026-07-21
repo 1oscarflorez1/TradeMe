@@ -1561,3 +1561,8 @@ pre.hint {
 .gear-cooldown input {
   width: 3.4rem;
 }
+
+/* ---- Backtest: nota del nº de operaciones ---- */
+.bt-trades-note {
+  margin: 0 0 0.8rem;
+}
