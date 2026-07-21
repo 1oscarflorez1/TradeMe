@@ -5,6 +5,15 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Changed — Modo solo-técnico (separar fundamental del técnico)
+
+- **api:** flag `MACRO_ENABLED` (por defecto `false`): el sesgo macro/fundamental deja de inyectarse
+  en la decisión en vivo, que pasa a ser **solo-técnica** y queda consistente con el backtest (que ya
+  era solo-técnico). Reversible con `MACRO_ENABLED=true`. La matemática macro y su paridad quedan
+  intactas (en pausa, no eliminadas).
+- **web:** el panel Macro indica "modo solo-técnico"; la pestaña Backtest explica de forma intuitiva
+  por qué emerge el número de operaciones.
+
 ### Added — M9 · PWA + Web Push
 
 - **web:** PWA instalable (manifest, iconos, service worker) y registro del SW; la app se instala en

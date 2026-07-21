@@ -7,6 +7,8 @@ const EnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3001),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   ENABLE_LIVE_TRADING: z.enum(['true', 'false']).default('false'),
+  // Modo solo-técnico: el sesgo macro/fundamental no se inyecta en la decisión en vivo.
+  MACRO_ENABLED: z.enum(['true', 'false']).default('false'),
   DATABASE_URL: z.string().optional(),
   TRADEME_SYMBOLS: z.string().default('BTCUSDT'),
   TRADEME_INTERVALS: z.string().default('1m,5m,15m,30m,1h,4h,1d,1w,1M'),

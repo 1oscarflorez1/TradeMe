@@ -63,6 +63,7 @@ async function main(): Promise<void> {
   const repo = pool ? new CandlesRepo(pool) : null;
   const externalRepo = pool ? new ExternalSignalsRepo(pool) : null;
   const macroStore = new MacroStore();
+  const macroEnabled = env.MACRO_ENABLED === 'true';
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
@@ -110,7 +111,7 @@ async function main(): Promise<void> {
     reloadArtifacts,
     ensembleMeta,
     equity: env.ACCOUNT_EQUITY,
-    getMacro: (symbol: string) => macroStore.get(symbol),
+    getMacro: macroEnabled ? (symbol: string) => macroStore.get(symbol) : undefined,
     recordSnapshot: snapshotsRepo
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
@@ -157,7 +158,7 @@ async function main(): Promise<void> {
         config: ensemble,
         equity: env.ACCOUNT_EQUITY,
         interval: iv,
-        macro: macroStore.get(symbol),
+        macro: macroEnabled ? macroStore.get(symbol) : undefined,
         calibrators,
       });
       hub.broadcastSignal(symbol, iv, signal);
@@ -200,7 +201,7 @@ async function main(): Promise<void> {
 
   const MACRO_REFRESH_MS = 60 * 60 * 1000;
   async function refreshMacro(symbol: string): Promise<void> {
-    if (!ensemble.macro.enabled) return;
+    if (!macroEnabled || !ensemble.macro.enabled) return;
     try {
       const weekly = buffer.get(symbol, '1w');
       if (weekly.length < 20) return;

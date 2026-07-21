@@ -12,7 +12,12 @@ const CONFLUENCE_LABEL: Record<Macro['confluence'], string> = {
 
 export function MacroPanel({ macro }: { macro?: Macro }) {
   if (!macro) {
-    return <p className="muted">Sesgo macro no disponible (requiere velas 1w).</p>;
+    return (
+      <p className="muted">
+        Análisis fundamental en pausa · modo solo-técnico. El sesgo macro no influye en la decisión
+        por ahora.
+      </p>
+    );
   }
   const biasClass =
     (macro.bias ?? 0) > 0.05 ? 'wh-long' : (macro.bias ?? 0) < -0.05 ? 'wh-short' : 'wh-flat';
