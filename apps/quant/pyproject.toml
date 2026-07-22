@@ -14,7 +14,9 @@ dependencies = [
   "psycopg[binary]>=3.1,<4",
   "numpy>=1.24",
   "pyyaml>=6",
-  "optuna>=3.6,<5"
+  "optuna>=3.6,<5",
+  "fastapi>=0.110,<1",
+  "uvicorn>=0.29,<1"
 ]
 
 [project.optional-dependencies]

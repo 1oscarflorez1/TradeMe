@@ -22,14 +22,16 @@ export interface BacktestRow {
 export class BacktestsRepo {
   constructor(private readonly pool: pg.Pool) {}
 
-  async latest(symbol: string, interval: string): Promise<BacktestRow | null> {
+  async latest(symbol: string, interval: string): Promise<(BacktestRow & { previous: BacktestRow | null }) | null> {
     const res = await this.pool.query<BacktestRow>(
       `SELECT id, created_at, symbol, interval, n_trades, win_rate, expectancy, profit_factor,
               max_drawdown, sharpe, oos_win_rate, oos_expectancy, metrics, trades, equity_curve
        FROM backtests WHERE symbol = $1 AND interval = $2
-       ORDER BY created_at DESC LIMIT 1`,
+       ORDER BY created_at DESC LIMIT 2`,
       [symbol.toUpperCase(), interval],
     );
-    return res.rows[0] ?? null;
+    const cur = res.rows[0];
+    if (!cur) return null;
+    return { ...cur, previous: res.rows[1] ?? null };
   }
 }

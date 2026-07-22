@@ -6,4 +6,5 @@ COPY apps/quant/trademe_quant ./trademe_quant
 COPY artifacts /app/artifacts
 RUN pip install --no-cache-dir -e ".[dev]"
 # Contenedor de tooling: no es un servicio. Mantener vivo para ejecutar trabajos quant.
-CMD ["python", "-c", "import trademe_quant; print('trademe-quant', trademe_quant.__version__, 'listo')"]
+EXPOSE 8000
+CMD ["uvicorn", "trademe_quant.service:app", "--host", "0.0.0.0", "--port", "8000"]

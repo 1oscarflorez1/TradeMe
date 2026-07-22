@@ -141,6 +141,7 @@ export interface BacktestResult {
   oos_expectancy: number | null;
   equity_curve: number[];
   trades: BacktestTrade[];
+  previous?: BacktestResult | null;
 }
 
 

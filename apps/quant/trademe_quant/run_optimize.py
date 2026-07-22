@@ -14,6 +14,7 @@ import os
 import pathlib
 import sys
 import time
+from typing import Any
 
 import yaml
 
@@ -27,11 +28,8 @@ def _repo_artifact(name: str) -> str:
     return str(pathlib.Path(__file__).resolve().parents[3] / "artifacts" / name)
 
 
-def main() -> None:
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDT"
-    interval = sys.argv[2] if len(sys.argv) > 2 else "5m"
-    n_trials = int(os.environ.get("OPTUNA_TRIALS", "60"))
-
+def optimize_and_publish(symbol: str, interval: str, n_trials: int = 60) -> dict[str, Any]:
+    """Optimiza pesos con Optuna, escribe el informe y (si gana) el ensemble optimizado."""
     rows = fetch_klines(symbol, interval, limit=1000)
     candles = [normalize_rest_kline(symbol, interval, r) for r in rows]
     high = [c.high for c in candles]
@@ -61,22 +59,27 @@ def main() -> None:
     with open(report_path, "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2)
 
-    ho = result["holdout"]
-    print(
-        f"trials={n_trials} val_score={result['validation_score']:.4f} | "
-        f"hold-out base={ho['base_expectancy']:.4f}R ({ho['base_trades']}) "
-        f"opt={ho['optimized_expectancy']:.4f}R ({ho['optimized_trades']})"
-    )
-
     if result["promoted"]:
         opt_cfg = dict(result["best_config"])
         opt_cfg["version"] = version
         opt_path = os.environ.get("OPTIMIZED_ENSEMBLE", _repo_artifact("ensemble.optimized.yaml"))
         with open(opt_path, "w", encoding="utf-8") as fh:
             yaml.safe_dump(opt_cfg, fh, sort_keys=False, allow_unicode=True)
-        print(f"PROMOVIDO: el candidato gana en hold-out -> {opt_path}")
-    else:
-        print("NO promovido: el base se mantiene (el candidato no supera el hold-out).")
+    return report
+
+
+def main() -> None:
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDT"
+    interval = sys.argv[2] if len(sys.argv) > 2 else "5m"
+    n_trials = int(os.environ.get("OPTUNA_TRIALS", "60"))
+    report = optimize_and_publish(symbol, interval, n_trials)
+    ho = report["holdout"]
+    print(
+        f"trials={n_trials} val_score={report['validation_score']:.4f} | "
+        f"hold-out base={ho['base_expectancy']:.4f}R ({ho['base_trades']}) "
+        f"opt={ho['optimized_expectancy']:.4f}R ({ho['optimized_trades']})"
+    )
+    print("PROMOVIDO" if report["promoted"] else "NO promovido (se mantiene el base).")
 
 
 if __name__ == "__main__":

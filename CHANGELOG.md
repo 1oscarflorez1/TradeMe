@@ -5,6 +5,17 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Backtest desde la UI + Δ + límite de auto-snapshot
+
+- **quant:** servicio HTTP (FastAPI) `run-backtest` / `run-optimize`; los CLI se refactorizan a
+  funciones reutilizables. El contenedor quant pasa a servidor (uvicorn); el CLI sigue disponible con
+  `docker compose run --rm quant python -m ...`.
+- **api:** `POST /backtest/run` y `POST /optimize/run` (proxy al servicio quant); `GET /backtest`
+  devuelve además la corrida anterior para calcular deltas.
+- **web:** botones **▶ Correr backtest** y **⚙ Optimizar** en la pestaña Backtest (sin terminal);
+  indicadores **Δ** (verde/rojo) junto a cada métrica respecto a la corrida previa; en el engranaje,
+  **límite** de snapshots automáticos (al alcanzarlo se desactiva y hay que reactivarlo).
+
 ### Changed / Added — Afinar técnico
 
 - **ensemble:** `hold_band` 0.15 → 0.06 (menos zona neutra). En modo solo-técnico la decisión ya no
