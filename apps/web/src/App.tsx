@@ -11,7 +11,15 @@ import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
 import { BacktestView } from './BacktestView';
 import { DrawingLayer } from './DrawingLayer';
-import { fetchCandles, fetchSignal, fetchSnapshots, fetchSymbols, fetchVotes, streamUrl } from './api';
+import {
+  fetchCandles,
+  fetchSignal,
+  fetchSnapshots,
+  fetchSymbols,
+  fetchVotes,
+  postSnapshot,
+  streamUrl,
+} from './api';
 import { AlertCenter, useAlerts } from './AlertCenter';
 import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
@@ -55,6 +63,9 @@ export function App() {
   const { alerts: alertHistory, unread, create: createAlert, markRead } = useAlerts();
   const [cooldownMin, setCooldownMin] = useState<number>(() =>
     Number(localStorage.getItem('trademe.alertCooldownMin') ?? 5),
+  );
+  const [autoSnap, setAutoSnapState] = useState<boolean>(
+    () => localStorage.getItem('trademe.autoSnapshot') === 'true',
   );
   const lastFired = useRef<Record<string, number>>({});
   const prevTfAlert = useRef<Set<string>>(new Set());
@@ -175,6 +186,21 @@ export function App() {
       /* almacenamiento no disponible */
     }
   };
+  const setAutoSnap = (v: boolean): void => {
+    setAutoSnapState(v);
+    try {
+      localStorage.setItem('trademe.autoSnapshot', String(v));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  };
+  const fireSnapshot = (sym: string, iv: string): void => {
+    const key = `snap:${sym}:${iv}`;
+    const now = Date.now();
+    if (now - (lastFired.current[key] ?? 0) < cooldownMin * 60000) return;
+    lastFired.current[key] = now;
+    void postSnapshot(sym, iv as Interval, 'auto');
+  };
   const fireAlert = (key: string, input: Parameters<typeof createAlert>[0]): void => {
     const now = Date.now();
     if (now - (lastFired.current[key] ?? 0) < cooldownMin * 60000) return;
@@ -198,6 +224,7 @@ export function App() {
             title: `Decisión ${ACT_ES[a.action] ?? a.action}`,
             message: `${symbol} ${iv}: confianza ${(a.conf * 100).toFixed(0)}% ≥ ${thr(iv)}%`,
           });
+          if (autoSnap) fireSnapshot(symbol, iv);
         }
       }
     }
@@ -440,6 +467,14 @@ export function App() {
                     onChange={(e) => setCooldown(Number(e.target.value))}
                   />
                   <span className="muted">min entre alertas iguales</span>
+                </label>
+                <label className="gear-row gear-autosnap">
+                  <input
+                    type="checkbox"
+                    checked={autoSnap}
+                    onChange={(e) => setAutoSnap(e.target.checked)}
+                  />
+                  <span>Guardar snapshot automático al superar el umbral</span>
                 </label>
                 <div className="gear-actions">
                   <button type="button" className="gear-save" onClick={() => setShowGear(false)}>

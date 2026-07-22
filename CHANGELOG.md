@@ -5,6 +5,14 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Changed / Added — Afinar técnico
+
+- **ensemble:** `hold_band` 0.15 → 0.06 (menos zona neutra). En modo solo-técnico la decisión ya no
+  cae en FLAT tan a menudo: sugiere COMPRAR/VENDER cuando |net| > 0.06 (antes 0.15). Vectores de
+  paridad regenerados (Node≡Python).
+- **web:** snapshot **automático** (toggle en el engranaje): guarda un snapshot al superar el umbral
+  de una temporalidad, con el mismo cooldown, sin tener que registrarlo a mano.
+
 ### Changed — Modo solo-técnico (separar fundamental del técnico)
 
 - **api:** flag `MACRO_ENABLED` (por defecto `false`): el sesgo macro/fundamental deja de inyectarse

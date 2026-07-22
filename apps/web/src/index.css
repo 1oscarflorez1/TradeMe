@@ -1566,3 +1566,15 @@ pre.hint {
 .bt-trades-note {
   margin: 0 0 0.8rem;
 }
+
+/* ---- Engranaje: toggle de snapshot automático ---- */
+.gear-autosnap {
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  margin-top: 0.5rem;
+}
+.gear-autosnap input {
+  margin-top: 0.15rem;
+}

@@ -4,7 +4,7 @@ version: 'ens-m3-2026-07-07'
 
 # Softmax: temperatura (menor = más decidido) y banda neutra que favorece HOLD.
 temperature: 0.5
-hold_band: 0.15
+hold_band: 0.06
 
 # Pesos base por indicador interno (ADX/ATR no votan: son contexto/volatilidad).
 weights:
