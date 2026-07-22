@@ -41,6 +41,7 @@ services:
       ENABLE_LIVE_TRADING: 'false'
       DATABASE_URL: postgres://trademe:trademe@postgres:5432/trademe
       REDIS_URL: redis://redis:6379
+      QUANT_URL: http://quant:8000
     volumes:
       - ../artifacts:/repo/artifacts
     ports:
@@ -67,6 +68,8 @@ services:
     environment:
       MLFLOW_TRACKING_URI: file:./mlruns
       DATABASE_URL: postgres://trademe:trademe@postgres:5432/trademe
+    ports:
+      - '8000:8000'
     volumes:
       - ../artifacts:/app/artifacts
     depends_on:

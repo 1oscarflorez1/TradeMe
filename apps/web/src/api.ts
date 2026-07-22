@@ -204,6 +204,49 @@ export async function postPushSubscribe(sub: unknown): Promise<boolean> {
   }
 }
 
+export async function runBacktest(
+  symbol: string,
+  interval: Interval,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/backtest/run?symbol=${symbol}&interval=${interval}`, {
+      method: 'POST',
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function runOptimize(
+  symbol: string,
+  interval: Interval,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/optimize/run?symbol=${symbol}&interval=${interval}`, {
+      method: 'POST',
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function postReload(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/reload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function streamUrl(symbol: string, interval: Interval): string {
   const url = new URL(API_URL);
   const proto = url.protocol === 'https:' ? 'wss:' : 'ws:';

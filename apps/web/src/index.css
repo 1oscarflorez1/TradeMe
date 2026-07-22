@@ -1566,3 +1566,67 @@ pre.hint {
 .bt-trades-note {
   margin: 0 0 0.8rem;
 }
+
+/* ---- Engranaje: toggle de snapshot automático ---- */
+.gear-autosnap {
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  margin-top: 0.5rem;
+}
+.gear-autosnap input {
+  margin-top: 0.15rem;
+}
+
+/* ---- Backtest: botones de correr/optimizar + Δ por métrica ---- */
+.bt-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+.bt-run {
+  background: #1e6fb8;
+  border: none;
+  color: #fff;
+  border-radius: 7px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bt-run:hover:not(:disabled) {
+  background: #4da3ff;
+}
+.bt-run:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.bt-opt {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+.bt-opt:hover:not(:disabled) {
+  border-color: #4da3ff;
+  background: var(--bg);
+}
+.bt-card {
+  position: relative;
+}
+.bt-delta {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.delta-up {
+  color: #2fbf6b;
+}
+.delta-down {
+  color: #e0645f;
+}
+.delta-flat {
+  color: var(--muted);
+}

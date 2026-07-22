@@ -120,6 +120,7 @@ async function main(): Promise<void> {
     createAlert: alertsRepo ? (a) => alertsRepo.create(a) : undefined,
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
     markAlertsRead: alertsRepo ? () => alertsRepo.markAllRead() : undefined,
+    quantUrl: env.QUANT_URL,
     vapidPublicKey: env.VAPID_PUBLIC_KEY,
     savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo

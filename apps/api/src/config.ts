@@ -28,6 +28,7 @@ const EnvSchema = z.object({
   PUSH_COOLDOWN_MS: z.coerce.number().int().default(600000),
 
   MIGRATIONS_DIR: z.string().default('infra/postgres/migrations'),
+  QUANT_URL: z.string().optional(),
   ACCOUNT_EQUITY: z.coerce.number().positive().default(10_000),
 });
 

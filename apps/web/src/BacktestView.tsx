@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { fetchBacktest, fetchCalibration, fetchEnsemble } from './api';
+import {
+  fetchBacktest,
+  fetchCalibration,
+  fetchEnsemble,
+  postReload,
+  runBacktest,
+  runOptimize,
+} from './api';
 import type {
   BacktestResult,
   CalibrationMeta,
@@ -143,21 +150,58 @@ function EquityCurve({ equity }: { equity: number[] }) {
 export function BacktestView({ symbol, interval }: { symbol: string; interval: Interval }) {
   const [bt, setBt] = useState<BacktestResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState<string | null>(null);
+
+  const load = (): Promise<void> =>
+    fetchBacktest(symbol, interval).then((r) => {
+      setBt(r);
+      setLoading(false);
+    });
 
   useEffect(() => {
     if (!symbol) return;
-    let cancelled = false;
     setLoading(true);
-    fetchBacktest(symbol, interval).then((r) => {
-      if (!cancelled) {
-        setBt(r);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    void load();
   }, [symbol, interval]);
+
+  const runBt = async (): Promise<void> => {
+    setRunning('backtest');
+    const r = await runBacktest(symbol, interval);
+    setRunning(null);
+    if (r.ok) await load();
+  };
+  const runOpt = async (): Promise<void> => {
+    setRunning('optimize');
+    const r = await runOptimize(symbol, interval);
+    if (r.ok) {
+      await postReload();
+      await runBacktest(symbol, interval);
+    }
+    setRunning(null);
+    await load();
+  };
+
+  const actions = (
+    <div className="bt-actions">
+      <button
+        type="button"
+        className="bt-run"
+        disabled={running !== null}
+        onClick={() => void runBt()}
+      >
+        {running === 'backtest' ? 'Corriendo…' : '▶ Correr backtest'}
+      </button>
+      <button
+        type="button"
+        className="bt-run bt-opt"
+        disabled={running !== null}
+        onClick={() => void runOpt()}
+        title="Optimiza los pesos con Optuna y aplica el resultado si gana en hold-out"
+      >
+        {running === 'optimize' ? 'Optimizando…' : '⚙ Optimizar'}
+      </button>
+    </div>
+  );
 
   if (loading) return <p className="muted">Cargando backtest…</p>;
   if (!bt) {
@@ -165,12 +209,17 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
       <div className="bt-layout">
         <div className="bt-main">
           <section className="panel">
+            <div className="chart-head">
+              <strong>Backtest</strong>
+              <span className="muted">
+                · {symbol} · {interval} · sin resultados aún
+              </span>
+              {actions}
+            </div>
             <p className="muted">
-              Aún no hay backtest para {symbol} · {interval}. Ejecútalo desde quant:
+              Aún no hay backtest para {symbol} · {interval}. Pulsa <strong>▶ Correr backtest</strong>
+              para generarlo sobre esta temporalidad (sin necesidad de terminal).
             </p>
-            <pre className="hint">
-              python -m trademe_quant.run_backtest {symbol} {interval}
-            </pre>
           </section>
           <CalibrationSection />
           <OptimizationSection />
@@ -180,15 +229,40 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
     );
   }
 
-  const cards: Array<[string, string, string]> = [
-    ['Trades', String(bt.n_trades ?? 0), 'Operaciones simuladas sobre el histórico. Cuantas más, más fiable la estadística.'],
-    ['Win rate', pct(bt.win_rate), 'Porcentaje de operaciones ganadoras. Por sí solo no dice si el sistema gana dinero.'],
-    ['Expectancy', `${num(bt.expectancy, 3)} R`, 'Ganancia media por operación en R (riesgo por trade). Positiva = hay ventaja. Es la métrica clave.'],
-    ['Profit factor', num(bt.profit_factor), 'Ganancias brutas ÷ pérdidas brutas. >1 rentable; cerca de 1 = ventaja pequeña.'],
-    ['Max drawdown', `${num(bt.max_drawdown, 2)} R`, 'Peor caída acumulada (en R) desde un pico. Mide cuánto duele la peor racha.'],
-    ['Sharpe', num(bt.sharpe), 'Rentabilidad ajustada a la volatilidad: cuánto ganas por unidad de riesgo. Mayor = más estable.'],
-    ['Win rate OOS', pct(bt.oos_win_rate), 'Win rate en el 30% final reservado (out-of-sample). Si se parece al resto, no hay sobreajuste.'],
-    ['Expectancy OOS', `${num(bt.oos_expectancy, 3)} R`, 'Expectancy en el tramo out-of-sample. Prueba de honestidad frente al sobreajuste.'],
+  const P = bt.previous ?? null;
+  const dlt = (
+    cur: number | null,
+    prev: number | null | undefined,
+    dir: 'up' | 'down' | 'neutral',
+    kind: 'r' | 'pct' | 'num' | 'dec',
+  ): { text: string; cls: string } | null => {
+    if (!P || cur === null || prev === null || prev === undefined) return null;
+    const diff = cur - prev;
+    const sign = diff > 0 ? '+' : '';
+    const text =
+      kind === 'pct'
+        ? `${sign}${(diff * 100).toFixed(1)}pp`
+        : kind === 'num'
+          ? `${sign}${diff.toFixed(0)}`
+          : kind === 'dec'
+            ? `${sign}${diff.toFixed(2)}`
+            : `${sign}${diff.toFixed(3)}R`;
+    let cls = 'delta-flat';
+    if (Math.abs(diff) > 1e-9 && dir !== 'neutral') {
+      const better = dir === 'up' ? diff > 0 : diff < 0;
+      cls = better ? 'delta-up' : 'delta-down';
+    }
+    return { text, cls };
+  };
+  const cards: Array<{ k: string; v: string; tip: string; delta: { text: string; cls: string } | null }> = [
+    { k: 'Trades', v: String(bt.n_trades ?? 0), tip: 'Operaciones simuladas sobre el histórico. Cuantas más, más fiable la estadística.', delta: dlt(bt.n_trades, P?.n_trades, 'neutral', 'num') },
+    { k: 'Win rate', v: pct(bt.win_rate), tip: 'Porcentaje de operaciones ganadoras. Por sí solo no dice si el sistema gana dinero.', delta: dlt(bt.win_rate, P?.win_rate, 'up', 'pct') },
+    { k: 'Expectancy', v: `${num(bt.expectancy, 3)} R`, tip: 'Ganancia media por operación en R. Positiva = hay ventaja. Es la métrica clave.', delta: dlt(bt.expectancy, P?.expectancy, 'up', 'r') },
+    { k: 'Profit factor', v: num(bt.profit_factor), tip: 'Ganancias brutas ÷ pérdidas brutas. >1 rentable; cerca de 1 = ventaja pequeña.', delta: dlt(bt.profit_factor, P?.profit_factor, 'up', 'dec') },
+    { k: 'Max drawdown', v: `${num(bt.max_drawdown, 2)} R`, tip: 'Peor caída acumulada (en R) desde un pico. Menos es mejor.', delta: dlt(bt.max_drawdown, P?.max_drawdown, 'down', 'r') },
+    { k: 'Sharpe', v: num(bt.sharpe), tip: 'Rentabilidad ajustada a la volatilidad. Mayor = más estable.', delta: dlt(bt.sharpe, P?.sharpe, 'up', 'dec') },
+    { k: 'Win rate OOS', v: pct(bt.oos_win_rate), tip: 'Win rate en el 30% final (out-of-sample). Si se parece al resto, no hay sobreajuste.', delta: dlt(bt.oos_win_rate, P?.oos_win_rate, 'up', 'pct') },
+    { k: 'Expectancy OOS', v: `${num(bt.oos_expectancy, 3)} R`, tip: 'Expectancy out-of-sample. Prueba de honestidad frente al sobreajuste.', delta: dlt(bt.oos_expectancy, P?.oos_expectancy, 'up', 'r') },
   ];
 
   return (
@@ -200,12 +274,14 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
           <span className="muted">
             · {bt.symbol} · {bt.interval} · sin look-ahead · peor caso SL
           </span>
+          {actions}
         </div>
         <div className="bt-cards">
-          {cards.map(([k, v, tip]) => (
-            <div key={k} className="bt-card" title={tip}>
-              <span className="bt-k">{k}</span>
-              <span className="bt-v">{v}</span>
+          {cards.map((c) => (
+            <div key={c.k} className="bt-card" title={c.tip}>
+              {c.delta && <span className={`bt-delta ${c.delta.cls}`}>{c.delta.text}</span>}
+              <span className="bt-k">{c.k}</span>
+              <span className="bt-v">{c.v}</span>
             </div>
           ))}
         </div>

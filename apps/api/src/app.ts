@@ -47,6 +47,7 @@ export interface AppDeps {
   markAlertsRead?: () => Promise<number>;
   vapidPublicKey?: string;
   savePushSub?: (sub: PushSub) => Promise<void>;
+  quantUrl?: string;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -240,6 +241,38 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.status(404).send({ error: 'sin backtest; ejecuta el CLI de quant' });
     }
     return bt;
+  });
+
+  // ---- Lanzar backtest / optimización desde la UI (proxy al servicio quant) ----
+  const QuantQuery = z.object({
+    symbol: z.string().default('BTCUSDT'),
+    interval: z.string().default('5m'),
+  });
+  async function proxyQuant(path: string, query: { symbol: string; interval: string }) {
+    const url = `${deps.quantUrl}/${path}?symbol=${encodeURIComponent(query.symbol.toUpperCase())}&interval=${encodeURIComponent(query.interval)}`;
+    const res = await fetch(url, { method: 'POST' });
+    if (!res.ok) throw new Error(`quant ${res.status}`);
+    return res.json();
+  }
+  app.post('/backtest/run', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    const q = QuantQuery.parse(request.query);
+    try {
+      return await proxyQuant('run-backtest', q);
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al lanzar backtest');
+      return reply.status(502).send({ error: 'no se pudo lanzar el backtest' });
+    }
+  });
+  app.post('/optimize/run', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    const q = QuantQuery.parse(request.query);
+    try {
+      return await proxyQuant('run-optimize', q);
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al lanzar optimización');
+      return reply.status(502).send({ error: 'no se pudo lanzar la optimización' });
+    }
   });
 
   // Metadatos de calibración (fiabilidad + Brier por régimen) para el dashboard.
