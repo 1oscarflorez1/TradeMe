@@ -34,6 +34,12 @@ def apply_params(base: dict[str, Any], params: dict[str, float]) -> dict[str, An
         cfg["weights"][k] = params[f"w_{k}"]
     for reg, kind in REGIME_KEYS:
         cfg["regime"][reg][kind] = params[f"r_{reg}_{kind}"]
+    if "hold_band" in params:
+        cfg["hold_band"] = params["hold_band"]
+    if "temperature" in params:
+        cfg["temperature"] = params["temperature"]
+    if "adx_threshold" in params:
+        cfg["regime"]["adx_threshold"] = params["adx_threshold"]
     return cfg
 
 
@@ -48,7 +54,8 @@ def penalized_expectancy(
     if n < min_trades:
         return -1.0
     exp = sum(float(t["r"]) for t in trades) / n
-    complexity = sum(abs(v - 1.0) for v in params.values()) / max(1, len(params))
+    weightlike = [v for k, v in params.items() if k.startswith("w_") or k.startswith("r_")]
+    complexity = sum(abs(v - 1.0) for v in weightlike) / max(1, len(weightlike))
     return exp - complexity_penalty * complexity
 
 
@@ -92,6 +99,9 @@ def optimize_weights(
             params[f"w_{k}"] = trial.suggest_float(f"w_{k}", 0.0, 2.0)
         for reg, kind in REGIME_KEYS:
             params[f"r_{reg}_{kind}"] = trial.suggest_float(f"r_{reg}_{kind}", 0.0, 2.0)
+        params["hold_band"] = trial.suggest_float("hold_band", 0.0, 0.25)
+        params["temperature"] = trial.suggest_float("temperature", 0.2, 1.5)
+        params["adx_threshold"] = trial.suggest_float("adx_threshold", 15.0, 40.0)
         cfg = apply_params(base_config, params)
         res = run_backtest(high[:split], low[:split], close[:split], cfg, horizon=horizon)
         val = [t for t in res["trades"] if in_test_folds(int(t["index"]), horizon, folds)]

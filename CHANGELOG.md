@@ -5,6 +5,12 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Changed — Optimizador ampliado (afinar técnico)
+
+- **quant/optimize:** Optuna ahora ajusta también la "forma" de la decisión —`hold_band`,
+  `temperature` y el umbral de régimen `adx_threshold`— además de los pesos y multiplicadores. La
+  penalización de complejidad se aplica solo a pesos/multiplicadores (no a la forma).
+
 ### Added — Backtest desde la UI + Δ + límite de auto-snapshot
 
 - **quant:** servicio HTTP (FastAPI) `run-backtest` / `run-optimize`; los CLI se refactorizan a
