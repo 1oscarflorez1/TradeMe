@@ -310,6 +310,64 @@ function BacktestGuide() {
       </details>
 
       <div className="bt-acc-group">
+        <h4>Metodología · por qué fiarse · pulsa para desplegar</h4>
+        <details className="bt-acc">
+          <summary>Sin look-ahead (sin trampa)</summary>
+          <div className="bt-acc-body">
+            <p>
+              En cada vela la decisión se toma usando <strong>solo</strong> la información disponible
+              hasta ese momento, nunca datos futuros. Es lo que separa un backtest honesto de uno que
+              se engaña a sí mismo mirando el resultado antes de decidir.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Peor caso en el stop (conservador)</summary>
+          <div className="bt-acc-body">
+            <p>
+              Cuando una misma vela toca el stop y el objetivo, se asume la <strong>pérdida</strong>
+              (no se sabe cuál ocurrió primero dentro de la vela). Así los resultados pecan de
+              prudentes: en la realidad no serían peores por este motivo.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Reserva out-of-sample (70/30)</summary>
+          <div className="bt-acc-body">
+            <p>
+              El 30% final del histórico se aparta y no influye en nada; sirve de examen. Si las
+              métricas de ese tramo se parecen a las del resto, el sistema no está memorizando el
+              pasado (no hay sobreajuste). Es la prueba de honestidad clave.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>De dónde sale el número de operaciones</summary>
+          <div className="bt-acc-body">
+            <p>
+              No se fija: es cuántas veces la lógica dijo COMPRAR o VENDER (no MANTENER) sobre las
+              ~1000 velas, sin solapar (tras abrir una operación se salta hasta que cierra). Ejemplo:
+              si de 950 velas evaluadas el modelo opera y cada operación dura ~10 velas, salen del
+              orden de decenas de operaciones. Cambia con la temporalidad (muchas más en 1m, pocas en
+              4h) y con la ventana de mercado, por eso el número varía entre ejecuciones.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Qué NO incluye (modo solo-técnico)</summary>
+          <div className="bt-acc-body">
+            <p>
+              El backtest reproduce la decisión <strong>solo con el análisis técnico</strong> (mismos
+              indicadores y ensemble que en vivo). No incluye el sesgo macro/fundamental —que ahora
+              está en pausa— ni las alertas Reditum en vivo (son eventos externos, no reconstruibles
+              del histórico de velas). Por eso el backtest y la decisión en vivo son ahora
+              <strong> consistentes</strong>.
+            </p>
+          </div>
+        </details>
+      </div>
+
+      <div className="bt-acc-group">
         <h4>Calibración de probabilidades · pulsa para desplegar</h4>
         <details className="bt-acc">
           <summary>¿Qué es calibrar?</summary>
