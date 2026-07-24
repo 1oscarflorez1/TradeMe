@@ -5,6 +5,18 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Changed — Módulo 1a · ADX continuo + estructura w_macro por TF (flag off)
+
+- **ensemble:** el ADX deja de ser un corte binario y pasa a **escalado continuo**: los
+  multiplicadores de régimen se interpolan entre "rango" (ADX bajo) y "tendencia" (ADX alto) por un
+  factor `f = clamp((ADX−adx_lo)/(adx_hi−adx_lo))` (nuevos `adx_lo`/`adx_hi`). Módula dinámicamente la
+  fuerza del voto de tendencia/momentum. Mirror Node≡Python + vectores de paridad regenerados.
+- **optimize:** Optuna ahora ajusta `adx_lo`/`adx_hi` (en vez de `adx_threshold`, que solo etiqueta).
+- **macro (scaffold, DESACTIVADO):** firma/interfaz de escalado de `w_macro` por temporalidad
+  (`scaledWMacro`/`scaled_w_macro` + `enable_scaling: false` + `tf_scale`), lista para cuando vuelva
+  el análisis fundamental, sin interferir en la fase solo-técnica.
+- **web:** definición ampliada del botón **⚙ Optimizar** (tooltip + acordeón).
+
 ### Changed — Optimizador ampliado (afinar técnico)
 
 - **quant/optimize:** Optuna ahora ajusta también la "forma" de la decisión —`hold_band`,

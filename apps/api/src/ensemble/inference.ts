@@ -40,3 +40,18 @@ export function confluence(net: number, bias: number): 'aligned' | 'conflict' | 
   if (net === 0 || bias === 0) return 'neutral';
   return Math.sign(net) === Math.sign(bias) ? 'aligned' : 'conflict';
 }
+
+/**
+ * Escalado de w_macro por temporalidad (M1, estructura preparada · DESACTIVADA por defecto).
+ * Cuando `enableScaling` es false devuelve el w_macro sin cambios. Se activará al reintroducir
+ * el análisis fundamental, ponderando el sesgo macro menos en temporalidades cortas.
+ */
+export function scaledWMacro(
+  wMacro: number,
+  interval: string,
+  cfg: { enableScaling: boolean; tfScale: Record<string, number> },
+): number {
+  if (!cfg.enableScaling) return wMacro;
+  const factor = cfg.tfScale[interval] ?? 1;
+  return wMacro * factor;
+}

@@ -21,6 +21,8 @@ external_weights:
 # Conmutación por régimen (ADX). En tendencia sube tendencia/momentum; en rango, reversión.
 regime:
   adx_threshold: 25
+  adx_lo: 15
+  adx_hi: 35
   trend: # ADX >= threshold
     trend: 1.5
     momentum: 1.5
@@ -52,3 +54,6 @@ macro:
   trend_scale: 0.05
   conflict_downgrade: true
   conflict_threshold: 0.5
+  # Escalado de w_macro por temporalidad (M1) — DESACTIVADO (fase solo-técnico).
+  enable_scaling: false
+  tf_scale: { '1m': 0.2, '5m': 0.3, '15m': 0.4, '30m': 0.5, '1h': 0.6, '4h': 0.8, '1d': 1.0, '1w': 1.0, '1M': 1.0 }
