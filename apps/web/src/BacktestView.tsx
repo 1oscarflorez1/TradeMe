@@ -151,6 +151,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   const [bt, setBt] = useState<BacktestResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<string | null>(null);
+  const [runMsg, setRunMsg] = useState<string | null>(null);
 
   const load = (): Promise<void> =>
     fetchBacktest(symbol, interval).then((r) => {
@@ -166,19 +167,31 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
 
   const runBt = async (): Promise<void> => {
     setRunning('backtest');
+    setRunMsg(null);
     const r = await runBacktest(symbol, interval);
     setRunning(null);
-    if (r.ok) await load();
+    if (r.ok) {
+      setRunMsg('✓ Backtest actualizado.');
+      await load();
+    } else {
+      setRunMsg('No se pudo correr el backtest. ¿Está arriba el servicio quant? (docker compose up -d --build)');
+    }
   };
   const runOpt = async (): Promise<void> => {
     setRunning('optimize');
+    setRunMsg('Optimizando con Optuna (puede tardar ~1 min)…');
     const r = await runOptimize(symbol, interval);
     if (r.ok) {
       await postReload();
       await runBacktest(symbol, interval);
+      setRunMsg('✓ Optimización aplicada y backtest actualizado.');
+      await load();
+    } else {
+      setRunning(null);
+      setRunMsg('No se pudo optimizar. ¿Está arriba el servicio quant?');
+      return;
     }
     setRunning(null);
-    await load();
   };
 
   const actions = (
@@ -216,6 +229,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
               </span>
               {actions}
             </div>
+            {runMsg && <p className="bt-runmsg">{runMsg}</p>}
             <p className="muted">
               Aún no hay backtest para {symbol} · {interval}. Pulsa <strong>▶ Correr backtest</strong>
               para generarlo sobre esta temporalidad (sin necesidad de terminal).
@@ -276,6 +290,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
           </span>
           {actions}
         </div>
+        {runMsg && <p className="bt-runmsg">{runMsg}</p>}
         <div className="bt-cards">
           {cards.map((c) => (
             <div key={c.k} className="bt-card" title={c.tip}>
@@ -438,6 +453,43 @@ function BacktestGuide() {
               está en pausa— ni las alertas Reditum en vivo (son eventos externos, no reconstruibles
               del histórico de velas). Por eso el backtest y la decisión en vivo son ahora
               <strong> consistentes</strong>.
+            </p>
+          </div>
+        </details>
+      </div>
+
+      <div className="bt-acc-group">
+        <h4>Los botones ▶ / ⚙ · pulsa para desplegar</h4>
+        <details className="bt-acc">
+          <summary>▶ Correr backtest</summary>
+          <div className="bt-acc-body">
+            <p>
+              Genera el backtest de la <strong>temporalidad seleccionada</strong> (cada TF tiene el
+              suyo; por eso en 15m dice "aún no hay backtest" hasta que lo corres ahí). Lo ejecuta el
+              servicio quant en el servidor, tarda ~10–30s y al terminar refresca las cifras. Si no
+              cambia nada o falla, verás un aviso: casi siempre es que el servicio quant no está
+              arriba (<code>docker compose up -d --build</code>).
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>⚙ Optimizar (Optuna)</summary>
+          <div className="bt-acc-body">
+            <p>
+              Busca los mejores parámetros (pesos, multiplicadores de régimen, hold_band, temperature
+              y umbral ADX) maximizando la expectancy en validación. Solo <strong>promociona</strong>
+              el resultado si gana en el tramo hold-out; entonces lo aplica y re-corre el backtest.
+              Tarda ~1 min. Es la forma rigurosa de "mejorar la estrategia" sin ajustar a ojo.
+            </p>
+          </div>
+        </details>
+        <details className="bt-acc">
+          <summary>Los indicadores Δ (verde/rojo)</summary>
+          <div className="bt-acc-body">
+            <p>
+              El numerito arriba a la derecha de cada métrica es el <strong>cambio respecto a la
+              corrida anterior</strong> del backtest: verde = mejor, rojo = peor (en el drawdown es al
+              revés, porque menos es mejor). Solo aparece si ya hay dos corridas para comparar.
             </p>
           </div>
         </details>
