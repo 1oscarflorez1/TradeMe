@@ -46,9 +46,11 @@ describe('aggregate (régimen + pesos)', () => {
     expect(agg.votes.find((v) => v.key === 'adx14')?.weight).toBe(0);
     // Reditum/TradingView: peso 2 (externalWeights) * 1 (custom sin ajuste de régimen)
     expect(agg.votes.find((v) => v.key === 'reditum_sniper')?.weight).toBe(2);
-    // EMA (trend, mult 1.5) => 1.5 ; RSI (reversion, mult 0.6) => 0.6
-    expect(agg.votes.find((v) => v.key === 'ema_cross')?.weight).toBeCloseTo(1.5, 6);
-    const expected = (0.8 * 1.5 + -0.5 * 0.6 + 1 * 2) / (1.5 + 0.6 + 2);
+    // ADX continuo (adx_lo 15, adx_hi 35): con ADX 30 => f = 0.75
+    // EMA (trend): 0.6*(1-0.75) + 1.5*0.75 = 1.275 ; RSI (reversion): 1.5*0.25 + 0.6*0.75 = 0.825
+    expect(agg.votes.find((v) => v.key === 'ema_cross')?.weight).toBeCloseTo(1.275, 6);
+    expect(agg.votes.find((v) => v.key === 'rsi14')?.weight).toBeCloseTo(0.825, 6);
+    const expected = (0.8 * 1.275 + -0.5 * 0.825 + 1 * 2) / (1.275 + 0.825 + 2);
     expect(agg.net).toBeCloseTo(expected, 6);
   });
 

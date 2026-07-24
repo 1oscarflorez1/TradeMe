@@ -23,3 +23,15 @@ def infer_probs(
 
 def pick_action(probs: dict[str, float]) -> str:
     return max(probs, key=lambda k: probs[k])
+
+
+def scaled_w_macro(w_macro: float, interval: str, cfg: dict[str, object]) -> float:
+    """Escalado de w_macro por temporalidad (M1, estructura preparada · DESACTIVADA por defecto).
+
+    Si enable_scaling es False devuelve w_macro sin cambios. Mirror de apps/api inference.ts.
+    """
+    if not cfg.get("enable_scaling", False):
+        return w_macro
+    tf_scale = cfg.get("tf_scale", {})
+    factor = float(tf_scale.get(interval, 1.0)) if isinstance(tf_scale, dict) else 1.0
+    return w_macro * factor

@@ -209,7 +209,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         className="bt-run bt-opt"
         disabled={running !== null}
         onClick={() => void runOpt()}
-        title="Optimiza los pesos con Optuna y aplica el resultado si gana en hold-out"
+        title="Optimizar = búsqueda automática (Optuna) de los mejores parámetros de la estrategia (pesos, régimen, hold_band, temperature, ADX) maximizando la expectancy en validación. Aplica el resultado SOLO si supera al actual en el tramo hold-out. Tarda ~1 min."
       >
         {running === 'optimize' ? 'Optimizando…' : '⚙ Optimizar'}
       </button>
@@ -473,13 +473,24 @@ function BacktestGuide() {
           </div>
         </details>
         <details className="bt-acc">
-          <summary>⚙ Optimizar (Optuna)</summary>
+          <summary>⚙ Optimizar (Optuna) — ¿qué es?</summary>
           <div className="bt-acc-body">
             <p>
-              Busca los mejores parámetros (pesos, multiplicadores de régimen, hold_band, temperature
-              y umbral ADX) maximizando la expectancy en validación. Solo <strong>promociona</strong>
-              el resultado si gana en el tramo hold-out; entonces lo aplica y re-corre el backtest.
-              Tarda ~1 min. Es la forma rigurosa de "mejorar la estrategia" sin ajustar a ojo.
+              <strong>Definición:</strong> "Optimizar" pone a un buscador inteligente (Optuna) a
+              probar cientos de combinaciones de los parámetros de la estrategia —los pesos de cada
+              indicador, los multiplicadores de régimen, la zona neutra (hold_band), la decisión
+              (temperature) y la sensibilidad del ADX— para encontrar la que <strong>más ventaja
+              habría dado</strong> sobre el histórico.
+            </p>
+            <p>
+              <strong>Cómo funciona:</strong> mide cada combinación en un tramo de validación y solo
+              <strong> promociona</strong> la ganadora si además supera a la actual en un tramo
+              hold-out reservado (nunca usado en la búsqueda). Así se evita el sobreajuste. Si gana,
+              la aplica en vivo y re-corre el backtest para que veas el efecto (mira los Δ).
+            </p>
+            <p className="bt-note">
+              Es la forma rigurosa de <strong>afinar la estrategia con datos</strong>, en vez de
+              ajustar los parámetros a ojo. Tarda ~1 minuto.
             </p>
           </div>
         </details>

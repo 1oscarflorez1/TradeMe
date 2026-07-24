@@ -61,7 +61,17 @@ def decide(
     adx = readings["adx14"]["value"]
     atr = readings["atr14"]["value"]
     label = "tendencia" if adx >= float(config["regime"]["adx_threshold"]) else "rango"
-    mult = config["regime"]["trend"] if label == "tendencia" else config["regime"]["range"]
+    adx_lo = float(config["regime"].get("adx_lo", 15.0))
+    adx_hi = float(config["regime"].get("adx_hi", 35.0))
+    if adx_hi > adx_lo:
+        f = min(1.0, max(0.0, (adx - adx_lo) / (adx_hi - adx_lo)))
+    else:
+        f = 1.0 if adx >= adx_hi else 0.0
+    range_mult = config["regime"]["range"]
+    trend_mult = config["regime"]["trend"]
+
+    def blend_mult(kind: str) -> float:
+        return _regime_mult(kind, range_mult) * (1 - f) + _regime_mult(kind, trend_mult) * f
 
     weights = config["weights"]
     ext_weights = config["external_weights"]
@@ -71,7 +81,7 @@ def decide(
         kind = KINDS[key]
         if kind not in VOTING:
             continue
-        w = float(weights.get(key, 1.0)) * _regime_mult(kind, mult)
+        w = float(weights.get(key, 1.0)) * blend_mult(kind)
         weighted_sum += r["score"] * w
         weight_total += w
     for ev in external_votes or []:

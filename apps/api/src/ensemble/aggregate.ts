@@ -24,7 +24,12 @@ export function aggregate(votes: Vote[], config: EnsembleConfig): Aggregation {
   const adx = votes.find((v) => v.key === 'adx14')?.value ?? 0;
   const atr = votes.find((v) => v.key === 'atr14')?.value ?? 0;
   const label = adx >= config.regime.adxThreshold ? 'tendencia' : 'rango';
-  const mult = label === 'tendencia' ? config.regime.trend : config.regime.range;
+  // ADX continuo: interpola entre multiplicadores de rango (ADX bajo) y tendencia (ADX alto).
+  const { adxLo, adxHi } = config.regime;
+  const f = adxHi > adxLo ? Math.min(1, Math.max(0, (adx - adxLo) / (adxHi - adxLo))) : adx >= adxHi ? 1 : 0;
+  const blendMult = (kind: string): number =>
+    regimeMultiplier(kind, config.regime.range) * (1 - f) +
+    regimeMultiplier(kind, config.regime.trend) * f;
 
   let weightedSum = 0;
   let weightTotal = 0;
@@ -39,7 +44,7 @@ export function aggregate(votes: Vote[], config: EnsembleConfig): Aggregation {
       v.source === 'internal'
         ? (config.weights[v.key] ?? 1)
         : (config.externalWeights[v.source] ?? 1);
-    const weight = base * regimeMultiplier(v.kind, mult);
+    const weight = base * blendMult(v.kind);
     weightedSum += v.score * weight;
     weightTotal += weight;
     out.push({ ...v, weight });

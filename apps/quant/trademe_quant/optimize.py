@@ -38,8 +38,9 @@ def apply_params(base: dict[str, Any], params: dict[str, float]) -> dict[str, An
         cfg["hold_band"] = params["hold_band"]
     if "temperature" in params:
         cfg["temperature"] = params["temperature"]
-    if "adx_threshold" in params:
-        cfg["regime"]["adx_threshold"] = params["adx_threshold"]
+    if "adx_lo" in params:
+        cfg["regime"]["adx_lo"] = params["adx_lo"]
+        cfg["regime"]["adx_hi"] = params["adx_lo"] + params.get("adx_width", 20.0)
     return cfg
 
 
@@ -101,7 +102,8 @@ def optimize_weights(
             params[f"r_{reg}_{kind}"] = trial.suggest_float(f"r_{reg}_{kind}", 0.0, 2.0)
         params["hold_band"] = trial.suggest_float("hold_band", 0.0, 0.25)
         params["temperature"] = trial.suggest_float("temperature", 0.2, 1.5)
-        params["adx_threshold"] = trial.suggest_float("adx_threshold", 15.0, 40.0)
+        params["adx_lo"] = trial.suggest_float("adx_lo", 10.0, 25.0)
+        params["adx_width"] = trial.suggest_float("adx_width", 5.0, 25.0)
         cfg = apply_params(base_config, params)
         res = run_backtest(high[:split], low[:split], close[:split], cfg, horizon=horizon)
         val = [t for t in res["trades"] if in_test_folds(int(t["index"]), horizon, folds)]

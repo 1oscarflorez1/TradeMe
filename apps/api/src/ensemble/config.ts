@@ -26,6 +26,8 @@ export interface MacroConfig {
   trendScale: number;
   conflictDowngrade: boolean;
   conflictThreshold: number;
+  enableScaling: boolean;
+  tfScale: Record<string, number>;
 }
 
 export interface EnsembleConfig {
@@ -34,7 +36,13 @@ export interface EnsembleConfig {
   holdBand: number;
   weights: Record<string, number>;
   externalWeights: Record<string, number>;
-  regime: { adxThreshold: number; trend: RegimeMultipliers; range: RegimeMultipliers };
+  regime: {
+    adxThreshold: number;
+    adxLo: number;
+    adxHi: number;
+    trend: RegimeMultipliers;
+    range: RegimeMultipliers;
+  };
   risk: RiskConfig;
   macro: MacroConfig;
   plan: PlanConfig;
@@ -48,6 +56,8 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
   externalWeights: { tradingview: 2 },
   regime: {
     adxThreshold: 25,
+    adxLo: 15,
+    adxHi: 35,
     trend: { trend: 1.5, momentum: 1.5, reversion: 0.6 },
     range: { trend: 0.6, momentum: 0.8, reversion: 1.5 },
   },
@@ -61,6 +71,8 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
     trendScale: 0.05,
     conflictDowngrade: true,
     conflictThreshold: 0.5,
+    enableScaling: false,
+    tfScale: { '1m': 0.2, '5m': 0.3, '15m': 0.4, '30m': 0.5, '1h': 0.6, '4h': 0.8, '1d': 1, '1w': 1, '1M': 1 },
   },
   plan: { validCandles: 3 },
 };
@@ -76,12 +88,20 @@ interface RawConfig {
   hold_band?: number;
   weights?: Record<string, number>;
   external_weights?: Record<string, number>;
-  regime?: { adx_threshold?: number; trend?: RawRegimeMult; range?: RawRegimeMult };
+  regime?: {
+    adx_threshold?: number;
+    adx_lo?: number;
+    adx_hi?: number;
+    trend?: RawRegimeMult;
+    range?: RawRegimeMult;
+  };
   risk?: { atr_stop_mult?: number; tp_r_multiple?: number; risk_pct?: number };
   plan?: { valid_candles?: number };
   macro?: {
     enabled?: boolean;
     w_macro?: number;
+    enable_scaling?: boolean;
+    tf_scale?: Record<string, number>;
     funding_weight?: number;
     trend_weight?: number;
     funding_scale?: number;
@@ -109,6 +129,8 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
     externalWeights: raw.external_weights ?? d.externalWeights,
     regime: {
       adxThreshold: raw.regime?.adx_threshold ?? d.regime.adxThreshold,
+      adxLo: raw.regime?.adx_lo ?? d.regime.adxLo,
+      adxHi: raw.regime?.adx_hi ?? d.regime.adxHi,
       trend: mult(raw.regime?.trend, d.regime.trend),
       range: mult(raw.regime?.range, d.regime.range),
     },
@@ -126,6 +148,8 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
       trendScale: raw.macro?.trend_scale ?? d.macro.trendScale,
       conflictDowngrade: raw.macro?.conflict_downgrade ?? d.macro.conflictDowngrade,
       conflictThreshold: raw.macro?.conflict_threshold ?? d.macro.conflictThreshold,
+      enableScaling: raw.macro?.enable_scaling ?? d.macro.enableScaling,
+      tfScale: raw.macro?.tf_scale ?? d.macro.tfScale,
     },
     plan: { validCandles: raw.plan?.valid_candles ?? d.plan.validCandles },
   };
