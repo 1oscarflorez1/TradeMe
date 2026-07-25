@@ -32,6 +32,58 @@ body {
   flex-direction: column;
 }
 
+.login-screen {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-panel {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.login-field input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.95rem;
+}
+
+.login-error {
+  color: #f87171;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.login-submit {
+  background: var(--accent);
+  color: #08131a;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .topbar {
   display: flex;
   align-items: center;

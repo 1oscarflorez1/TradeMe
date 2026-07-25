@@ -17,6 +17,9 @@ const EnvSchema = z.object({
   EXTERNAL_SIGNALS_CONFIG: z.string().default('apps/api/config/external_signals.yaml'),
   // CORS: lista de orígenes separada por comas; vacío = permitir cualquiera (dev).
   CORS_ORIGIN: z.string().optional(),
+  // Módulo 3: firma JWT. Sin configurar, la API queda abierta (dev/tests); en producción
+  // SIEMPRE debe estar puesto (ver docs/despliegue.md).
+  JWT_SECRET: z.string().optional(),
   ENSEMBLE_CONFIG: z.string().default('artifacts/ensemble.yaml'),
   CALIBRATORS_PATH: z.string().default('artifacts/calibrators.json'),
   OPTIMIZED_ENSEMBLE: z.string().default('artifacts/ensemble.optimized.yaml'),

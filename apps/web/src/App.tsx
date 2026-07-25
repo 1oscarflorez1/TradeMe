@@ -17,6 +17,7 @@ import {
   fetchSnapshots,
   fetchSymbols,
   fetchVotes,
+  logout,
   postSnapshot,
   streamUrl,
 } from './api';
@@ -513,6 +514,10 @@ export function App() {
           </div>
 
           <AlertCenter alerts={alertHistory} unread={unread} onMarkRead={markRead} />
+
+          <button type="button" className="gear-btn" title="Cerrar sesión" onClick={() => logout()}>
+            ⎋
+          </button>
 
           <span className={`status status-${status}`}>
             <span className="dot" aria-hidden />

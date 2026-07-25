@@ -11,6 +11,8 @@ import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { BacktestsRepo } from './db/backtests-repo.js';
 import { AlertsRepo } from './db/alerts-repo.js';
 import { PushSubsRepo } from './db/push-subs-repo.js';
+import { UsersRepo } from './db/users-repo.js';
+import { verifyJwt } from './auth/jwt.js';
 import { Pusher } from './push/push.js';
 import { runMigrations } from './db/migrate.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
@@ -68,6 +70,10 @@ async function main(): Promise<void> {
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
   const pushSubsRepo = pool ? new PushSubsRepo(pool) : null;
+  const usersRepo = pool ? new UsersRepo(pool) : null;
+  if (env.JWT_SECRET && !usersRepo) {
+    console.warn('JWT_SECRET configurado sin DATABASE_URL: /auth/login no podrá autenticar a nadie.');
+  }
   const pusher = new Pusher(env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT);
   const pushCooldown = new Map<string, number>();
 
@@ -127,6 +133,8 @@ async function main(): Promise<void> {
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
       : undefined,
     tvSecret: env.TV_WEBHOOK_SECRET,
+    authSecret: env.JWT_SECRET,
+    findUserByEmail: usersRepo ? (email) => usersRepo.findByEmail(email) : undefined,
     onExternalVote: (symbol: string) => broadcast(symbol),
     recordExternal: externalRepo
       ? (rec) =>
@@ -224,7 +232,11 @@ async function main(): Promise<void> {
       app.log.error({ err: String(err) }, 'fallo al aplicar migraciones'),
     );
   }
-  attachStream(app.server, hub);
+  attachStream(
+    app.server,
+    hub,
+    env.JWT_SECRET ? (token) => Boolean(token && verifyJwt(token, env.JWT_SECRET!)) : undefined,
+  );
   await app.listen({ host: env.API_HOST, port: env.API_PORT });
 
   const subscriptions = buildSubscriptions(env);
