@@ -1221,6 +1221,11 @@
       "score": -0.526921,
       "confidence": 0.526921
     },
+    "supertrend": {
+      "value": 114.984508,
+      "score": -0.995773,
+      "confidence": 0.995773
+    },
     "rsi14": {
       "value": 20.37,
       "score": 1,

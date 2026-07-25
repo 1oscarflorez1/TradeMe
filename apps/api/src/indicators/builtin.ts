@@ -118,6 +118,75 @@ export const macd: Indicator = {
   },
 };
 
+/**
+ * Supertrend(10, 3) — tendencia; no viene en `technicalindicators`, se implementa a mano
+ * (bandas ATR + regla "sticky" + flip de tendencia). Recorre todo el historial disponible
+ * (no solo la última vela) para que las bandas finales estén asentadas antes de leer el
+ * último valor: con poco calentamiento la banda inicial es arbitraria y el score sería ruido.
+ */
+export const supertrend: Indicator = {
+  key: 'supertrend',
+  label: 'Supertrend 10·3',
+  kind: 'trend',
+  defaultParams: { period: 10, multiplier: 3 },
+  minCandles: 40,
+  compute(candles) {
+    const period = 10;
+    const multiplier = 3;
+    const { close, high, low } = series(candles);
+    const atrSeries = ATR.calculate({ high, low, close, period });
+    // ATR.calculate descarta las primeras `period` velas (sin TR/SMA semilla todavía);
+    // atrSeries[i] corresponde a candles[i + period].
+    if (atrSeries.length < 5) return null;
+
+    const offset = period;
+    let finalUpper = 0;
+    let finalLower = 0;
+    let trend = 1; // 1 = arriba (usa banda inferior), -1 = abajo (usa banda superior)
+
+    for (let i = 0; i < atrSeries.length; i++) {
+      const atr = atrSeries[i];
+      const ci = i + offset;
+      const h = high[ci];
+      const l = low[ci];
+      const c = close[ci];
+      if (atr === undefined || h === undefined || l === undefined || c === undefined) continue;
+      const basicUpper = (h + l) / 2 + multiplier * atr;
+      const basicLower = (h + l) / 2 - multiplier * atr;
+
+      if (i === 0) {
+        finalUpper = basicUpper;
+        finalLower = basicLower;
+        trend = c <= finalUpper ? -1 : 1;
+        continue;
+      }
+
+      const prevClose = close[ci - 1];
+      if (prevClose === undefined) continue;
+      finalUpper = basicUpper < finalUpper || prevClose > finalUpper ? basicUpper : finalUpper;
+      finalLower = basicLower > finalLower || prevClose < finalLower ? basicLower : finalLower;
+
+      if (trend === 1) {
+        trend = c < finalLower ? -1 : 1;
+      } else {
+        trend = c > finalUpper ? 1 : -1;
+      }
+    }
+
+    const lastAtr = atrSeries[atrSeries.length - 1];
+    const price = close[close.length - 1];
+    if (lastAtr === undefined || lastAtr === 0 || price === undefined) return null;
+    const line = trend === 1 ? finalLower : finalUpper;
+    const score = clamp(Math.tanh((price - line) / lastAtr));
+    return {
+      value: line,
+      score,
+      confidence: confidenceFromScore(score),
+      meta: { trend: trend === 1 ? 'up' : 'down', finalUpper, finalLower },
+    };
+  },
+};
+
 /** ADX(14) — contexto: define régimen (>=25 tendencia). No vota dirección. */
 export const adx14: Indicator = {
   key: 'adx14',
@@ -158,6 +227,7 @@ export const atr14: Indicator = {
 export const BUILTIN_INDICATORS: Indicator[] = [
   emaCross,
   macd,
+  supertrend,
   rsi14,
   bbands,
   stoch14,

@@ -138,7 +138,7 @@
     {
       "macroBias": null,
       "expected": {
-        "net": -0.104326,
+        "net": -0.316575,
         "action": "SELL",
         "direction": "SHORT",
         "levels": {
@@ -151,7 +151,7 @@
     {
       "macroBias": -0.5,
       "expected": {
-        "net": -0.104326,
+        "net": -0.316575,
         "action": "SELL",
         "direction": "SHORT",
         "levels": {
@@ -164,7 +164,7 @@
     {
       "macroBias": 0.6,
       "expected": {
-        "net": -0.104326,
+        "net": -0.316575,
         "action": "HOLD",
         "direction": "FLAT",
         "levels": null

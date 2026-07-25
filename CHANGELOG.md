@@ -5,6 +5,18 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Módulo 1b · Supertrend
+
+- **ensemble (api+quant):** nuevo indicador **Supertrend(10, 3)**, `kind: trend`. No existe en
+  `technicalindicators` (Node) ni en el stack Python: se implementa a mano en ambos lados (bandas
+  ATR `(H+L)/2 ± 3·ATR` con regla "sticky" + flip de tendencia), recorriendo todo el historial
+  disponible para que las bandas estén asentadas antes de leer el valor (evita ruido por
+  calentamiento insuficiente). `score = clamp(tanh((close − línea)/ATR))`. Mirror Node≡Python +
+  vectores de paridad regenerados.
+- **ensemble:** peso inicial `1.0` (igual que EMA/MACD) — balancea el ensemble a 3 indicadores de
+  tendencia/momentum vs 3 de reversión.
+- **optimize:** Optuna ahora también afina `w_supertrend`.
+
 ### Changed — Módulo 1a · ADX continuo + estructura w_macro por TF (flag off)
 
 - **ensemble:** el ADX deja de ser un corte binario y pasa a **escalado continuo**: los

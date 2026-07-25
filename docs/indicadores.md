@@ -33,10 +33,21 @@ las mismas convenciones: semilla SMA + suavizado de Wilder para RSI/ATR/ADX). Am
 | Bollinger(20,2) | reversión   | `%B`: `clamp(1 − 2·%B)` (banda inferior = +1)                                |
 | EMA(9/21)       | tendencia   | `clamp(tanh((ema9 − ema21)/ATR))`                                            |
 | MACD(12,26,9)   | momentum    | `clamp(tanh(histograma/ATR))`                                                |
+| Supertrend(10,3)| tendencia   | `clamp(tanh((close − línea)/ATR))` — línea = banda final activa (M1b)        |
 | ADX(14)         | contexto    | **No vota** (`score = 0`); define régimen (≥25 tendencia) y modula confianza |
-| ATR(14)         | volatilidad | **No vota**; alimenta el plan (M4) y normaliza EMA/MACD                      |
+| ATR(14)         | volatilidad | **No vota**; alimenta el plan (M4) y normaliza EMA/MACD/Supertrend           |
 
 `confidence = |score|` (salvo ADX = `clamp(adx/50)` y ATR = 0).
+
+**Supertrend(10,3) — M1b.** No viene en `technicalindicators` (Node) ni en ninguna librería del
+stack Python: se implementa a mano en ambos lados (bandas ATR `(H+L)/2 ± 3·ATR` con regla "sticky" +
+flip de tendencia), mirror bit-a-bit entre `apps/api/src/indicators/builtin.ts` y
+`apps/quant/trademe_quant/indicators.py::supertrend_last`. Recorre **todo el historial disponible**
+(no solo la última vela) para que las bandas finales estén asentadas antes de leer el valor —con poco
+calentamiento la banda inicial es arbitraria y el score sería ruido—, por eso pide `minCandles: 40` y
+descarta el cálculo si hay menos de 5 barras de ATR asentadas. Se añadió para balancear el ensemble:
+antes había 3 indicadores de reversión (RSI/Stoch/BB) contra 2 de tendencia/momentum (EMA/MACD); con
+Supertrend queda 3 contra 3. Peso inicial `1.0`, igual que EMA/MACD.
 
 ## Familia B — señales externas (TradingView / Reditum)
 
