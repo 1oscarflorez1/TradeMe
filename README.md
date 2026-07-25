@@ -83,6 +83,10 @@ La API (`apps/api`) sirve, además de `/health`:
 - `POST /reload` — recarga en caliente de artefactos (ensemble optimizado + calibradores) publicados por quant.
 - `GET /alerts`, `POST /alerts`, `POST /alerts/read` — centro de notificaciones (M8). Ver [`docs/notificaciones.md`](docs/notificaciones.md).
 - `GET /push/vapid`, `POST /push/subscribe` — PWA + Web Push en segundo plano (M9). Ver [`docs/pwa-push.md`](docs/pwa-push.md).
+- `POST /auth/login`, `GET /auth/me` — login del equipo (JWT). Con `JWT_SECRET` configurado,
+  **todas las demás rutas exigen `Authorization: Bearer <jwt>`** (salvo `/health` y `/tv-hook`, que
+  tiene su propio secreto); sin `JWT_SECRET` la API queda abierta, como antes. Ver
+  [`docs/despliegue.md`](docs/despliegue.md).
 
 Calibración de probabilidades (M7):
 

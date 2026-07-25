@@ -17,6 +17,9 @@ import type { AlertRow, AlertInput } from './db/alerts-repo.js';
 import type { PushSub } from './push/push.js';
 import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
+import type { UserRow } from './db/users-repo.js';
+import { verifyPassword } from './auth/password.js';
+import { signJwt, verifyJwt } from './auth/jwt.js';
 
 export interface AppDeps {
   getHistory: (symbol: string, interval: string, limit: number, endTime?: number) => Promise<Candle[]>;
@@ -54,6 +57,10 @@ export interface AppDeps {
   onExternalVote?: (symbol: string, vote: Vote) => void;
   /** Callback para registrar la alerta externa (persistencia para backtest). */
   recordExternal?: (record: ExternalRecord) => void;
+  /** Secreto HMAC para firmar/verificar JWT (Módulo 3). Sin configurar, la API queda abierta
+   * (dev/tests) — en producción SIEMPRE debe estar puesto. */
+  authSecret?: string;
+  findUserByEmail?: (email: string) => Promise<UserRow | null>;
 }
 
 /** Alerta externa registrada (para el backtest de M6). */
@@ -97,11 +104,55 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const corsOrigin = env.CORS_ORIGIN ? env.CORS_ORIGIN.split(',').map((o) => o.trim()) : true;
   void app.register(cors, { origin: corsOrigin });
 
+  // Auth (Módulo 3): si hay `authSecret` configurado, toda ruta exige `Authorization: Bearer
+  // <jwt>` salvo la allowlist (salud, webhook de TradingView con su propio secreto, y login).
+  // Sin `authSecret` (dev/tests) la API queda abierta, igual que antes de este módulo.
+  const PUBLIC_PATHS = new Set(['/health', '/tv-hook', '/auth/login']);
+  if (deps.authSecret) {
+    const authSecret = deps.authSecret;
+    app.addHook('onRequest', async (request, reply) => {
+      if (request.method === 'OPTIONS') return;
+      const path = request.url.split('?')[0] ?? request.url;
+      if (PUBLIC_PATHS.has(path)) return;
+      const header = request.headers.authorization;
+      const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+      if (!token || !verifyJwt(token, authSecret)) {
+        return reply.status(401).send({ error: 'no autenticado' });
+      }
+    });
+  }
+
+  const LoginBody = z.object({ email: z.string().email(), password: z.string().min(1) });
+
+  app.post('/auth/login', async (request, reply) => {
+    if (!deps.authSecret || !deps.findUserByEmail) {
+      return reply.status(503).send({ error: 'autenticación no configurada' });
+    }
+    const parsed = LoginBody.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'credenciales inválidas' });
+    const user = await deps.findUserByEmail(parsed.data.email);
+    if (!user || !verifyPassword(parsed.data.password, user.password_hash)) {
+      return reply.status(401).send({ error: 'email o contraseña incorrectos' });
+    }
+    const token = signJwt({ sub: user.id, email: user.email }, deps.authSecret);
+    return { token, user: { id: user.id, email: user.email } };
+  });
+
+  app.get('/auth/me', async (request, reply) => {
+    if (!deps.authSecret) return reply.status(503).send({ error: 'autenticación no configurada' });
+    const header = request.headers.authorization;
+    const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+    const payload = token ? verifyJwt(token, deps.authSecret) : null;
+    if (!payload) return reply.status(401).send({ error: 'no autenticado' });
+    return { id: payload.sub, email: payload.email };
+  });
+
   app.get('/health', async () => ({
     status: 'ok',
     service: 'trademe-api',
     version: PKG.version,
     liveTrading: env.ENABLE_LIVE_TRADING === 'true',
+    authRequired: Boolean(deps.authSecret),
     ts: new Date().toISOString(),
   }));
 

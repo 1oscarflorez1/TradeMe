@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
+import { AuthGate } from './AuthGate.tsx';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import './index.css';
 
@@ -10,7 +11,9 @@ if (!container) throw new Error('No se encontró #root');
 createRoot(container).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <AuthGate>
+        <App />
+      </AuthGate>
     </ErrorBoundary>
   </StrictMode>,
 );

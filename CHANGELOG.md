@@ -5,6 +5,21 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Módulo 3 · Auth del equipo + despliegue PaaS
+
+- **api:** login JWT (`POST /auth/login`, `GET /auth/me`) — hash de contraseñas con `scrypt`
+  (nativo de Node) y JWT HS256 hecho a mano (sin dependencias nuevas). Con `JWT_SECRET`
+  configurado, todas las rutas exigen `Authorization: Bearer <jwt>` salvo `/health`, `/tv-hook`
+  (secreto propio) y `/auth/login`; el canal WS `/stream/{symbol}` exige `?token=` en el
+  handshake. Sin `JWT_SECRET` la API queda abierta (comportamiento previo, dev/tests intactos).
+- **api:** tabla `users` (migración `009_users.sql`) + script `scripts/create-user.ts` para dar de
+  alta al equipo — sin registro público.
+- **web:** pantalla de login (`Login.tsx` + `AuthGate.tsx`); el token vive en `sessionStorage`
+  (nunca `localStorage`); `GET /health` anuncia `authRequired` para que la web solo pida
+  credenciales si el backend las exige. Botón de cerrar sesión en la barra superior.
+- **docs:** `docs/despliegue.md` — Vercel (web) + Railway (api/quant/Postgres-Timescale/Redis) en
+  vez de Caddy/VPS; sin dominio propio aún, todo parametrizado por variables de entorno.
+
 ### Added — Módulo 1b · Supertrend
 
 - **ensemble (api+quant):** nuevo indicador **Supertrend(10, 3)**, `kind: trend`. No existe en
