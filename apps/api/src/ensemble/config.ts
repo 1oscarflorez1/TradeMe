@@ -52,7 +52,7 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
   version: 'ens-default',
   temperature: 0.5,
   holdBand: 0.06,
-  weights: { ema_cross: 1, macd: 1, rsi14: 1, bbands: 1, stoch14: 1 },
+  weights: { ema_cross: 1, macd: 1, supertrend: 1, rsi14: 1, bbands: 1, stoch14: 1 },
   externalWeights: { tradingview: 2 },
   regime: {
     adxThreshold: 25,

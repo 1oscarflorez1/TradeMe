@@ -16,7 +16,7 @@ import optuna
 from .backtest import MIN_CANDLES, run_backtest
 from .walkforward import in_test_folds, make_folds
 
-WEIGHT_KEYS = ["ema_cross", "macd", "rsi14", "bbands", "stoch14"]
+WEIGHT_KEYS = ["ema_cross", "macd", "supertrend", "rsi14", "bbands", "stoch14"]
 REGIME_KEYS = [
     ("trend", "trend"),
     ("trend", "momentum"),

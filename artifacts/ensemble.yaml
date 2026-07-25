@@ -10,6 +10,7 @@ hold_band: 0.06
 weights:
   ema_cross: 1.0
   macd: 1.0
+  supertrend: 1.0
   rsi14: 1.0
   bbands: 1.0
   stoch14: 1.0

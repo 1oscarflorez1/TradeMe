@@ -34,7 +34,9 @@ def _base() -> dict[str, Any]:
 def test_apply_params_no_muta_base() -> None:
     base = _base()
     before = base["weights"]["macd"]
-    params = {f"w_{k}": 0.5 for k in ["ema_cross", "macd", "rsi14", "bbands", "stoch14"]}
+    params = {
+        f"w_{k}": 0.5 for k in ["ema_cross", "macd", "supertrend", "rsi14", "bbands", "stoch14"]
+    }
     params.update(
         {f"r_{r}_{k}": 0.5 for r in ("trend", "range") for k in ("trend", "momentum", "reversion")}
     )

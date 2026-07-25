@@ -6,8 +6,10 @@
 
 ## Cómo funciona
 
-1. **Espacio de búsqueda:** pesos de los 7 indicadores (los 5 que votan) y los multiplicadores por
-   régimen (`tendencia` / `rango`), en el rango `[0, 2]`.
+1. **Espacio de búsqueda:** pesos de los indicadores que votan (`ema_cross`, `macd`, `supertrend`,
+   `rsi14`, `bbands`, `stoch14` — Supertrend se sumó en M1b) y los multiplicadores por régimen
+   (`tendencia` / `rango`), en el rango `[0, 2]`. También afina `hold_band`, `temperature` y
+   `adx_lo`/`adx_hi` (M1a: el corte de régimen dejó de ser binario).
 2. **Optuna (TPE):** propone combinaciones de pesos de forma bayesiana (más eficiente que grid/random).
 3. **Walk-forward con purga/embargo** (`walkforward.py`): la serie se parte en bloques temporales
    (expanding). Un trade solo cuenta para la validación si cae **completo** dentro de un bloque de

@@ -156,6 +156,76 @@ def adx_last(
     return float(adx)
 
 
+def _atr_series(
+    high: Sequence[float], low: Sequence[float], close: Sequence[float], period: int
+) -> npt.NDArray[np.float64]:
+    """ATR de Wilder por barra (no solo el último valor), alineado con `ATR.calculate` de
+    Node: la salida `i` corresponde a `candles[i + period]` (misma semilla de `period`
+    valores + recursión de Wilder que usa `atr_last`)."""
+    tr = _true_range(
+        np.asarray(high, dtype=float),
+        np.asarray(low, dtype=float),
+        np.asarray(close, dtype=float),
+    )
+    n = len(tr)
+    out = np.empty(n - period)
+    out[0] = float(tr[:period].mean())
+    for i in range(period, n - 1):
+        out[i - period + 1] = (out[i - period] * (period - 1) + tr[i]) / period
+    return out
+
+
+def supertrend_last(
+    high: Sequence[float],
+    low: Sequence[float],
+    close: Sequence[float],
+    period: int = 10,
+    multiplier: float = 3.0,
+) -> tuple[float, int, float]:
+    """Supertrend — no está en ninguna librería del stack, se implementa a mano (mirror
+    exacto del bucle en `apps/api/src/indicators/builtin.ts`). Recorre todo el historial
+    disponible para que las bandas finales estén asentadas (warm-up) antes de leer el
+    último valor; con pocas barras de calentamiento la banda inicial es arbitraria.
+    Devuelve (línea, dirección [+1 arriba/-1 abajo], último ATR)."""
+    h = np.asarray(high, dtype=float)
+    low_a = np.asarray(low, dtype=float)
+    c = np.asarray(close, dtype=float)
+    atr_series = _atr_series(high, low, close, period)
+    if len(atr_series) < 5:
+        raise ValueError("historial insuficiente para Supertrend (warm-up < 5 barras)")
+
+    final_upper = 0.0
+    final_lower = 0.0
+    trend = 1
+    offset = period
+
+    for i, atr in enumerate(atr_series):
+        ci = i + offset
+        basic_upper = (h[ci] + low_a[ci]) / 2 + multiplier * atr
+        basic_lower = (h[ci] + low_a[ci]) / 2 - multiplier * atr
+
+        if i == 0:
+            final_upper = basic_upper
+            final_lower = basic_lower
+            trend = -1 if c[ci] <= final_upper else 1
+            continue
+
+        prev_close = c[ci - 1]
+        upper_breached = basic_upper < final_upper or prev_close > final_upper
+        lower_breached = basic_lower > final_lower or prev_close < final_lower
+        final_upper = basic_upper if upper_breached else final_upper
+        final_lower = basic_lower if lower_breached else final_lower
+
+        if trend == 1:
+            trend = -1 if c[ci] < final_lower else 1
+        else:
+            trend = 1 if c[ci] > final_upper else -1
+
+    last_atr = float(atr_series[-1])
+    line = final_lower if trend == 1 else final_upper
+    return float(line), trend, last_atr
+
+
 # ---- normalización a voto (idéntica a Node) ----
 
 
@@ -171,9 +241,12 @@ def compute_readings(
     hist = macd_hist_last(close)
     adx = adx_last(high, low, close)
 
+    st_line, st_trend, st_atr = supertrend_last(high, low, close)
+
     ema_diff = ema9 - ema21
     ema_score = clamp(math.tanh(ema_diff / atr)) if atr else 0.0
     macd_score = clamp(math.tanh(hist / atr)) if atr else 0.0
+    st_score = clamp(math.tanh((close[-1] - st_line) / st_atr)) if st_atr else 0.0
     rsi_score = clamp((50 - rsi) / 20)
     stoch_score = clamp((50 - k) / 30)
     bb_score = clamp(1 - 2 * pb)
@@ -181,6 +254,7 @@ def compute_readings(
     return {
         "ema_cross": {"value": ema_diff, "score": ema_score, "confidence": abs(ema_score)},
         "macd": {"value": hist, "score": macd_score, "confidence": abs(macd_score)},
+        "supertrend": {"value": st_line, "score": st_score, "confidence": abs(st_score)},
         "rsi14": {"value": rsi, "score": rsi_score, "confidence": abs(rsi_score)},
         "bbands": {"value": pb, "score": bb_score, "confidence": abs(bb_score)},
         "stoch14": {"value": k, "score": stoch_score, "confidence": abs(stoch_score)},

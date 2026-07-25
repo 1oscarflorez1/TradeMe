@@ -16,6 +16,7 @@ from .inference import infer_probs, pick_action
 KINDS: dict[str, str] = {
     "ema_cross": "trend",
     "macd": "momentum",
+    "supertrend": "trend",
     "rsi14": "reversion",
     "bbands": "reversion",
     "stoch14": "reversion",
