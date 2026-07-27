@@ -137,7 +137,7 @@ export async function postSnapshot(
 
 export async function fetchSnapshots(symbol: string): Promise<SnapshotsResponse | null> {
   try {
-    const res = await apiFetch(`/snapshots?symbol=${symbol}&limit=50`);
+    const res = await apiFetch(`/snapshots?symbol=${symbol}&limit=500`);
     if (!res.ok) return null;
     return (await res.json()) as SnapshotsResponse;
   } catch {

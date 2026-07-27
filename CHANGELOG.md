@@ -5,6 +5,15 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Registros: filtros, orden y contadores reales
+
+- **web · Registros:** barra de **filtros** por Temporalidad, Acción, Dirección y Estado
+  (En curso / ✓ TP / ✗ SL / Expirados / Sin plan) con chip "Filtradas" y botón limpiar;
+  **orden** pulsando las cabeceras Fecha y hora, Confianza o R en vivo (↓/↑).
+- **Contadores arreglados:** la web pedía solo 50 filas (los chips se congelaban en 50). Ahora pide
+  hasta 500, la API admite 1000 (antes 200) y devuelve el **total real** desde la base de datos; el
+  chip Total muestra `total (últimos N)` si hay más de los cargados.
+
 ### Fixed — Parámetros optimizados POR temporalidad
 
 - **Antes:** un único `ensemble.optimized.yaml` global — optimizar 15m sobrescribía lo de 5m, y el
