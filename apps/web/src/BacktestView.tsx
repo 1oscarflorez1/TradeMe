@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   fetchBacktest,
   fetchCalibration,
+  fetchDatasetReport,
   fetchEnsemble,
   postReload,
   runBacktest,
   runOptimize,
 } from './api';
+import type { DatasetReport } from './api';
 import type {
   BacktestResult,
   CalibrationMeta,
@@ -213,6 +215,9 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
       >
         {running === 'optimize' ? 'Optimizando…' : '⚙ Optimizar'}
       </button>
+      <span className="bt-actions-hint">
+        ▶ mide la estrategia actual (y evalúa tus registros) · ⚙ además busca parámetros mejores
+      </span>
     </div>
   );
 
@@ -237,6 +242,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
           </section>
           <CalibrationSection />
           <OptimizationSection />
+          <DatasetSection />
         </div>
         <BacktestGuide />
       </div>
@@ -316,6 +322,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
       </section>
       <CalibrationSection />
       <OptimizationSection />
+      <DatasetSection />
       </div>
       <BacktestGuide />
     </div>
@@ -742,6 +749,79 @@ function OptimizationSection() {
           </p>
         </>
       )}
+    </section>
+  );
+}
+
+function DatasetSection() {
+  const [rep, setRep] = useState<DatasetReport | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDatasetReport().then((r) => {
+      if (!cancelled) {
+        setRep(r);
+        setLoaded(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!loaded || !rep) return null;
+
+  return (
+    <section className="panel opt-panel">
+      <div className="chart-head">
+        <strong title="Estado del dataset de decisiones evaluadas con el que se entrenará el meta-modelo de ML (Módulo 2). Solo se entrena cuando hay datos suficientes y balanceados.">
+          Dataset ML
+        </strong>
+        <span className="muted">· preparación para el meta-modelo</span>
+        {rep.ready ? (
+          <span className="opt-badge opt-ok" style={{ marginLeft: 'auto' }}>
+            ✓ Listo para entrenar
+          </span>
+        ) : (
+          <span className="opt-badge opt-no" style={{ marginLeft: 'auto' }}>
+            Aún acumulando datos
+          </span>
+        )}
+      </div>
+      <div className="reg-summary" style={{ marginTop: '0.6rem' }}>
+        <span className="reg-chip" title="Snapshots guardados en total">
+          Total <strong>{rep.total}</strong>
+        </span>
+        <span
+          className="reg-chip"
+          title="Decisiones que ya tocaron TP o SL: son las que pueden enseñar al modelo"
+        >
+          Evaluadas <strong>{rep.evaluated}</strong> / {rep.criteria.min_evaluated}
+        </span>
+        <span className="reg-chip reg-chip-ok" title="Decisiones que alcanzaron el objetivo">
+          ✓ TP <strong>{rep.tp}</strong>
+        </span>
+        <span className="reg-chip reg-chip-bad" title="Decisiones que tocaron el stop">
+          ✗ SL <strong>{rep.sl}</strong>
+        </span>
+        <span className="reg-chip" title="Snapshots con todas las columnas clave completas">
+          Features <strong>{(rep.feature_completeness * 100).toFixed(0)}%</strong>
+        </span>
+      </div>
+      {!rep.ready && rep.reasons.length > 0 && (
+        <ul className="ds-reasons">
+          {rep.reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      )}
+      <p className="muted calib-legend">
+        El meta-modelo (Módulo 2) se entrenará <strong>solo</strong> cuando este panel esté en
+        verde: exige suficientes decisiones evaluadas, ejemplos de ambos desenlaces (TP y SL) y
+        features completas. Los snapshots automáticos alimentan este dataset; el botón ▶ evalúa
+        los pendientes.
+      </p>
     </section>
   );
 }

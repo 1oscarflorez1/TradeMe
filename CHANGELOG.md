@@ -5,6 +5,18 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Claridad de botones · Dataset ML · despliegue gratis
+
+- **web · Backtest:** aclaración de los botones (▶ mide la estrategia actual y evalúa registros;
+  ⚙ además busca parámetros mejores) con hint visible; nueva tarjeta **Dataset ML** con el estado de
+  preparación para el meta-modelo (evaluadas, TP/SL, features, criterios y veredicto).
+- **quant:** módulo `dataset.py` (informe de preparación con criterios mínimos: ≥60 evaluadas,
+  ≥20 por clase, ≥90% features completas) + endpoint `/dataset-report` en el servicio.
+- **api:** `GET /ml/dataset` (proxy al servicio quant, protegido por el auth global).
+- **docs:** `despliegue-gratis.md` — opción sin costo recomendada (Tailscale, 3 usuarios gratis,
+  HTTPS ts.net para PWA/push, app corriendo en la PC con el compose intacto; alternativa Oracle
+  Always Free para 24/7).
+
 ### Added — Módulo 3 · Auth del equipo + despliegue PaaS
 
 - **api:** login JWT (`POST /auth/login`, `GET /auth/me`) — hash de contraseñas con `scrypt`
