@@ -186,7 +186,11 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
     if (r.ok) {
       await postReload();
       await runBacktest(symbol, interval);
-      setRunMsg('✓ Optimización aplicada y backtest actualizado.');
+      setRunMsg(
+        r.promoted
+          ? '✓ Promovido: el candidato ganó en hold-out. Nueva config activa para esta temporalidad; backtest actualizado.'
+          : 'ℹ No promovido: ningún candidato superó a la config actual en hold-out (protección anti-sobreajuste). Se mantiene la base; backtest actualizado.',
+      );
       await load();
     } else {
       setRunning(null);

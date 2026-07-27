@@ -309,13 +309,14 @@ export async function runBacktest(
 export async function runOptimize(
   symbol: string,
   interval: Interval,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; promoted?: boolean; error?: string }> {
   try {
     const res = await apiFetch(`/optimize/run?symbol=${symbol}&interval=${interval}`, {
       method: 'POST',
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return { ok: true };
+    const body = (await res.json()) as { promoted?: boolean };
+    return { ok: true, promoted: body.promoted };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
