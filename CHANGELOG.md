@@ -5,6 +5,29 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Confirmaciones, política editable y adiós a la terminal
+
+- **web:** los botones ▶/⚙ piden **confirmación** explicando cómo interfieren con el piloto (⚙
+  reinicia su reloj; optimizar seguido = sobreajuste). Botón **⚙ Configurar** en la tarjeta del
+  piloto: política editable desde la UI (activo, frecuencias, cooldown, temporalidades) — se guarda
+  en el servidor (`artifacts/automation.json`) y el worker la aplica en su siguiente ciclo, sin
+  reiniciar. Botón **🎯 Calibrar** (entrena calibradores desde la UI). Eliminados todos los textos
+  con comandos de terminal.
+- **quant:** overrides persistentes de la política (env como defaults) releídos por ciclo;
+  `POST /automation` y `POST /run-calibration`; `calibrate_and_publish()` usa la config ACTIVA del TF.
+- **api:** `POST /automation` (validado) y `POST /calibrate/run`.
+
+### Added — 🤖 Piloto automático de backtest/optimización
+
+- **quant:** worker en el servicio (scheduler): **mide** cada símbolo+TF activo cada 6h (y evalúa
+  snapshots pendientes); **optimiza** solo por mantenimiento (7d) o **degradación** (2 mediciones
+  seguidas con expectancy negativa y muestra suficiente), con **cooldown 48h** y el gate de hold-out
+  de siempre. Configurable por env (`AUTO_*`); 5m fuera por defecto. Crea **alertas** en la campana
+  ante promoción o degradación sin mejora (+5 tests de la política).
+- **api:** `GET /automation` (estado del piloto).
+- **web:** tarjeta **Piloto automático** en Backtest (política, estado por TF, última medición/
+  optimización) y guía: los botones quedan para resultados inmediatos.
+
 ### Added — Registros: filtros, orden y contadores reales
 
 - **web · Registros:** barra de **filtros** por Temporalidad, Acción, Dirección y Estado

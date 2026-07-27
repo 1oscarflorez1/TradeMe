@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import {
+  fetchAutomation,
   fetchBacktest,
   fetchCalibration,
   fetchDatasetReport,
   fetchEnsemble,
+  postAutomation,
   postReload,
   runBacktest,
+  runCalibrate,
   runOptimize,
 } from './api';
-import type { DatasetReport } from './api';
+import type { AutomationStatus, DatasetReport } from './api';
 import type {
   BacktestResult,
   CalibrationMeta,
@@ -154,6 +157,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<string | null>(null);
   const [runMsg, setRunMsg] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<'backtest' | 'optimize' | null>(null);
 
   const load = (): Promise<void> =>
     fetchBacktest(symbol, interval).then((r) => {
@@ -186,7 +190,11 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
     if (r.ok) {
       await postReload();
       await runBacktest(symbol, interval);
-      setRunMsg('✓ Optimización aplicada y backtest actualizado.');
+      setRunMsg(
+        r.promoted
+          ? '✓ Promovido: el candidato ganó en hold-out. Nueva config activa para esta temporalidad; backtest actualizado.'
+          : 'ℹ No promovido: ningún candidato superó a la config actual en hold-out (protección anti-sobreajuste). Se mantiene la base; backtest actualizado.',
+      );
       await load();
     } else {
       setRunning(null);
@@ -202,7 +210,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         type="button"
         className="bt-run"
         disabled={running !== null}
-        onClick={() => void runBt()}
+        onClick={() => setConfirm('backtest')}
       >
         {running === 'backtest' ? 'Corriendo…' : '▶ Correr backtest'}
       </button>
@@ -210,7 +218,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         type="button"
         className="bt-run bt-opt"
         disabled={running !== null}
-        onClick={() => void runOpt()}
+        onClick={() => setConfirm('optimize')}
         title="Optimizar = búsqueda automática (Optuna) de los mejores parámetros de la estrategia (pesos, régimen, hold_band, temperature, ADX) maximizando la expectancy en validación. Aplica el resultado SOLO si supera al actual en el tramo hold-out. Tarda ~1 min."
       >
         {running === 'optimize' ? 'Optimizando…' : '⚙ Optimizar'}
@@ -218,6 +226,49 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
       <span className="bt-actions-hint">
         ▶ mide la estrategia actual (y evalúa tus registros) · ⚙ además busca parámetros mejores
       </span>
+      {confirm && (
+        <div className="modal-overlay" onClick={() => setConfirm(null)}>
+          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            {confirm === 'backtest' ? (
+              <>
+                <p className="modal-title">▶ Correr backtest ahora</p>
+                <p className="muted">
+                  El 🤖 piloto ya mide esta temporalidad automáticamente cada pocas horas. Correrlo a
+                  mano no daña nada (solo mide y evalúa registros), pero los Δ pasarán a comparar
+                  contra esta corrida manual.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="modal-title">⚙ Optimizar ahora</p>
+                <p className="muted">
+                  El 🤖 piloto ya optimiza esta temporalidad cuando toca (mantenimiento o
+                  degradación). Hacerlo a mano <strong>reinicia su reloj</strong> (cooldown y
+                  mantenimiento se cuentan desde ahora), y optimizar con mucha frecuencia tiende a
+                  perseguir el ruido del mercado (sobreajuste). Úsalo solo si buscas algo concreto.
+                </p>
+              </>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn-ghost" onClick={() => setConfirm(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="bt-run"
+                onClick={() => {
+                  const which = confirm;
+                  setConfirm(null);
+                  if (which === 'backtest') void runBt();
+                  else void runOpt();
+                }}
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -240,9 +291,10 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
               para generarlo sobre esta temporalidad (sin necesidad de terminal).
             </p>
           </section>
-          <CalibrationSection />
+          <CalibrationSection symbol={symbol} interval={interval} />
           <OptimizationSection symbol={symbol} interval={interval} />
           <DatasetSection />
+          <AutomationSection />
         </div>
         <BacktestGuide />
       </div>
@@ -320,9 +372,10 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         <EquityCurve equity={bt.equity_curve} />
         <EquityReport bt={bt} />
       </section>
-      <CalibrationSection />
+      <CalibrationSection symbol={symbol} interval={interval} />
       <OptimizationSection symbol={symbol} interval={interval} />
       <DatasetSection />
+      <AutomationSection />
       </div>
       <BacktestGuide />
     </div>
@@ -609,9 +662,10 @@ function ReliabilityDiagram({ bins }: { bins: ReliabilityBin[] }) {
   );
 }
 
-function CalibrationSection() {
+function CalibrationSection({ symbol, interval }: { symbol: string; interval: Interval }) {
   const [cal, setCal] = useState<CalibrationMeta | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -637,12 +691,32 @@ function CalibrationSection() {
         <span className="muted">
           · diagrama de fiabilidad{cal?.version ? ` · ${cal.version}` : ''}
         </span>
+        <button
+          type="button"
+          className="bt-run bt-opt"
+          style={{ marginLeft: 'auto' }}
+          disabled={calibrating}
+          title="Entrena los calibradores (isotónica/Platt por régimen) con el backtest de esta temporalidad y los aplica en caliente"
+          onClick={() => {
+            setCalibrating(true);
+            void runCalibrate(symbol, interval)
+              .then(async (r) => {
+                if (r.ok) {
+                  await postReload();
+                  const fresh = await fetchCalibration();
+                  setCal(fresh);
+                }
+              })
+              .finally(() => setCalibrating(false));
+          }}
+        >
+          {calibrating ? 'Calibrando…' : '🎯 Calibrar'}
+        </button>
       </div>
       {!trained ? (
         <p className="muted">
-          Aún sin calibrador entrenado. Genera uno desde quant:{' '}
-          <code>python -m trademe_quant.run_calibration BTCUSDT 5m</code>, y recarga la API con{' '}
-          <code>POST /reload</code>.
+          Aún sin calibrador entrenado. Pulsa <strong>🎯 Calibrar</strong> para entrenarlo con el
+          backtest de esta temporalidad (ajusta la confianza a la frecuencia real de acierto).
         </p>
       ) : (
         <div className="calib-grid">
@@ -706,9 +780,8 @@ function OptimizationSection({ symbol, interval }: { symbol: string; interval: I
       </div>
       {!report ? (
         <p className="muted">
-          Aún sin optimización. Ejecútala desde quant:{' '}
-          <code>python -m trademe_quant.run_optimize BTCUSDT 5m</code>, y recarga con{' '}
-          <code>POST /reload</code>.
+          Aún sin optimización para esta temporalidad. El 🤖 piloto la hará solo cuando toque, o
+          pulsa <strong>⚙ Optimizar</strong> arriba si la quieres ahora.
         </p>
       ) : (
         <>
@@ -821,6 +894,202 @@ function DatasetSection() {
         verde: exige suficientes decisiones evaluadas, ejemplos de ambos desenlaces (TP y SL) y
         features completas. Los snapshots automáticos alimentan este dataset; el botón ▶ evalúa
         los pendientes.
+      </p>
+    </section>
+  );
+}
+
+function fmtH(h: number | null): string {
+  if (h === null) return 'nunca';
+  if (h < 1) return `hace ${Math.round(h * 60)} min`;
+  if (h < 48) return `hace ${h.toFixed(0)} h`;
+  return `hace ${(h / 24).toFixed(1)} días`;
+}
+
+const ALL_TFS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'];
+
+function AutomationSection() {
+  const [st, setSt] = useState<AutomationStatus | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    enabled: true,
+    backtest_every_h: 6,
+    optimize_every_d: 7,
+    cooldown_h: 48,
+    intervals: [] as string[],
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      fetchAutomation().then((r) => {
+        if (!cancelled) setSt(r);
+      });
+    void load();
+    const id = setInterval(() => void load(), 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  if (!st) return null;
+
+  return (
+    <section className="panel opt-panel">
+      <div className="chart-head">
+        <strong title="Worker en el servicio quant: mide cada pocas horas y optimiza solo por mantenimiento o degradación, con cooldown y gate de hold-out. Te avisa por la campana cuando promueve una config o detecta degradación sin mejora.">
+          🤖 Piloto automático
+        </strong>
+        <span className="muted">
+          · mide cada {st.backtest_every_h}h · optimiza cada {(st.optimize_every_h / 24).toFixed(0)}d
+          o si se degrada · cooldown {st.cooldown_h}h
+        </span>
+        <span
+          className={`opt-badge ${st.enabled ? 'opt-ok' : 'opt-no'}`}
+          style={{ marginLeft: 'auto' }}
+        >
+          {st.enabled ? 'Activo' : 'Apagado'}
+        </span>
+        <button
+          type="button"
+          className="bt-run bt-opt"
+          onClick={() => {
+            setForm({
+              enabled: st.enabled,
+              backtest_every_h: st.backtest_every_h,
+              optimize_every_d: Math.round(st.optimize_every_h / 24),
+              cooldown_h: st.cooldown_h,
+              intervals: st.intervals,
+            });
+            setEditing((v) => !v);
+          }}
+        >
+          ⚙ Configurar
+        </button>
+      </div>
+      {editing && (
+        <div className="auto-form">
+          <label className="auto-row">
+            <input
+              type="checkbox"
+              checked={form.enabled}
+              onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+            />
+            <span>Piloto activo</span>
+          </label>
+          <label className="auto-row">
+            <span className="auto-k">Medir cada</span>
+            <input
+              type="number"
+              min={1}
+              max={168}
+              value={form.backtest_every_h}
+              onChange={(e) => setForm({ ...form, backtest_every_h: Number(e.target.value) })}
+            />
+            <span className="muted">horas</span>
+          </label>
+          <label className="auto-row">
+            <span className="auto-k">Optimizar cada</span>
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={form.optimize_every_d}
+              onChange={(e) => setForm({ ...form, optimize_every_d: Number(e.target.value) })}
+            />
+            <span className="muted">días (o antes si se degrada)</span>
+          </label>
+          <label className="auto-row">
+            <span className="auto-k">Cooldown</span>
+            <input
+              type="number"
+              min={1}
+              max={720}
+              value={form.cooldown_h}
+              onChange={(e) => setForm({ ...form, cooldown_h: Number(e.target.value) })}
+            />
+            <span className="muted">horas mínimas entre optimizaciones</span>
+          </label>
+          <div className="auto-row auto-tfs">
+            <span className="auto-k">Temporalidades</span>
+            {ALL_TFS.map((tf) => (
+              <label key={tf} className="auto-tf">
+                <input
+                  type="checkbox"
+                  checked={form.intervals.includes(tf)}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      intervals: e.target.checked
+                        ? [...form.intervals, tf]
+                        : form.intervals.filter((x) => x !== tf),
+                    })
+                  }
+                />
+                {tf}
+              </label>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={() => setEditing(false)}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="bt-run"
+              disabled={saving || form.intervals.length === 0}
+              onClick={() => {
+                setSaving(true);
+                void postAutomation({
+                  enabled: form.enabled,
+                  backtest_every_h: form.backtest_every_h,
+                  optimize_every_h: form.optimize_every_d * 24,
+                  cooldown_h: form.cooldown_h,
+                  intervals: form.intervals,
+                })
+                  .then((r) => {
+                    if (r) {
+                      setSt(r);
+                      setEditing(false);
+                    }
+                  })
+                  .finally(() => setSaving(false));
+              }}
+            >
+              {saving ? 'Guardando…' : 'Guardar política'}
+            </button>
+          </div>
+          <p className="muted" style={{ fontSize: '0.72rem' }}>
+            Los cambios se guardan en el servidor y el piloto los aplica en su siguiente ciclo
+            (≤15 min), sin reiniciar nada.
+          </p>
+        </div>
+      )}
+      <table className="opt-table">
+        <thead>
+          <tr>
+            <th>Temporalidad</th>
+            <th>Última medición</th>
+            <th>Última optimización</th>
+          </tr>
+        </thead>
+        <tbody>
+          {st.per_tf.map((t) => (
+            <tr key={`${t.symbol}:${t.interval}`}>
+              <td>{t.interval}</td>
+              <td>{fmtH(t.hours_since_backtest)}</td>
+              <td>{fmtH(t.hours_since_optimize)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="muted calib-legend">
+        Ya no necesitas vigilar ni decidir cuándo pulsar: el piloto mide, evalúa tus registros,
+        optimiza solo cuando toca (nunca promueve sin ganar en hold-out) y te avisa por la campana
+        🔔 si promueve una config o detecta degradación. Los botones quedan para cuando quieras un
+        resultado inmediato.
       </p>
     </section>
   );

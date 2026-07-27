@@ -16,7 +16,7 @@ import sys
 
 from .backtest import run_backtest
 from .calibration import fit_calibrators
-from .ensemble import load_ensemble
+from .ensemble import load_active_ensemble
 from .market.binance import fetch_klines
 from .market.normalize import normalize_rest_kline
 
@@ -25,18 +25,15 @@ def _repo_artifact(name: str) -> str:
     return str(pathlib.Path(__file__).resolve().parents[3] / "artifacts" / name)
 
 
-def main() -> None:
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDT"
-    interval = sys.argv[2] if len(sys.argv) > 2 else "5m"
-
+def calibrate_and_publish(symbol: str, interval: str) -> dict[str, object]:
+    """Entrena calibradores por régimen desde el backtest del TF y publica el artefacto."""
     rows = fetch_klines(symbol, interval, limit=1000)
     candles = [normalize_rest_kline(symbol, interval, r) for r in rows]
     high = [c.high for c in candles]
     low = [c.low for c in candles]
     close = [c.close for c in candles]
 
-    ensemble_path = os.environ.get("ENSEMBLE_CONFIG", _repo_artifact("ensemble.yaml"))
-    config = load_ensemble(ensemble_path)
+    config = load_active_ensemble(symbol, interval)
     result = run_backtest(high, low, close, config)
 
     samples: list[tuple[str, float, float]] = [
@@ -51,12 +48,14 @@ def main() -> None:
     with open(out_path, "w", encoding="utf-8") as fh:
         json.dump(calibrators, fh, indent=2)
 
-    print(f"calibradores entrenados desde {len(samples)} trades -> {out_path}")
-    for regime, cal in calibrators["regimes"].items():
-        print(
-            f"  {regime}: metodo={cal['method']} n={cal['n']} "
-            f"brier={cal['brier']:.4f} bins={len(cal['reliability'])}"
-        )
+    return {"samples": len(samples), "version": calibrators["version"], "path": out_path}
+
+
+def main() -> None:
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDT"
+    interval = sys.argv[2] if len(sys.argv) > 2 else "5m"
+    out = calibrate_and_publish(symbol, interval)
+    print(f"calibradores entrenados desde {out['samples']} trades -> {out['path']}")
 
 
 if __name__ == "__main__":

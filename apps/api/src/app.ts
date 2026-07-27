@@ -321,6 +321,59 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.status(502).send({ error: 'no se pudo lanzar el backtest' });
     }
   });
+  // Estado del piloto automático de backtest/optimización (worker en quant).
+  app.get('/automation', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    try {
+      const res = await fetch(`${deps.quantUrl}/automation`);
+      if (!res.ok) throw new Error(`quant ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al pedir el estado de automatización');
+      return reply.status(502).send({ error: 'no se pudo obtener el estado de automatización' });
+    }
+  });
+
+  // Configurar la política del piloto automático (persistente; el worker la relee).
+  app.post('/automation', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    const body = z
+      .object({
+        enabled: z.boolean().optional(),
+        backtest_every_h: z.number().min(0.5).max(168).optional(),
+        optimize_every_h: z.number().min(6).max(24 * 60).optional(),
+        cooldown_h: z.number().min(1).max(24 * 30).optional(),
+        trials: z.number().int().min(5).max(200).optional(),
+        intervals: z.array(z.string()).min(1).optional(),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: 'configuración inválida' });
+    try {
+      const res = await fetch(`${deps.quantUrl}/automation`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body.data),
+      });
+      if (!res.ok) throw new Error(`quant ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al configurar la automatización');
+      return reply.status(502).send({ error: 'no se pudo configurar la automatización' });
+    }
+  });
+
+  // Calibrar probabilidades desde la UI (sin terminal).
+  app.post('/calibrate/run', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    const q = QuantQuery.parse(request.query);
+    try {
+      return await proxyQuant('run-calibration', q);
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al lanzar calibración');
+      return reply.status(502).send({ error: 'no se pudo lanzar la calibración' });
+    }
+  });
+
   // Informe de preparación del dataset ML (Módulo 2 · fase 0).
   app.get('/ml/dataset', async (request, reply) => {
     if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });

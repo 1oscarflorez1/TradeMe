@@ -12,7 +12,8 @@ import type {
 } from './types';
 import { authHeaders, getToken, setToken } from './auth';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+// '||' a propósito: un VITE_API_URL vacío (build sin el arg) debe caer al default, no quedarse ''.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /** fetch con la cabecera de sesión ya puesta; si el servidor dice 401, cierra la sesión local
  * (el token venció o es inválido) para que la app vuelva a mostrar el login. */
@@ -290,6 +291,66 @@ export async function fetchDatasetReport(): Promise<DatasetReport | null> {
   }
 }
 
+export interface AutomationStatus {
+  enabled: boolean;
+  backtest_every_h: number;
+  optimize_every_h: number;
+  cooldown_h: number;
+  intervals: string[];
+  last_cycle: string | null;
+  per_tf: Array<{
+    symbol: string;
+    interval: string;
+    hours_since_backtest: number | null;
+    hours_since_optimize: number | null;
+  }>;
+}
+
+export async function fetchAutomation(): Promise<AutomationStatus | null> {
+  try {
+    const res = await apiFetch('/automation');
+    if (!res.ok) return null;
+    return (await res.json()) as AutomationStatus;
+  } catch {
+    return null;
+  }
+}
+
+export async function postAutomation(
+  overrides: Partial<
+    Pick<
+      AutomationStatus,
+      'enabled' | 'backtest_every_h' | 'optimize_every_h' | 'cooldown_h' | 'intervals'
+    > & { trials: number }
+  >,
+): Promise<AutomationStatus | null> {
+  try {
+    const res = await apiFetch('/automation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(overrides),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as AutomationStatus;
+  } catch {
+    return null;
+  }
+}
+
+export async function runCalibrate(
+  symbol: string,
+  interval: Interval,
+): Promise<{ ok: boolean }> {
+  try {
+    const res = await apiFetch(`/calibrate/run?symbol=${symbol}&interval=${interval}`, {
+      method: 'POST',
+    });
+    return { ok: res.ok };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function runBacktest(
   symbol: string,
   interval: Interval,
@@ -308,13 +369,14 @@ export async function runBacktest(
 export async function runOptimize(
   symbol: string,
   interval: Interval,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; promoted?: boolean; error?: string }> {
   try {
     const res = await apiFetch(`/optimize/run?symbol=${symbol}&interval=${interval}`, {
       method: 'POST',
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return { ok: true };
+    const body = (await res.json()) as { promoted?: boolean };
+    return { ok: true, promoted: body.promoted };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
