@@ -22,8 +22,6 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().optional(),
   ENSEMBLE_CONFIG: z.string().default('artifacts/ensemble.yaml'),
   CALIBRATORS_PATH: z.string().default('artifacts/calibrators.json'),
-  OPTIMIZED_ENSEMBLE: z.string().default('artifacts/ensemble.optimized.yaml'),
-  OPT_REPORT_PATH: z.string().default('artifacts/optimization_report.json'),
   VAPID_PUBLIC_KEY: z.string().default('BEg-pAQi-VrkEr0n9OpokYqzXsBq7Ub_ZqTpGkUrwPZSBb3PlMbj5Hb4qcjJGqydWcqcUnUFrO6EE5gnw0_BIss'),
   VAPID_PRIVATE_KEY: z.string().default('dUfNiCSsZ-NL-v543jUw-cyRwPD0AX29bz9Jt12tbFI'),
   VAPID_SUBJECT: z.string().default('mailto:trademe@example.com'),

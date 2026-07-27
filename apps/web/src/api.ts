@@ -137,7 +137,7 @@ export async function postSnapshot(
 
 export async function fetchSnapshots(symbol: string): Promise<SnapshotsResponse | null> {
   try {
-    const res = await apiFetch(`/snapshots?symbol=${symbol}&limit=50`);
+    const res = await apiFetch(`/snapshots?symbol=${symbol}&limit=500`);
     if (!res.ok) return null;
     return (await res.json()) as SnapshotsResponse;
   } catch {
@@ -169,9 +169,12 @@ export async function fetchCalibration(): Promise<CalibrationMeta | null> {
   }
 }
 
-export async function fetchEnsemble(): Promise<EnsembleMeta | null> {
+export async function fetchEnsemble(
+  symbol: string,
+  interval: Interval,
+): Promise<EnsembleMeta | null> {
   try {
-    const res = await apiFetch(`/ensemble`);
+    const res = await apiFetch(`/ensemble?symbol=${symbol}&interval=${interval}`);
     if (!res.ok) return null;
     return (await res.json()) as EnsembleMeta;
   } catch {

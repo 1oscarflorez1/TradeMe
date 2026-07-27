@@ -60,7 +60,7 @@ describe('GET /snapshots', () => {
     const app = buildApp(
       makeDeps({
         getHistory: async () => synthCandles(1).map((c) => ({ ...c, close: 103 })),
-        listSnapshots: async () => [row({})],
+        listSnapshots: async () => ({ rows: [row({})], total: 1 }),
       }),
     );
     const res = await app.inject({ method: 'GET', url: '/snapshots?symbol=BTCUSDT' });

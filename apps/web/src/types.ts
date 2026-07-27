@@ -114,6 +114,7 @@ export interface SnapshotsResponse {
   symbol: string;
   currentPrice: number;
   snapshots: SnapshotRow[];
+  total: number;
 }
 
 export interface BacktestTrade {

@@ -5,6 +5,27 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Registros: filtros, orden y contadores reales
+
+- **web · Registros:** barra de **filtros** por Temporalidad, Acción, Dirección y Estado
+  (En curso / ✓ TP / ✗ SL / Expirados / Sin plan) con chip "Filtradas" y botón limpiar;
+  **orden** pulsando las cabeceras Fecha y hora, Confianza o R en vivo (↓/↑).
+- **Contadores arreglados:** la web pedía solo 50 filas (los chips se congelaban en 50). Ahora pide
+  hasta 500, la API admite 1000 (antes 200) y devuelve el **total real** desde la base de datos; el
+  chip Total muestra `total (últimos N)` si hay más de los cargados.
+
+### Fixed — Parámetros optimizados POR temporalidad
+
+- **Antes:** un único `ensemble.optimized.yaml` global — optimizar 15m sobrescribía lo de 5m, y el
+  backtest medía con la config base (no la optimizada). **Ahora:** cada símbolo+TF tiene su artefacto
+  (`artifacts/optimized/ensemble.<SYM>.<TF>.yaml` + `report.<SYM>.<TF>.json`); la decisión en vivo,
+  el backtest (▶) y el comparador usan **la config activa de esa temporalidad**, y ⚙ Optimizar
+  compite contra la activa (mejora iterativa honesta).
+- **api:** caché por símbolo+TF con recarga en `POST /reload`; `GET /ensemble?symbol&interval`.
+- **quant:** `load_active_ensemble()` compartido por backtest y optimizador (+2 tests).
+- **web:** el panel de Optimización muestra la temporalidad y se actualiza al cambiarla.
+- Los artefactos optimizados legados (globales) quedan ignorados; re-optimiza por TF.
+
 ### Added — Claridad de botones · Dataset ML · despliegue gratis
 
 - **web · Backtest:** aclaración de los botones (▶ mide la estrategia actual y evalúa registros;

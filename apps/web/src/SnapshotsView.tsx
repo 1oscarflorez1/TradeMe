@@ -53,9 +53,9 @@ const HEADERS: Array<[string, string]> = [
   ['R en vivo', 'Resultado actual en múltiplos de R (unidad de riesgo). Positivo = a favor.'],
 ];
 
-function Th({ label, tip }: { label: string; tip: string }) {
+function Th({ label, tip, onSort }: { label: string; tip: string; onSort?: () => void }) {
   return (
-    <th>
+    <th onClick={onSort} className={onSort ? 'th-sortable' : undefined}>
       <span className="th-label">
         {label}
         <span className="th-tip" role="tooltip">
@@ -88,6 +88,13 @@ function DetailField({ label, children }: { label: string; children: React.React
 export function SnapshotsView({ symbol }: { symbol: string }) {
   const [rows, setRows] = useState<SnapshotRow[]>([]);
   const [price, setPrice] = useState<number>(0);
+  const [total, setTotal] = useState<number>(0);
+  const [fTf, setFTf] = useState('');
+  const [fAct, setFAct] = useState('');
+  const [fDir, setFDir] = useState('');
+  const [fEst, setFEst] = useState('');
+  const [sortKey, setSortKey] = useState<'fecha' | 'conf' | 'liveR'>('fecha');
+  const [sortDesc, setSortDesc] = useState(true);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -100,6 +107,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
       if (r) {
         setRows(r.snapshots);
         setPrice(r.currentPrice);
+        setTotal(r.total ?? r.snapshots.length);
         setLoading(false);
       }
     });
@@ -157,6 +165,43 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const tp = rows.filter((r) => r.tracking?.status === 'tp' || r.outcome_result === 'tp').length;
   const sl = rows.filter((r) => r.tracking?.status === 'sl' || r.outcome_result === 'sl').length;
   const expirados = rows.filter((r) => r.tracking?.expired).length;
+  const estadoDe = (r: SnapshotRow): string => {
+    if (r.outcome_result === 'tp' || r.tracking?.status === 'tp') return 'tp';
+    if (r.outcome_result === 'sl' || r.tracking?.status === 'sl') return 'sl';
+    if (r.tracking?.expired) return 'expirado';
+    if (r.tracking?.status === 'en_curso') return 'en_curso';
+    return 'sin_plan';
+  };
+  const tfs = [...new Set(rows.map((r) => r.interval))];
+  const filtered = rows.filter(
+    (r) =>
+      (!fTf || r.interval === fTf) &&
+      (!fAct || r.action === fAct) &&
+      (!fDir || r.direction === fDir) &&
+      (!fEst || estadoDe(r) === fEst),
+  );
+  const visible = [...filtered].sort((a, b) => {
+    let d = 0;
+    if (sortKey === 'fecha') d = Date.parse(a.captured_at) - Date.parse(b.captured_at);
+    else if (sortKey === 'conf') d = (a.confidence ?? 0) - (b.confidence ?? 0);
+    else d = (a.tracking?.liveR ?? -Infinity) - (b.tracking?.liveR ?? -Infinity);
+    return sortDesc ? -d : d;
+  });
+  const filtering = !!(fTf || fAct || fDir || fEst);
+  const clearFilters = () => {
+    setFTf('');
+    setFAct('');
+    setFDir('');
+    setFEst('');
+  };
+  const toggleSort = (k: 'fecha' | 'conf' | 'liveR') => {
+    if (sortKey === k) setSortDesc((v) => !v);
+    else {
+      setSortKey(k);
+      setSortDesc(true);
+    }
+  };
+
   const COLS = HEADERS.length + 1;
 
   return (
@@ -178,8 +223,16 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
           Precio {symbol} <strong>{price.toFixed(2)}</strong>
         </span>
         <span className="reg-chip" title={CHIP_TIPS.total}>
-          Total <strong>{rows.length}</strong>
+          Total <strong>{total}</strong>
+          {total > rows.length ? (
+            <span className="muted"> (últimos {rows.length})</span>
+          ) : null}
         </span>
+        {filtering && (
+          <span className="reg-chip reg-chip-filter" title="Filas que pasan los filtros activos">
+            Filtradas <strong>{visible.length}</strong>
+          </span>
+        )}
         <span className="reg-chip" title={CHIP_TIPS.enCurso}>
           En curso <strong>{enCurso}</strong>
         </span>
@@ -197,21 +250,91 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
         </span>
       </div>
 
+      {rows.length > 0 && (
+        <div className="reg-filters">
+          <label>
+            <span>Temporalidad</span>
+            <select value={fTf} onChange={(e) => setFTf(e.target.value)}>
+              <option value="">Todas</option>
+              {tfs.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Acción</span>
+            <select value={fAct} onChange={(e) => setFAct(e.target.value)}>
+              <option value="">Todas</option>
+              <option value="BUY">COMPRAR</option>
+              <option value="SELL">VENDER</option>
+              <option value="HOLD">MANTENER</option>
+            </select>
+          </label>
+          <label>
+            <span>Dirección</span>
+            <select value={fDir} onChange={(e) => setFDir(e.target.value)}>
+              <option value="">Todas</option>
+              <option value="LONG">LONG</option>
+              <option value="SHORT">SHORT</option>
+              <option value="FLAT">FLAT</option>
+            </select>
+          </label>
+          <label>
+            <span>Estado</span>
+            <select value={fEst} onChange={(e) => setFEst(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="en_curso">En curso</option>
+              <option value="tp">✓ TP</option>
+              <option value="sl">✗ SL</option>
+              <option value="expirado">Expirados</option>
+              <option value="sin_plan">Sin plan</option>
+            </select>
+          </label>
+          {filtering && (
+            <button type="button" className="reg-clear" onClick={clearFilters}>
+              Limpiar filtros
+            </button>
+          )}
+          <span className="reg-filters-hint">
+            Ordena pulsando «Fecha y hora», «Confianza» o «R en vivo».
+          </span>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <p className="muted">Aún no hay snapshots. Pulsa 📸 en el Panel para guardar el primero.</p>
+      ) : visible.length === 0 ? (
+        <p className="muted">Ningún registro pasa los filtros. Pulsa «Limpiar filtros».</p>
       ) : (
         <div className="snap-scroll">
           <table className="snap-table">
             <thead>
               <tr>
-                {HEADERS.map(([label, tip]) => (
-                  <Th key={label} label={label} tip={tip} />
-                ))}
+                {HEADERS.map(([label, tip]) => {
+                  const key =
+                    label === 'Fecha y hora'
+                      ? ('fecha' as const)
+                      : label === 'Confianza'
+                        ? ('conf' as const)
+                        : label === 'R en vivo'
+                          ? ('liveR' as const)
+                          : null;
+                  return (
+                    <Th
+                      key={label}
+                      label={key && sortKey === key ? `${label} ${sortDesc ? '↓' : '↑'}` : label}
+                      tip={tip}
+                      onSort={key ? () => toggleSort(key) : undefined}
+                    />
+                  );
+                })}
                 <th aria-label="acciones" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {visible.map((r) => {
                 const t = r.tracking;
                 const open = expanded.has(r.id);
                 const dirClass =

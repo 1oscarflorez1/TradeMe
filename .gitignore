@@ -31,4 +31,5 @@ artifacts/*.onnx
 artifacts/calibrators.json
 artifacts/optimization_report.json
 artifacts/ensemble.optimized.yaml
+artifacts/optimized/
 infra/.env.prod

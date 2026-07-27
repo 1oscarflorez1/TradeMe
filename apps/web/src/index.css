@@ -1712,3 +1712,61 @@ pre.hint {
   color: var(--muted);
   line-height: 1.5;
 }
+
+/* ---- Registros: filtros, orden y contadores ---- */
+.reg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.reg-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.reg-filters select {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--fg);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+}
+.reg-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: #4da3ff;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.reg-clear:hover {
+  border-color: #4da3ff;
+}
+.reg-filters-hint {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.reg-chip-filter {
+  border-color: rgba(77, 163, 255, 0.5);
+}
+.reg-chip-filter strong {
+  color: #4da3ff;
+}
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.th-sortable:hover .th-label {
+  color: #4da3ff;
+}

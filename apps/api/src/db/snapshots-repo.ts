@@ -81,7 +81,10 @@ export class SnapshotsRepo {
     return res.rows[0]?.id ?? '';
   }
 
-  async list(symbol: string, limit: number): Promise<SnapshotRow[]> {
+  async list(
+    symbol: string,
+    limit: number,
+  ): Promise<{ rows: SnapshotRow[]; total: number }> {
     const res = await this.pool.query<SnapshotRow>(
       `SELECT id, captured_at, symbol, interval, action, direction, price, confidence,
               regime_label, net, prob_buy, prob_hold, prob_sell,
@@ -90,7 +93,11 @@ export class SnapshotsRepo {
        FROM snapshots WHERE symbol = $1 ORDER BY captured_at DESC LIMIT $2`,
       [symbol.toUpperCase(), limit],
     );
-    return res.rows;
+    const count = await this.pool.query<{ n: string }>(
+      'SELECT COUNT(*)::text AS n FROM snapshots WHERE symbol = $1',
+      [symbol.toUpperCase()],
+    );
+    return { rows: res.rows, total: Number(count.rows[0]?.n ?? 0) };
   }
 
   async delete(id: string): Promise<boolean> {

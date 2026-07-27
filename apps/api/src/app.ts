@@ -32,10 +32,13 @@ export interface AppDeps {
   calibrators?: Calibrators;
   reloadArtifacts?: () => {
     ensembleVersion: string;
-    ensembleOptimized: boolean;
     calibrationVersion: string | null;
   };
-  ensembleMeta?: () => { version: string; optimized: boolean; report: unknown };
+  ensembleMeta?: (
+    symbol?: string,
+    interval?: string,
+  ) => { version: string; optimized: boolean; report: unknown };
+  getEnsembleFor?: (symbol: string, interval: string) => EnsembleConfig;
   getMacro?: (symbol: string) => Macro | undefined;
   recordSnapshot?: (
     signal: Signal,
@@ -43,7 +46,10 @@ export interface AppDeps {
     levels: PlanLevels | null,
     note?: string,
   ) => Promise<string>;
-  listSnapshots?: (symbol: string, limit: number) => Promise<SnapshotRow[]>;
+  listSnapshots?: (
+    symbol: string,
+    limit: number,
+  ) => Promise<{ rows: SnapshotRow[]; total: number }>;
   deleteSnapshot?: (id: string) => Promise<boolean>;
   createAlert?: (a: AlertInput) => Promise<AlertRow>;
   listAlerts?: (limit: number) => Promise<{ alerts: AlertRow[]; unread: number }>;
@@ -215,7 +221,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         symbol: sym,
         price,
         votes,
-        config: deps.ensemble,
+        config: deps.getEnsembleFor?.(sym, interval) ?? deps.ensemble,
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),
@@ -346,9 +352,16 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   // Metadatos del ensemble activo (base vs optimizado) para el comparador.
-  app.get('/ensemble', async () => {
+  app.get('/ensemble', async (request) => {
+    const q = z
+      .object({ symbol: z.string().default('BTCUSDT'), interval: z.string().default('5m') })
+      .parse(request.query);
     return (
-      deps.ensembleMeta?.() ?? { version: deps.ensemble.version, optimized: false, report: null }
+      deps.ensembleMeta?.(q.symbol, q.interval) ?? {
+        version: deps.ensemble.version,
+        optimized: false,
+        report: null,
+      }
     );
   });
 
@@ -408,7 +421,6 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return {
         reloaded: true,
         ensemble_version: r.ensembleVersion,
-        ensemble_optimized: r.ensembleOptimized,
         calibration_version: r.calibrationVersion,
       };
     }
@@ -424,11 +436,11 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const q = z
       .object({
         symbol: z.string().default(deps.symbols[0] ?? 'BTCUSDT'),
-        limit: z.coerce.number().int().min(1).max(200).default(20),
+        limit: z.coerce.number().int().min(1).max(1000).default(300),
       })
       .parse(request.query);
     const sym = q.symbol.toUpperCase();
-    const rows = await deps.listSnapshots(sym, q.limit);
+    const { rows, total } = await deps.listSnapshots(sym, q.limit);
     let currentPrice = 0;
     try {
       const candles = await deps.getHistory(sym, '1m', 1);
@@ -441,7 +453,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       ...row,
       tracking: currentPrice > 0 ? trackSnapshot(row, currentPrice, now) : null,
     }));
-    return { symbol: sym, currentPrice, snapshots };
+    return { symbol: sym, currentPrice, snapshots, total };
   });
 
   const SnapshotBody = z.object({
@@ -469,7 +481,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         symbol: sym,
         price,
         votes,
-        config: deps.ensemble,
+        config: deps.getEnsembleFor?.(sym, interval) ?? deps.ensemble,
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),

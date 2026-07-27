@@ -5,6 +5,7 @@ En M3 solo se valida el esquema; la optimización (Optuna) llega en M7.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -65,3 +66,22 @@ def load_ensemble(path: str | Path) -> dict[str, Any]:
     data = yaml.safe_load(Path(path).read_text())
     validate_ensemble(data)
     return cast("dict[str, Any]", data)
+
+
+def artifacts_dir() -> Path:
+    """Carpeta de artefactos (override con ARTIFACTS_DIR para tests/despliegues)."""
+    return Path(
+        os.environ.get("ARTIFACTS_DIR", str(Path(__file__).resolve().parents[3] / "artifacts"))
+    )
+
+
+def load_active_ensemble(symbol: str, interval: str) -> dict[str, Any]:
+    """Config ACTIVA para un símbolo+temporalidad: la optimizada por TF si existe, si no la base.
+
+    Es la misma regla que aplica la API en vivo: así el backtest mide exactamente lo que decide
+    el sistema para esa temporalidad.
+    """
+    opt = artifacts_dir() / "optimized" / f"ensemble.{symbol.upper()}.{interval}.yaml"
+    if opt.exists():
+        return load_ensemble(opt)
+    return load_ensemble(artifacts_dir() / "ensemble.yaml")
