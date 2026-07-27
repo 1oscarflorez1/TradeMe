@@ -49,14 +49,15 @@ def dataset_report(dsn: str) -> dict[str, Any]:
 
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM snapshots")
-        total = int(cur.fetchone()[0])
+        row0 = cur.fetchone()
+        total = int(row0[0]) if row0 else 0
         cur.execute("""SELECT
                  COUNT(*) FILTER (WHERE outcome_result IS NOT NULL) AS evaluated,
                  COUNT(*) FILTER (WHERE outcome_result = 'tp') AS tp,
                  COUNT(*) FILTER (WHERE outcome_result = 'sl') AS sl,
                  COUNT(*) FILTER (WHERE outcome_result = 'timeout') AS timeout
                FROM snapshots""")
-        row = cur.fetchone()
+        row = cur.fetchone() or (0, 0, 0, 0)
         evaluated, tp, sl, timeout = (int(x) for x in row)
         cur.execute("""SELECT interval, COUNT(*),
                       COUNT(*) FILTER (WHERE outcome_result IS NOT NULL)
@@ -71,7 +72,8 @@ def dataset_report(dsn: str) -> dict[str, Any]:
                WHERE net IS NOT NULL AND confidence IS NOT NULL
                  AND prob_buy IS NOT NULL AND adx14_value IS NOT NULL
                  AND atr14_value IS NOT NULL AND regime_label IS NOT NULL""")
-        complete = int(cur.fetchone()[0])
+        rowc = cur.fetchone()
+        complete = int(rowc[0]) if rowc else 0
 
     feature_completeness = (complete / total) if total > 0 else 0.0
     verdict = readiness_from_counts(evaluated, tp, sl, feature_completeness)
