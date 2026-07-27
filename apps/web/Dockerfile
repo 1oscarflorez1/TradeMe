@@ -6,6 +6,8 @@ WORKDIR /repo
 
 COPY . .
 RUN pnpm install --frozen-lockfile
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm --filter @trademe/web build
 
 EXPOSE 5173

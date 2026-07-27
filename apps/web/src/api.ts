@@ -262,6 +262,31 @@ export async function postPushSubscribe(sub: unknown): Promise<boolean> {
   }
 }
 
+export interface DatasetReport {
+  total: number;
+  evaluated: number;
+  pending: number;
+  tp: number;
+  sl: number;
+  timeout: number;
+  by_interval: Array<{ interval: string; total: number; evaluated: number }>;
+  by_regime: Record<string, number>;
+  feature_completeness: number;
+  criteria: { min_evaluated: number; min_per_class: number; min_feature_completeness: number };
+  ready: boolean;
+  reasons: string[];
+}
+
+export async function fetchDatasetReport(): Promise<DatasetReport | null> {
+  try {
+    const res = await apiFetch('/ml/dataset');
+    if (!res.ok) return null;
+    return (await res.json()) as DatasetReport;
+  } catch {
+    return null;
+  }
+}
+
 export async function runBacktest(
   symbol: string,
   interval: Interval,

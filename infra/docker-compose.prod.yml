@@ -1,0 +1,91 @@
+# TradeMe — producción (Oracle Always Free / cualquier VM con Docker).
+# Uso:  docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yml up -d --build
+# - Volúmenes nombrados => los datos (velas, snapshots, backtests, usuarios) sobreviven reinicios.
+# - Nada expuesto a internet: la web y la API escuchan SOLO en localhost de la VM; el acceso del
+#   equipo llega por Tailscale Serve (HTTPS ts.net). Postgres/Redis/quant son solo internos.
+name: trademe-prod
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trademe
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir en infra/.env.prod}
+      POSTGRES_DB: trademe
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U trademe -d trademe']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: '3001'
+      LOG_LEVEL: info
+      ENABLE_LIVE_TRADING: 'false'
+      MACRO_ENABLED: 'false'
+      DATABASE_URL: postgres://trademe:${POSTGRES_PASSWORD}@postgres:5432/trademe
+      REDIS_URL: redis://redis:6379
+      QUANT_URL: http://quant:8000
+      JWT_SECRET: ${JWT_SECRET:?Definir en infra/.env.prod}
+      TV_WEBHOOK_SECRET: ${TV_WEBHOOK_SECRET:-}
+      CORS_ORIGIN: ${PUBLIC_WEB_ORIGIN:?Definir en infra/.env.prod}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:equipo@trademe.local}
+    volumes:
+      - ../artifacts:/repo/artifacts
+    ports:
+      - '127.0.0.1:3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:?Definir en infra/.env.prod}
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:5173:5173'
+    depends_on:
+      - api
+
+  quant:
+    build:
+      context: ..
+      dockerfile: apps/quant/Dockerfile
+    restart: unless-stopped
+    environment:
+      MLFLOW_TRACKING_URI: file:./mlruns
+      DATABASE_URL: postgresql://trademe:${POSTGRES_PASSWORD}@postgres:5432/trademe
+    volumes:
+      - ../artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata_prod:

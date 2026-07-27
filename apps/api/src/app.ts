@@ -315,6 +315,19 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.status(502).send({ error: 'no se pudo lanzar el backtest' });
     }
   });
+  // Informe de preparación del dataset ML (Módulo 2 · fase 0).
+  app.get('/ml/dataset', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    try {
+      const res = await fetch(`${deps.quantUrl}/dataset-report`);
+      if (!res.ok) throw new Error(`quant ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al pedir el informe del dataset');
+      return reply.status(502).send({ error: 'no se pudo obtener el informe del dataset' });
+    }
+  });
+
   app.post('/optimize/run', async (request, reply) => {
     if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
     const q = QuantQuery.parse(request.query);
