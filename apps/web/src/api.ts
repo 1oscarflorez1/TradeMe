@@ -316,6 +316,41 @@ export async function fetchAutomation(): Promise<AutomationStatus | null> {
   }
 }
 
+export async function postAutomation(
+  overrides: Partial<
+    Pick<
+      AutomationStatus,
+      'enabled' | 'backtest_every_h' | 'optimize_every_h' | 'cooldown_h' | 'intervals'
+    > & { trials: number }
+  >,
+): Promise<AutomationStatus | null> {
+  try {
+    const res = await apiFetch('/automation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(overrides),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as AutomationStatus;
+  } catch {
+    return null;
+  }
+}
+
+export async function runCalibrate(
+  symbol: string,
+  interval: Interval,
+): Promise<{ ok: boolean }> {
+  try {
+    const res = await apiFetch(`/calibrate/run?symbol=${symbol}&interval=${interval}`, {
+      method: 'POST',
+    });
+    return { ok: res.ok };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function runBacktest(
   symbol: string,
   interval: Interval,

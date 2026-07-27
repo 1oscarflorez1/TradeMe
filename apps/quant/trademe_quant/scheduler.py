@@ -10,10 +10,12 @@ Política:
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .db import insert_alert, last_backtests
 from .ensemble import artifacts_dir
@@ -29,6 +31,45 @@ class AutoConfig:
     cooldown_h: float = 48.0
     trials: int = 40
     min_trades_degradation: int = 30
+
+
+def _config_path() -> Path:
+    return artifacts_dir() / "automation.json"
+
+
+def save_config_overrides(data: dict[str, object]) -> None:
+    """Guarda overrides de la política (editables desde la UI). El piloto los relee cada ciclo."""
+    path = _config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    current: dict[str, object] = {}
+    if path.exists():
+        try:
+            current = json.loads(path.read_text())
+        except Exception:  # noqa: BLE001
+            current = {}
+    current.update(data)
+    path.write_text(json.dumps(current, indent=2))
+
+
+def load_config() -> AutoConfig:
+    """Config efectiva: defaults de env + overrides de artifacts/automation.json (UI)."""
+    cfg = config_from_env()
+    path = _config_path()
+    if path.exists():
+        try:
+            o = json.loads(path.read_text())
+        except Exception:  # noqa: BLE001
+            return cfg
+        if isinstance(o.get("enabled"), bool):
+            cfg.enabled = o["enabled"]
+        for k in ("backtest_every_h", "optimize_every_h", "cooldown_h"):
+            if isinstance(o.get(k), (int, float)) and o[k] > 0:
+                setattr(cfg, k, float(o[k]))
+        if isinstance(o.get("trials"), int) and 5 <= o["trials"] <= 200:
+            cfg.trials = o["trials"]
+        if isinstance(o.get("intervals"), list) and o["intervals"]:
+            cfg.intervals = [str(x) for x in o["intervals"]]
+    return cfg
 
 
 def config_from_env() -> AutoConfig:
@@ -172,15 +213,12 @@ def automation_status(cfg: AutoConfig) -> dict[str, object]:
 
 
 def start_scheduler() -> None:
-    cfg = config_from_env()
-    if not cfg.enabled:
-        return
-
     def loop() -> None:
         time.sleep(60)  # dejar arrancar API/DB
         while True:
             try:
-                log = run_cycle(cfg)
+                cfg = load_config()  # la UI puede haber cambiado la política
+                log = run_cycle(cfg) if cfg.enabled else []
                 _state["last_cycle"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                 if log:
                     _state["last_log"] = log[-10:]

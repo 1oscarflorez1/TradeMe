@@ -12,8 +12,9 @@ from fastapi import FastAPI
 
 from .dataset import dataset_report
 from .run_backtest import run_and_save
+from .run_calibration import calibrate_and_publish
 from .run_optimize import optimize_and_publish
-from .scheduler import automation_status, config_from_env, start_scheduler
+from .scheduler import automation_status, load_config, save_config_overrides, start_scheduler
 
 app = FastAPI(title="TradeMe quant")
 start_scheduler()
@@ -44,4 +45,15 @@ def dataset_report_endpoint() -> dict[str, Any]:
 
 @app.get("/automation")
 def automation_endpoint() -> dict[str, Any]:
-    return automation_status(config_from_env())
+    return automation_status(load_config())
+
+
+@app.post("/automation")
+def automation_config_endpoint(overrides: dict[str, Any]) -> dict[str, Any]:
+    save_config_overrides(overrides)
+    return automation_status(load_config())
+
+
+@app.post("/run-calibration")
+def run_calibration_endpoint(symbol: str = "BTCUSDT", interval: str = "5m") -> dict[str, Any]:
+    return calibrate_and_publish(symbol, interval)
