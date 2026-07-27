@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { buildApp } from './app.js';
 import { attachStream } from './ws.js';
 import { buildSubscriptions, loadEnv, parseSymbols } from './config.js';
@@ -57,8 +58,19 @@ async function main(): Promise<void> {
   const registry = new IndicatorRegistry();
   const buffer = new CandleBuffer(300);
   const externalStore = new ExternalSignalStore();
-  const ensemblePath = existsSync(env.OPTIMIZED_ENSEMBLE) ? env.OPTIMIZED_ENSEMBLE : env.ENSEMBLE_CONFIG;
-  const ensemble = loadEnsembleSafe(ensemblePath, (m) => console.warn(m));
+  const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
+  const artifactsDir = dirname(env.ENSEMBLE_CONFIG);
+  const ensembleCache = new Map<string, EnsembleConfig>();
+  // Config ACTIVA por símbolo+TF: la optimizada de esa temporalidad si existe; si no, la base.
+  function getEnsembleFor(symbol: string, interval: string): EnsembleConfig {
+    const key = `${symbol.toUpperCase()}:${interval}`;
+    const hit = ensembleCache.get(key);
+    if (hit) return hit;
+    const p = join(artifactsDir, 'optimized', `ensemble.${symbol.toUpperCase()}.${interval}.yaml`);
+    const cfg = existsSync(p) ? loadEnsembleSafe(p, (m) => console.warn(m)) : ensemble;
+    ensembleCache.set(key, cfg);
+    return cfg;
+  }
   const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
 
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
@@ -79,30 +91,33 @@ async function main(): Promise<void> {
 
   function reloadArtifacts(): {
     ensembleVersion: string;
-    ensembleOptimized: boolean;
     calibrationVersion: string | null;
   } {
-    const path = existsSync(env.OPTIMIZED_ENSEMBLE) ? env.OPTIMIZED_ENSEMBLE : env.ENSEMBLE_CONFIG;
-    const fresh = loadEnsembleSafe(path, (m) => console.warn(m));
+    const fresh = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
     Object.assign(ensemble, fresh);
+    ensembleCache.clear();
     calibrators.reload();
     return {
       ensembleVersion: ensemble.version,
-      ensembleOptimized: path === env.OPTIMIZED_ENSEMBLE,
       calibrationVersion: calibrators.version,
     };
   }
 
-  function ensembleMeta(): { version: string; optimized: boolean; report: unknown } {
+  function ensembleMeta(
+    symbol = 'BTCUSDT',
+    interval = '5m',
+  ): { version: string; optimized: boolean; report: unknown } {
+    const sym = symbol.toUpperCase();
+    const optPath = join(artifactsDir, 'optimized', `ensemble.${sym}.${interval}.yaml`);
+    const repPath = join(artifactsDir, 'optimized', `report.${sym}.${interval}.json`);
     let report: unknown = null;
     try {
-      if (existsSync(env.OPT_REPORT_PATH)) {
-        report = JSON.parse(readFileSync(env.OPT_REPORT_PATH, 'utf8'));
-      }
+      if (existsSync(repPath)) report = JSON.parse(readFileSync(repPath, 'utf8'));
     } catch {
       report = null;
     }
-    return { version: ensemble.version, optimized: existsSync(env.OPTIMIZED_ENSEMBLE), report };
+    const active = getEnsembleFor(sym, interval);
+    return { version: active.version, optimized: existsSync(optPath), report };
   }
 
   const app = buildApp({
@@ -116,6 +131,7 @@ async function main(): Promise<void> {
     calibrators,
     reloadArtifacts,
     ensembleMeta,
+    getEnsembleFor,
     equity: env.ACCOUNT_EQUITY,
     getMacro: macroEnabled ? (symbol: string) => macroStore.get(symbol) : undefined,
     recordSnapshot: snapshotsRepo
@@ -164,7 +180,7 @@ async function main(): Promise<void> {
         symbol,
         price,
         votes,
-        config: ensemble,
+        config: getEnsembleFor(symbol, iv),
         equity: env.ACCOUNT_EQUITY,
         interval: iv,
         macro: macroEnabled ? macroStore.get(symbol) : undefined,

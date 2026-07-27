@@ -241,7 +241,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
             </p>
           </section>
           <CalibrationSection />
-          <OptimizationSection />
+          <OptimizationSection symbol={symbol} interval={interval} />
           <DatasetSection />
         </div>
         <BacktestGuide />
@@ -321,7 +321,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         <EquityReport bt={bt} />
       </section>
       <CalibrationSection />
-      <OptimizationSection />
+      <OptimizationSection symbol={symbol} interval={interval} />
       <DatasetSection />
       </div>
       <BacktestGuide />
@@ -676,13 +676,13 @@ function fmtR(n: number | undefined): string {
   return n == null ? '—' : `${n.toFixed(3)} R`;
 }
 
-function OptimizationSection() {
+function OptimizationSection({ symbol, interval }: { symbol: string; interval: Interval }) {
   const [meta, setMeta] = useState<EnsembleMeta | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetchEnsemble().then((r) => {
+    fetchEnsemble(symbol, interval).then((r) => {
       if (!cancelled) {
         setMeta(r);
         setLoaded(true);
@@ -691,7 +691,7 @@ function OptimizationSection() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [symbol, interval]);
 
   if (!loaded) return null;
   const report = meta?.report ?? null;
@@ -701,7 +701,7 @@ function OptimizationSection() {
       <div className="chart-head">
         <strong>Optimización de pesos</strong>
         <span className="muted">
-          · Optuna + walk-forward{meta?.version ? ` · activo: ${meta.version}` : ''}
+          · {interval} · Optuna + walk-forward{meta?.version ? ` · activo: ${meta.version}` : ''}
         </span>
       </div>
       {!report ? (

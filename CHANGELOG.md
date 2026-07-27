@@ -5,6 +5,18 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Fixed — Parámetros optimizados POR temporalidad
+
+- **Antes:** un único `ensemble.optimized.yaml` global — optimizar 15m sobrescribía lo de 5m, y el
+  backtest medía con la config base (no la optimizada). **Ahora:** cada símbolo+TF tiene su artefacto
+  (`artifacts/optimized/ensemble.<SYM>.<TF>.yaml` + `report.<SYM>.<TF>.json`); la decisión en vivo,
+  el backtest (▶) y el comparador usan **la config activa de esa temporalidad**, y ⚙ Optimizar
+  compite contra la activa (mejora iterativa honesta).
+- **api:** caché por símbolo+TF con recarga en `POST /reload`; `GET /ensemble?symbol&interval`.
+- **quant:** `load_active_ensemble()` compartido por backtest y optimizador (+2 tests).
+- **web:** el panel de Optimización muestra la temporalidad y se actualiza al cambiarla.
+- Los artefactos optimizados legados (globales) quedan ignorados; re-optimiza por TF.
+
 ### Added — Claridad de botones · Dataset ML · despliegue gratis
 
 - **web · Backtest:** aclaración de los botones (▶ mide la estrategia actual y evalúa registros;

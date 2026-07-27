@@ -7,26 +7,18 @@ También expone run_and_save() para el servicio HTTP.
 from __future__ import annotations
 
 import os
-import pathlib
 import sys
 from typing import Any
 
 from .backtest import run_backtest
 from .db import evaluate_snapshot_outcomes, save_backtest
-from .ensemble import load_ensemble
+from .ensemble import load_active_ensemble
 from .market.binance import fetch_klines
 from .market.normalize import normalize_rest_kline
 
 
 def _dsn() -> str:
     return os.environ.get("DATABASE_URL", "postgresql://trademe:trademe@localhost:5432/trademe")
-
-
-def _ensemble_path() -> str:
-    return os.environ.get(
-        "ENSEMBLE_CONFIG",
-        str(pathlib.Path(__file__).resolve().parents[3] / "artifacts/ensemble.yaml"),
-    )
 
 
 def run_and_save(symbol: str, interval: str) -> dict[str, Any]:
@@ -36,7 +28,7 @@ def run_and_save(symbol: str, interval: str) -> dict[str, Any]:
     high = [c.high for c in candles]
     low = [c.low for c in candles]
     close = [c.close for c in candles]
-    config = load_ensemble(_ensemble_path())
+    config = load_active_ensemble(symbol, interval)
     result = run_backtest(high, low, close, config)
     save_backtest(_dsn(), symbol, interval, result)
     evaluated = 0
