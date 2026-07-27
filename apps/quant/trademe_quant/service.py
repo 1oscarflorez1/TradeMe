@@ -13,8 +13,10 @@ from fastapi import FastAPI
 from .dataset import dataset_report
 from .run_backtest import run_and_save
 from .run_optimize import optimize_and_publish
+from .scheduler import automation_status, config_from_env, start_scheduler
 
 app = FastAPI(title="TradeMe quant")
+start_scheduler()
 
 
 @app.get("/health")
@@ -38,3 +40,8 @@ def run_optimize_endpoint(
 def dataset_report_endpoint() -> dict[str, Any]:
     dsn = os.environ.get("DATABASE_URL", "postgresql://trademe:trademe@localhost:5432/trademe")
     return dataset_report(dsn)
+
+
+@app.get("/automation")
+def automation_endpoint() -> dict[str, Any]:
+    return automation_status(config_from_env())

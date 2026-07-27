@@ -5,6 +5,17 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — 🤖 Piloto automático de backtest/optimización
+
+- **quant:** worker en el servicio (scheduler): **mide** cada símbolo+TF activo cada 6h (y evalúa
+  snapshots pendientes); **optimiza** solo por mantenimiento (7d) o **degradación** (2 mediciones
+  seguidas con expectancy negativa y muestra suficiente), con **cooldown 48h** y el gate de hold-out
+  de siempre. Configurable por env (`AUTO_*`); 5m fuera por defecto. Crea **alertas** en la campana
+  ante promoción o degradación sin mejora (+5 tests de la política).
+- **api:** `GET /automation` (estado del piloto).
+- **web:** tarjeta **Piloto automático** en Backtest (política, estado por TF, última medición/
+  optimización) y guía: los botones quedan para resultados inmediatos.
+
 ### Added — Registros: filtros, orden y contadores reales
 
 - **web · Registros:** barra de **filtros** por Temporalidad, Acción, Dirección y Estado

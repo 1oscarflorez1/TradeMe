@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  fetchAutomation,
   fetchBacktest,
   fetchCalibration,
   fetchDatasetReport,
@@ -8,7 +9,7 @@ import {
   runBacktest,
   runOptimize,
 } from './api';
-import type { DatasetReport } from './api';
+import type { AutomationStatus, DatasetReport } from './api';
 import type {
   BacktestResult,
   CalibrationMeta,
@@ -247,6 +248,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
           <CalibrationSection />
           <OptimizationSection symbol={symbol} interval={interval} />
           <DatasetSection />
+          <AutomationSection />
         </div>
         <BacktestGuide />
       </div>
@@ -327,6 +329,7 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
       <CalibrationSection />
       <OptimizationSection symbol={symbol} interval={interval} />
       <DatasetSection />
+      <AutomationSection />
       </div>
       <BacktestGuide />
     </div>
@@ -825,6 +828,77 @@ function DatasetSection() {
         verde: exige suficientes decisiones evaluadas, ejemplos de ambos desenlaces (TP y SL) y
         features completas. Los snapshots automáticos alimentan este dataset; el botón ▶ evalúa
         los pendientes.
+      </p>
+    </section>
+  );
+}
+
+function fmtH(h: number | null): string {
+  if (h === null) return 'nunca';
+  if (h < 1) return `hace ${Math.round(h * 60)} min`;
+  if (h < 48) return `hace ${h.toFixed(0)} h`;
+  return `hace ${(h / 24).toFixed(1)} días`;
+}
+
+function AutomationSection() {
+  const [st, setSt] = useState<AutomationStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      fetchAutomation().then((r) => {
+        if (!cancelled) setSt(r);
+      });
+    void load();
+    const id = setInterval(() => void load(), 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  if (!st) return null;
+
+  return (
+    <section className="panel opt-panel">
+      <div className="chart-head">
+        <strong title="Worker en el servicio quant: mide cada pocas horas y optimiza solo por mantenimiento o degradación, con cooldown y gate de hold-out. Te avisa por la campana cuando promueve una config o detecta degradación sin mejora.">
+          🤖 Piloto automático
+        </strong>
+        <span className="muted">
+          · mide cada {st.backtest_every_h}h · optimiza cada {(st.optimize_every_h / 24).toFixed(0)}d
+          o si se degrada · cooldown {st.cooldown_h}h
+        </span>
+        <span
+          className={`opt-badge ${st.enabled ? 'opt-ok' : 'opt-no'}`}
+          style={{ marginLeft: 'auto' }}
+        >
+          {st.enabled ? 'Activo' : 'Apagado'}
+        </span>
+      </div>
+      <table className="opt-table">
+        <thead>
+          <tr>
+            <th>Temporalidad</th>
+            <th>Última medición</th>
+            <th>Última optimización</th>
+          </tr>
+        </thead>
+        <tbody>
+          {st.per_tf.map((t) => (
+            <tr key={`${t.symbol}:${t.interval}`}>
+              <td>{t.interval}</td>
+              <td>{fmtH(t.hours_since_backtest)}</td>
+              <td>{fmtH(t.hours_since_optimize)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="muted calib-legend">
+        Ya no necesitas vigilar ni decidir cuándo pulsar: el piloto mide, evalúa tus registros,
+        optimiza solo cuando toca (nunca promueve sin ganar en hold-out) y te avisa por la campana
+        🔔 si promueve una config o detecta degradación. Los botones quedan para cuando quieras un
+        resultado inmediato.
       </p>
     </section>
   );

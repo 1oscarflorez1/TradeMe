@@ -129,3 +129,46 @@ def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
             updated += 1
         conn.commit()
     return updated
+
+
+def last_backtests(dsn: str, symbol: str, interval: str, limit: int = 2) -> list[dict[str, Any]]:
+    """Últimas mediciones (más reciente primero) para decidir si hay degradación."""
+    import psycopg
+
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT expectancy, n_trades,
+                      EXTRACT(EPOCH FROM (now() - created_at)) / 3600 AS hours_ago
+               FROM backtests WHERE symbol = %s AND interval = %s
+               ORDER BY created_at DESC LIMIT %s""",
+            (symbol.upper(), interval, limit),
+        )
+        return [
+            {
+                "expectancy": float(r[0]) if r[0] is not None else 0.0,
+                "n_trades": int(r[1] or 0),
+                "hours_ago": float(r[2]),
+            }
+            for r in cur.fetchall()
+        ]
+
+
+def insert_alert(
+    dsn: str,
+    type_: str,
+    severity: str,
+    title: str,
+    message: str,
+    symbol: str | None = None,
+    interval: str | None = None,
+) -> None:
+    """Crea una alerta (campana del portal) desde el worker de automatización."""
+    import psycopg
+
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO alerts (symbol, interval, type, severity, title, message)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (symbol, interval, type_, severity, title, message),
+        )
+        conn.commit()

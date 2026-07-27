@@ -321,6 +321,19 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.status(502).send({ error: 'no se pudo lanzar el backtest' });
     }
   });
+  // Estado del piloto automático de backtest/optimización (worker en quant).
+  app.get('/automation', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    try {
+      const res = await fetch(`${deps.quantUrl}/automation`);
+      if (!res.ok) throw new Error(`quant ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al pedir el estado de automatización');
+      return reply.status(502).send({ error: 'no se pudo obtener el estado de automatización' });
+    }
+  });
+
   // Informe de preparación del dataset ML (Módulo 2 · fase 0).
   app.get('/ml/dataset', async (request, reply) => {
     if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
