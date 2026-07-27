@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from .dataset import dataset_report
 from .run_backtest import run_and_save
 from .run_calibration import calibrate_and_publish
+from .run_metamodel import train_and_publish
 from .run_optimize import optimize_and_publish
 from .scheduler import automation_status, load_config, save_config_overrides, start_scheduler
 
@@ -57,3 +58,8 @@ def automation_config_endpoint(overrides: dict[str, Any]) -> dict[str, Any]:
 @app.post("/run-calibration")
 def run_calibration_endpoint(symbol: str = "BTCUSDT", interval: str = "5m") -> dict[str, Any]:
     return calibrate_and_publish(symbol, interval)
+
+
+@app.post("/run-metamodel")
+def run_metamodel_endpoint() -> dict[str, Any]:
+    return train_and_publish()

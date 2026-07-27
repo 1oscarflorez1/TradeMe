@@ -10,8 +10,9 @@ import {
   runBacktest,
   runCalibrate,
   runOptimize,
+  trainMetamodel,
 } from './api';
-import type { AutomationStatus, DatasetReport } from './api';
+import type { AutomationStatus, DatasetReport, MetamodelResult } from './api';
 import type {
   BacktestResult,
   CalibrationMeta,
@@ -829,6 +830,8 @@ function OptimizationSection({ symbol, interval }: { symbol: string; interval: I
 function DatasetSection() {
   const [rep, setRep] = useState<DatasetReport | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [training, setTraining] = useState(false);
+  const [mm, setMm] = useState<MetamodelResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -861,6 +864,20 @@ function DatasetSection() {
             Aún acumulando datos
           </span>
         )}
+        <button
+          type="button"
+          className="bt-run bt-opt"
+          disabled={training}
+          title="Reentrena el meta-modelo con TODOS los registros evaluados. Solo se publica si mejora la expectancy en el tramo de validación."
+          onClick={() => {
+            setTraining(true);
+            void trainMetamodel()
+              .then(setMm)
+              .finally(() => setTraining(false));
+          }}
+        >
+          {training ? 'Entrenando…' : '🧠 Entrenar ahora'}
+        </button>
       </div>
       <div className="reg-summary" style={{ marginTop: '0.6rem' }}>
         <span className="reg-chip" title="Snapshots guardados en total">
@@ -882,6 +899,13 @@ function DatasetSection() {
           Features <strong>{(rep.feature_completeness * 100).toFixed(0)}%</strong>
         </span>
       </div>
+      {mm && (
+        <p className="bt-runmsg">
+          {mm.trained
+            ? `Entrenado con ${mm.n} decisiones · AUC ${mm.auc?.toFixed(2)} · umbral ${((mm.threshold ?? 0) * 100).toFixed(0)}% · expectancy ${mm.baseline_expectancy?.toFixed(3)}R → ${mm.filtered_expectancy?.toFixed(3)}R · ${mm.published ? '✓ publicado' : 'no publicado (no mejora)'}`
+            : `No entrenado: ${mm.reason}`}
+        </p>
+      )}
       {!rep.ready && rep.reasons.length > 0 && (
         <ul className="ds-reasons">
           {rep.reasons.map((r) => (
@@ -1085,11 +1109,19 @@ function AutomationSection() {
           ))}
         </tbody>
       </table>
+      <div className="reg-summary" style={{ marginTop: '0.5rem' }}>
+        <span className="reg-chip" title="El piloto recalibra siempre tras promover parámetros nuevos y por mantenimiento periódico">
+          Calibración <strong>{fmtH(st.hours_since_calibration ?? null)}</strong>
+        </span>
+        <span className="reg-chip" title="Reentrenamiento del meta-modelo con los registros evaluados nuevos">
+          Meta-modelo <strong>{fmtH(st.hours_since_metamodel ?? null)}</strong>
+        </span>
+      </div>
       <p className="muted calib-legend">
         Ya no necesitas vigilar ni decidir cuándo pulsar: el piloto mide, evalúa tus registros,
-        optimiza solo cuando toca (nunca promueve sin ganar en hold-out) y te avisa por la campana
-        🔔 si promueve una config o detecta degradación. Los botones quedan para cuando quieras un
-        resultado inmediato.
+        optimiza solo cuando toca (nunca promueve sin ganar en hold-out), **recalibra** tras cada
+        promoción y por mantenimiento, **reentrena el meta-modelo** con los registros nuevos, y te
+        avisa por la campana 🔔. Los botones quedan para cuando quieras un resultado inmediato.
       </p>
     </section>
   );

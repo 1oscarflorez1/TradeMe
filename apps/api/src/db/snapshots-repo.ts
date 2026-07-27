@@ -26,7 +26,7 @@ export class SnapshotsRepo {
         net, prob_buy, prob_hold, prob_sell, action, direction, confidence,
         macro_bias, funding_rate, weekly_trend, macro_label, confluence,
         ema_cross_score, macd_score, rsi14_score, rsi14_value, bbands_score,
-        stoch14_score, adx14_value, atr14_value, reditum_sniper_score, reditum_poc_score,
+        stoch14_score, supertrend_score, adx14_value, atr14_value, reditum_sniper_score, reditum_poc_score,
         plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr, valid_until,
         model_version, source, note, raw_signal
       ) VALUES (
@@ -34,9 +34,9 @@ export class SnapshotsRepo {
         $7,$8,$9,$10,$11,$12,$13,
         $14,$15,$16,$17,$18,
         $19,$20,$21,$22,$23,
-        $24,$25,$26,$27,$28,
-        $29,$30,$31,$32,$33,$34,
-        $35,'manual',$36,$37
+        $24,$25,$26,$27,$28,$29,
+        $30,$31,$32,$33,$34,$35,
+        $36,'manual',$37,$38
       ) RETURNING id`,
       [
         signal.symbol,
@@ -63,6 +63,7 @@ export class SnapshotsRepo {
         value(signal, 'rsi14'),
         score(signal, 'bbands'),
         score(signal, 'stoch14'),
+        score(signal, 'supertrend'),
         value(signal, 'adx14'),
         value(signal, 'atr14'),
         score(signal, 'reditum_sniper'),

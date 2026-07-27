@@ -5,6 +5,22 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Módulo 2 · Meta-modelo (meta-labeling) + calibración automatizada
+
+- **quant · meta-modelo:** `metamodel.py` + `run_metamodel.py` — aprende de los snapshots ya
+  evaluados (TP/SL) a estimar la probabilidad de éxito de cada señal (filtro anti-falsos-positivos).
+  **RandomForest** (mejor que boosting con datasets pequeños y exportable a ONNX de forma nativa),
+  **split temporal**, umbral elegido por expectancy y **publicación solo si mejora** en validación.
+  Exporta `artifacts/metamodel.onnx` + metadatos. **Reentrenamiento continuo:** cada ejecución usa
+  todos los registros disponibles, así el modelo mejora con los datos que llegan (+5 tests).
+- **Calibración automatizada:** el piloto recalibra **siempre tras una promoción** (los parámetros
+  nuevos cambian la distribución de confianzas) y por **mantenimiento periódico** (deriva del
+  mercado), con **cooldown 24h** para no ajustar a muestras pequeñas (+4 tests).
+- **Piloto:** reentrena el meta-modelo cada 12h y avisa por la campana cuando publica uno nuevo.
+- **api:** `POST /ml/train`. **web:** botón 🧠 Entrenar ahora con resultado (AUC, umbral, expectancy
+  antes/después) y estado de calibración/meta-modelo en la tarjeta del piloto.
+- **snapshots:** nueva columna `supertrend_score` (migración 010) — feature que faltaba desde M1b.
+
 ### Added — Confirmaciones, política editable y adiós a la terminal
 
 - **web:** los botones ▶/⚙ piden **confirmación** explicando cómo interfieren con el piloto (⚙
