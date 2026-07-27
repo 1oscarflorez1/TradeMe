@@ -12,7 +12,8 @@ import type {
 } from './types';
 import { authHeaders, getToken, setToken } from './auth';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+// '||' a propósito: un VITE_API_URL vacío (build sin el arg) debe caer al default, no quedarse ''.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /** fetch con la cabecera de sesión ya puesta; si el servidor dice 401, cierra la sesión local
  * (el token venció o es inválido) para que la app vuelva a mostrar el login. */
