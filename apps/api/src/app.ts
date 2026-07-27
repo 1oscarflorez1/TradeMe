@@ -374,6 +374,19 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     }
   });
 
+  // Reentrenar el meta-modelo (Módulo 2) desde la UI.
+  app.post('/ml/train', async (request, reply) => {
+    if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });
+    try {
+      const res = await fetch(`${deps.quantUrl}/run-metamodel`, { method: 'POST' });
+      if (!res.ok) throw new Error(`quant ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      request.log.error({ err: String(err) }, 'fallo al entrenar el meta-modelo');
+      return reply.status(502).send({ error: 'no se pudo entrenar el meta-modelo' });
+    }
+  });
+
   // Informe de preparación del dataset ML (Módulo 2 · fase 0).
   app.get('/ml/dataset', async (request, reply) => {
     if (!deps.quantUrl) return reply.status(503).send({ error: 'servicio quant no configurado' });

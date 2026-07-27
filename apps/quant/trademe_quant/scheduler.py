@@ -31,6 +31,11 @@ class AutoConfig:
     cooldown_h: float = 48.0
     trials: int = 40
     min_trades_degradation: int = 30
+    # Calibración: siempre tras promoción + mantenimiento semanal (cooldown para no ajustar ruido).
+    calibrate_every_h: float = 24.0 * 7
+    calibrate_cooldown_h: float = 24.0
+    # Meta-modelo (Módulo 2): reentrena con los registros nuevos cada N horas.
+    metamodel_every_h: float = 12.0
 
 
 def _config_path() -> Path:
@@ -62,7 +67,13 @@ def load_config() -> AutoConfig:
             return cfg
         if isinstance(o.get("enabled"), bool):
             cfg.enabled = o["enabled"]
-        for k in ("backtest_every_h", "optimize_every_h", "cooldown_h"):
+        for k in (
+            "backtest_every_h",
+            "optimize_every_h",
+            "cooldown_h",
+            "calibrate_every_h",
+            "metamodel_every_h",
+        ):
             if isinstance(o.get(k), (int, float)) and o[k] > 0:
                 setattr(cfg, k, float(o[k]))
         if isinstance(o.get("trials"), int) and 5 <= o["trials"] <= 200:
@@ -84,6 +95,9 @@ def config_from_env() -> AutoConfig:
         optimize_every_h=float(os.environ.get("AUTO_OPTIMIZE_EVERY_H", str(24 * 7))),
         cooldown_h=float(os.environ.get("AUTO_OPT_COOLDOWN_H", "48")),
         trials=int(os.environ.get("AUTO_TRIALS", "40")),
+        calibrate_every_h=float(os.environ.get("AUTO_CALIBRATE_EVERY_H", str(24 * 7))),
+        calibrate_cooldown_h=float(os.environ.get("AUTO_CALIBRATE_COOLDOWN_H", "24")),
+        metamodel_every_h=float(os.environ.get("AUTO_METAMODEL_EVERY_H", "12")),
     )
 
 
@@ -112,6 +126,30 @@ def should_optimize(
     return False, ""
 
 
+def _hours_since_file(name: str) -> float | None:
+    p = artifacts_dir() / name
+    if not p.exists():
+        return None
+    return (time.time() - p.stat().st_mtime) / 3600.0
+
+
+def should_calibrate(
+    hours_since_cal: float | None, promoted: bool, every_h: float, cooldown_h: float
+) -> tuple[bool, str]:
+    """Recalibrar: SIEMPRE tras una promoción (los parámetros nuevos cambian la confianza),
+    y por mantenimiento periódico (la relación confianza→acierto deriva con el mercado).
+    El cooldown evita recalibrar con muestras pequeñas una y otra vez."""
+    if hours_since_cal is None:
+        return True, "primera calibración"
+    if promoted:
+        return True, "tras promoción (parámetros nuevos)"
+    if hours_since_cal < cooldown_h:
+        return False, ""
+    if hours_since_cal >= every_h:
+        return True, "mantenimiento periódico"
+    return False, ""
+
+
 def hours_since_optimize(symbol: str, interval: str) -> float | None:
     p = artifacts_dir() / "optimized" / f"report.{symbol.upper()}.{interval}.json"
     if not p.exists():
@@ -126,6 +164,8 @@ def _dsn() -> str:
 def run_cycle(cfg: AutoConfig) -> list[str]:
     """Una pasada: mide lo vencido y optimiza solo cuando toca. Devuelve un log."""
     from .run_backtest import run_and_save
+    from .run_calibration import calibrate_and_publish
+    from .run_metamodel import train_and_publish
     from .run_optimize import optimize_and_publish
 
     log: list[str] = []
@@ -152,6 +192,15 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
                 report = optimize_and_publish(symbol, iv, cfg.trials)
                 run_and_save(symbol, iv)  # re-medir con la config activa resultante
                 log.append(f"optimizado {symbol} {iv} ({reason}; promovido={report['promoted']})")
+                cal_ok, cal_reason = should_calibrate(
+                    _hours_since_file("calibrators.json"),
+                    bool(report["promoted"]),
+                    cfg.calibrate_every_h,
+                    cfg.calibrate_cooldown_h,
+                )
+                if cal_ok:
+                    calibrate_and_publish(symbol, iv)
+                    log.append(f"calibrado {symbol} {iv} ({cal_reason})")
                 if report["promoted"]:
                     insert_alert(
                         dsn,
@@ -176,6 +225,43 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
                     )
             except Exception as err:  # noqa: BLE001 - el piloto no debe morir por un TF
                 log.append(f"error {symbol} {iv}: {err}")
+
+    # Calibración de mantenimiento (independiente de que haya habido optimización).
+    try:
+        cal_ok, cal_reason = should_calibrate(
+            _hours_since_file("calibrators.json"),
+            False,
+            cfg.calibrate_every_h,
+            cfg.calibrate_cooldown_h,
+        )
+        if cal_ok and cfg.symbols and cfg.intervals:
+            calibrate_and_publish(cfg.symbols[0], cfg.intervals[0])
+            log.append(f"calibrado {cfg.symbols[0]} {cfg.intervals[0]} ({cal_reason})")
+    except Exception as err:  # noqa: BLE001
+        log.append(f"error calibración: {err}")
+
+    # Meta-modelo (Módulo 2): reentrena con los registros nuevos; publica solo si mejora.
+    try:
+        mm_age = _hours_since_file("metamodel.json")
+        if mm_age is None or mm_age >= cfg.metamodel_every_h:
+            out = train_and_publish(dsn)
+            if out.get("trained"):
+                log.append(
+                    f"meta-modelo n={out['n']} AUC={out['auc']:.2f} "
+                    f"publicado={out.get('published')}"
+                )
+                if out.get("published"):
+                    insert_alert(
+                        dsn,
+                        "metamodel",
+                        "success",
+                        "Meta-modelo actualizado",
+                        f"Entrenado con {out['n']} decisiones evaluadas (AUC {out['auc']:.2f}). "
+                        f"Filtra señales por debajo de {out['threshold']:.0%} de probabilidad de "
+                        "éxito; mejora la expectancy en validación.",
+                    )
+    except Exception as err:  # noqa: BLE001
+        log.append(f"error meta-modelo: {err}")
     return log
 
 
@@ -206,6 +292,10 @@ def automation_status(cfg: AutoConfig) -> dict[str, object]:
         "optimize_every_h": cfg.optimize_every_h,
         "cooldown_h": cfg.cooldown_h,
         "intervals": cfg.intervals,
+        "calibrate_every_h": cfg.calibrate_every_h,
+        "metamodel_every_h": cfg.metamodel_every_h,
+        "hours_since_calibration": _hours_since_file("calibrators.json"),
+        "hours_since_metamodel": _hours_since_file("metamodel.json"),
         "last_cycle": _state["last_cycle"],
         "last_log": _state["last_log"],
         "per_tf": per_tf,

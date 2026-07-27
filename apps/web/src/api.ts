@@ -296,6 +296,10 @@ export interface AutomationStatus {
   backtest_every_h: number;
   optimize_every_h: number;
   cooldown_h: number;
+  calibrate_every_h?: number;
+  metamodel_every_h?: number;
+  hours_since_calibration?: number | null;
+  hours_since_metamodel?: number | null;
   intervals: string[];
   last_cycle: string | null;
   per_tf: Array<{
@@ -348,6 +352,27 @@ export async function runCalibrate(
     return { ok: res.ok };
   } catch {
     return { ok: false };
+  }
+}
+
+export interface MetamodelResult {
+  trained: boolean;
+  reason?: string;
+  n?: number;
+  auc?: number;
+  threshold?: number;
+  baseline_expectancy?: number;
+  filtered_expectancy?: number;
+  published?: boolean;
+}
+
+export async function trainMetamodel(): Promise<MetamodelResult | null> {
+  try {
+    const res = await apiFetch('/ml/train', { method: 'POST' });
+    if (!res.ok) return null;
+    return (await res.json()) as MetamodelResult;
+  } catch {
+    return null;
   }
 }
 

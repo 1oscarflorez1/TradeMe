@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from trademe_quant.scheduler import is_degraded, should_optimize
+from trademe_quant.scheduler import is_degraded, should_calibrate, should_optimize
 
 
 def test_degradacion_requiere_dos_negativas_y_muestra() -> None:
@@ -32,3 +32,22 @@ def test_mantenimiento_semanal() -> None:
     assert ok and "mantenimiento" in reason
     ok2, _ = should_optimize(100, False, 168, 48)
     assert ok2 is False
+
+
+def test_calibra_siempre_tras_promocion() -> None:
+    ok, reason = should_calibrate(1.0, True, 168, 24)  # aunque el cooldown no haya pasado
+    assert ok and "promoción" in reason
+
+
+def test_primera_calibracion() -> None:
+    ok, reason = should_calibrate(None, False, 168, 24)
+    assert ok and "primera" in reason
+
+
+def test_cooldown_bloquea_calibracion_rutinaria() -> None:
+    assert should_calibrate(5.0, False, 168, 24)[0] is False
+
+
+def test_calibracion_por_mantenimiento() -> None:
+    ok, reason = should_calibrate(200.0, False, 168, 24)
+    assert ok and "mantenimiento" in reason

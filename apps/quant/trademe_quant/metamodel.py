@@ -1,0 +1,183 @@
+"""Meta-modelo de ML (Módulo 2 · meta-labeling).
+
+Aprende de las decisiones REALES ya evaluadas (snapshots con outcome TP/SL) a estimar la
+probabilidad de éxito de una señal del ensemble. Actúa como filtro anti-falsos-positivos: no
+cambia la dirección, ajusta la confianza.
+
+Decisiones de diseño (honestas):
+- **RandomForest (sklearn)** en vez de LightGBM: con datasets de decenas/centenares de filas un
+  bosque pequeño generaliza mejor que un boosting profundo, y skl2onnx lo exporta a ONNX de forma
+  nativa (LightGBM exige convertidores extra). Si el dataset crece mucho, migrar es trivial.
+- **Split temporal** (entrena con lo viejo, valida con lo nuevo): nunca aleatorio, para no mirar
+  al futuro.
+- **Promoción sólo si mejora**: se compara la expectancy con y sin el filtro en el tramo de
+  validación; si no mejora, NO se publica el modelo (misma filosofía que el hold-out de Optuna).
+- **Reentrenamiento continuo:** cada ejecución usa todos los snapshots evaluados disponibles, así
+  el modelo mejora a medida que llegan registros nuevos.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import numpy as np
+import numpy.typing as npt
+
+FloatArr = npt.NDArray[np.float64]
+
+# Orden de features: DEBE coincidir con el applier (API). Se guarda también en el artefacto.
+FEATURES = [
+    "net",
+    "confidence",
+    "prob_buy",
+    "prob_hold",
+    "prob_sell",
+    "adx14_value",
+    "atr_rel",  # atr14_value / price (escala-invariante)
+    "ema_cross_score",
+    "macd_score",
+    "rsi14_score",
+    "bbands_score",
+    "stoch14_score",
+    "supertrend_score",
+    "is_trend",  # régimen: 1 tendencia, 0 rango
+    "is_long",  # dirección: 1 LONG, 0 SHORT
+]
+
+MIN_ROWS = 60
+MIN_PER_CLASS = 20
+
+
+def row_to_features(row: dict[str, Any]) -> list[float]:
+    """Convierte un snapshot (dict) al vector de features en el orden canónico."""
+
+    def f(key: str) -> float:
+        v = row.get(key)
+        return float(v) if v is not None else 0.0
+
+    price = f("price") or 1.0
+    return [
+        f("net"),
+        f("confidence"),
+        f("prob_buy"),
+        f("prob_hold"),
+        f("prob_sell"),
+        f("adx14_value"),
+        f("atr14_value") / price,
+        f("ema_cross_score"),
+        f("macd_score"),
+        f("rsi14_score"),
+        f("bbands_score"),
+        f("stoch14_score"),
+        f("supertrend_score"),
+        1.0 if str(row.get("regime_label")) == "tendencia" else 0.0,
+        1.0 if str(row.get("direction")) == "LONG" else 0.0,
+    ]
+
+
+def expectancy_with_filter(probs: FloatArr, rs: FloatArr, threshold: float) -> tuple[float, int]:
+    """Expectancy media si solo se operaran las señales con prob >= umbral."""
+    mask = probs >= threshold
+    n = int(np.sum(mask))
+    if n == 0:
+        return 0.0, 0
+    return float(np.mean(rs[mask])), n
+
+
+def pick_threshold(probs: FloatArr, rs: FloatArr, min_kept_ratio: float = 0.3) -> float:
+    """Umbral que maximiza la expectancy conservando al menos una fracción de las señales."""
+    best_t, best_e = 0.5, -1e9
+    total = len(probs)
+    for t in np.arange(0.30, 0.75, 0.05):
+        e, n = expectancy_with_filter(probs, rs, float(t))
+        if total and n / total < min_kept_ratio:
+            continue
+        if e > best_e:
+            best_e, best_t = e, float(t)
+    return best_t
+
+
+def train_metamodel(rows: list[dict[str, Any]], test_ratio: float = 0.3) -> dict[str, Any]:
+    """Entrena y evalúa el meta-modelo. Devuelve veredicto + modelo si mejora."""
+    from sklearn.ensemble import RandomForestClassifier
+
+    usable = [
+        r
+        for r in rows
+        if r.get("outcome_result") in ("tp", "sl") and r.get("outcome_return_r") is not None
+    ]
+    usable.sort(key=lambda r: str(r.get("captured_at")))  # orden temporal
+    y_all = np.asarray([1.0 if r["outcome_result"] == "tp" else 0.0 for r in usable])
+    if (
+        len(usable) < MIN_ROWS
+        or min(int(y_all.sum()), int(len(y_all) - y_all.sum())) < MIN_PER_CLASS
+    ):
+        return {
+            "trained": False,
+            "reason": (
+                f"dataset insuficiente: {len(usable)} evaluadas "
+                f"(mín {MIN_ROWS}), clase minoritaria "
+                f"{min(int(y_all.sum()), int(len(y_all) - y_all.sum()))} (mín {MIN_PER_CLASS})"
+            ),
+            "n": len(usable),
+        }
+
+    x_all = np.asarray([row_to_features(r) for r in usable], dtype=np.float64)
+    r_all = np.asarray([float(r["outcome_return_r"]) for r in usable], dtype=np.float64)
+    split = int(len(usable) * (1 - test_ratio))
+    x_tr, x_te = x_all[:split], x_all[split:]
+    y_tr, y_te = y_all[:split], y_all[split:]
+    r_te = r_all[split:]
+
+    if len(np.unique(y_tr)) < 2 or len(y_te) < 10:
+        return {"trained": False, "reason": "tramo de validación insuficiente", "n": len(usable)}
+
+    model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=4,
+        min_samples_leaf=5,
+        class_weight="balanced",
+        random_state=42,
+    )
+    model.fit(x_tr, y_tr)
+    probs_te = model.predict_proba(x_te)[:, 1].astype(np.float64)
+
+    baseline = float(np.mean(r_te))
+    threshold = pick_threshold(probs_te, r_te)
+    filtered, kept = expectancy_with_filter(probs_te, r_te, threshold)
+    improves = filtered > baseline and kept >= max(5, int(0.3 * len(r_te)))
+
+    try:
+        from sklearn.metrics import roc_auc_score
+
+        auc = float(roc_auc_score(y_te, probs_te)) if len(np.unique(y_te)) > 1 else 0.5
+    except Exception:  # noqa: BLE001
+        auc = 0.5
+
+    return {
+        "trained": True,
+        "promote": improves,
+        "model": model,
+        "n": len(usable),
+        "n_train": int(split),
+        "n_test": int(len(y_te)),
+        "auc": auc,
+        "threshold": threshold,
+        "baseline_expectancy": baseline,
+        "filtered_expectancy": filtered,
+        "kept": kept,
+        "features": FEATURES,
+    }
+
+
+def export_onnx(model: Any, path: str, meta: dict[str, Any]) -> None:
+    """Exporta el modelo a ONNX + un JSON con features, umbral y métricas."""
+    from skl2onnx import to_onnx
+
+    sample = np.zeros((1, len(FEATURES)), dtype=np.float32)
+    onx = to_onnx(model, sample, options={id(model): {"zipmap": False}})
+    with open(path, "wb") as fh:
+        fh.write(onx.SerializeToString())
+    with open(path.replace(".onnx", ".json"), "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=2)
