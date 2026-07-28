@@ -57,6 +57,7 @@ export interface AppDeps {
   vapidPublicKey?: string;
   savePushSub?: (sub: PushSub) => Promise<void>;
   quantUrl?: string;
+  pingDb?: () => Promise<boolean>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -151,6 +152,149 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const payload = token ? verifyJwt(token, deps.authSecret) : null;
     if (!payload) return reply.status(401).send({ error: 'no autenticado' });
     return { id: payload.sub, email: payload.email };
+  });
+
+  // Estado del sistema: comprueba EN VIVO cada pieza y su comunicación (pestaña Estado).
+  app.get('/status', async () => {
+    const t0 = Date.now();
+    const components: Array<{
+      key: string;
+      label: string;
+      status: 'ok' | 'degradado' | 'caido' | 'na';
+      detail: string;
+      ms?: number;
+    }> = [];
+
+    components.push({
+      key: 'api',
+      label: 'API (motor en vivo)',
+      status: 'ok',
+      detail: `v${PKG.version} · operaciones reales ${env.ENABLE_LIVE_TRADING === 'true' ? 'HABILITADAS' : 'deshabilitadas'}`,
+    });
+
+    // Base de datos
+    if (deps.pingDb) {
+      const t = Date.now();
+      const ok = await deps.pingDb().catch(() => false);
+      components.push({
+        key: 'db',
+        label: 'Base de datos (TimescaleDB)',
+        status: ok ? 'ok' : 'caido',
+        detail: ok ? 'consultas respondiendo' : 'sin respuesta: registros y backtests no se guardan',
+        ms: Date.now() - t,
+      });
+    } else {
+      components.push({
+        key: 'db',
+        label: 'Base de datos (TimescaleDB)',
+        status: 'na',
+        detail: 'no configurada (modo sin persistencia)',
+      });
+    }
+
+    // Datos de mercado (Binance)
+    {
+      const t = Date.now();
+      try {
+        const candles = await deps.getHistory(deps.symbols[0] ?? 'BTCUSDT', '1m', 1);
+        const ok = candles.length > 0;
+        components.push({
+          key: 'market',
+          label: 'Datos de mercado (Binance)',
+          status: ok ? 'ok' : 'degradado',
+          detail: ok
+            ? `último precio ${candles[candles.length - 1]!.close}`
+            : 'respuesta vacía del proveedor',
+          ms: Date.now() - t,
+        });
+      } catch (err) {
+        components.push({
+          key: 'market',
+          label: 'Datos de mercado (Binance)',
+          status: 'caido',
+          detail: `sin datos: ${String(err).slice(0, 80)}`,
+          ms: Date.now() - t,
+        });
+      }
+    }
+
+    // Servicio quant (backtest/optimización/ML) + piloto
+    if (deps.quantUrl) {
+      const t = Date.now();
+      try {
+        const res = await fetch(`${deps.quantUrl}/health`);
+        const ok = res.ok;
+        let autoDetail = '';
+        if (ok) {
+          try {
+            const a = (await (await fetch(`${deps.quantUrl}/automation`)).json()) as {
+              enabled?: boolean;
+              last_cycle?: string | null;
+            };
+            autoDetail = a.enabled
+              ? ` · piloto activo${a.last_cycle ? ` (último ciclo ${a.last_cycle})` : ''}`
+              : ' · piloto apagado';
+          } catch {
+            autoDetail = '';
+          }
+        }
+        components.push({
+          key: 'quant',
+          label: 'Servicio quant (backtest · optimización · ML)',
+          status: ok ? 'ok' : 'caido',
+          detail: ok ? `respondiendo${autoDetail}` : 'no responde: botones ▶/⚙/🧠 no funcionarán',
+          ms: Date.now() - t,
+        });
+      } catch (err) {
+        components.push({
+          key: 'quant',
+          label: 'Servicio quant (backtest · optimización · ML)',
+          status: 'caido',
+          detail: `sin conexión: ${String(err).slice(0, 60)}`,
+          ms: Date.now() - t,
+        });
+      }
+    } else {
+      components.push({
+        key: 'quant',
+        label: 'Servicio quant',
+        status: 'na',
+        detail: 'no configurado (QUANT_URL vacío)',
+      });
+    }
+
+    // Notificaciones push
+    components.push({
+      key: 'push',
+      label: 'Notificaciones push',
+      status: env.VAPID_PUBLIC_KEY ? 'ok' : 'na',
+      detail: env.VAPID_PUBLIC_KEY
+        ? 'claves VAPID configuradas'
+        : 'sin claves VAPID (solo avisos en la app)',
+    });
+
+    // Señales externas (Reditum/TradingView)
+    components.push({
+      key: 'webhook',
+      label: 'Webhook Reditum (TradingView)',
+      status: deps.tvSecret ? 'ok' : 'na',
+      detail: deps.tvSecret
+        ? 'endpoint protegido y listo para recibir alertas'
+        : 'sin secreto configurado (no se aceptan alertas)',
+    });
+
+    const worst = components.some((c) => c.status === 'caido')
+      ? 'caido'
+      : components.some((c) => c.status === 'degradado')
+        ? 'degradado'
+        : 'ok';
+    return {
+      overall: worst,
+      checked_at: new Date().toISOString(),
+      took_ms: Date.now() - t0,
+      version: PKG.version,
+      components,
+    };
   });
 
   app.get('/health', async () => ({

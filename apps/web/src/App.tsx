@@ -10,6 +10,10 @@ import { MacroPanel } from './MacroPanel';
 import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
 import { BacktestView } from './BacktestView';
+import { LabView } from './LabView';
+import { HelpView } from './HelpView';
+import { NewsView } from './NewsView';
+import { StatusView } from './StatusView';
 import { DrawingLayer } from './DrawingLayer';
 import {
   fetchCandles,
@@ -41,7 +45,7 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
   reconnecting: 'Reconectando…',
 };
 
-type View = 'panel' | 'registros' | 'backtest';
+type View = 'panel' | 'registros' | 'backtest' | 'lab' | 'ayuda' | 'novedades' | 'estado';
 
 export function App() {
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -107,6 +111,14 @@ export function App() {
       clearInterval(pid);
     };
   }, [symbol, intervals]);
+
+  // La barra muestra de entrada el rango que realmente usamos (15m–1d); el resto, deslizando.
+  useEffect(() => {
+    const el = tfRef.current;
+    if (!el) return;
+    const btn = el.querySelector<HTMLElement>('[data-tf="15m"]');
+    if (btn) el.scrollLeft = Math.max(0, btn.offsetLeft - el.offsetLeft);
+  }, [intervals]);
 
 
   useEffect(() => {
@@ -401,6 +413,39 @@ export function App() {
             >
               Backtest
             </button>
+            <button
+              type="button"
+              className={view === 'lab' ? 'nav active' : 'nav'}
+              onClick={() => setView('lab')}
+              title="Calibrar y afinar: optimización, calibración, meta-modelo y piloto automático"
+            >
+              Laboratorio
+            </button>
+            <span className="nav-sep" aria-hidden />
+            <button
+              type="button"
+              className={view === 'ayuda' ? 'nav active' : 'nav'}
+              onClick={() => setView('ayuda')}
+              title="Manual, base de conocimientos, preguntas frecuentes y glosario"
+            >
+              Ayuda
+            </button>
+            <button
+              type="button"
+              className={view === 'novedades' ? 'nav active' : 'nav'}
+              onClick={() => setView('novedades')}
+              title="Últimas funciones, mejoras y correcciones"
+            >
+              Novedades
+            </button>
+            <button
+              type="button"
+              className={view === 'estado' ? 'nav active' : 'nav'}
+              onClick={() => setView('estado')}
+              title="¿Funciona todo? Comprobación en vivo de cada servicio"
+            >
+              Estado
+            </button>
           </nav>
         </div>
 
@@ -531,6 +576,14 @@ export function App() {
           <SnapshotsView symbol={symbol} />
         ) : view === 'backtest' ? (
           <BacktestView symbol={symbol} interval={tf} />
+        ) : view === 'lab' ? (
+          <LabView symbol={symbol} interval={tf} />
+        ) : view === 'ayuda' ? (
+          <HelpView />
+        ) : view === 'novedades' ? (
+          <NewsView />
+        ) : view === 'estado' ? (
+          <StatusView />
         ) : error ? (
           <div className="panel error">
             <p>No se pudo cargar el mercado: {error}</p>

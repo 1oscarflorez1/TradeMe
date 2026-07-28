@@ -143,6 +143,12 @@ async function main(): Promise<void> {
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
     markAlertsRead: alertsRepo ? () => alertsRepo.markAllRead() : undefined,
     quantUrl: env.QUANT_URL,
+    pingDb: pool
+      ? async () => {
+          await pool.query('SELECT 1');
+          return true;
+        }
+      : undefined,
     vapidPublicKey: env.VAPID_PUBLIC_KEY,
     savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo
