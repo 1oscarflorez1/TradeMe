@@ -181,3 +181,44 @@ def export_onnx(model: Any, path: str, meta: dict[str, Any]) -> None:
         fh.write(onx.SerializeToString())
     with open(path.replace(".onnx", ".json"), "w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=2)
+
+
+def forest_to_dict(model: Any) -> dict[str, Any]:
+    """Serializa un RandomForest a un artefacto plano (árboles como arrays).
+
+    Se aplica igual en Python y en Node (sin dependencias nativas): mismo patrón que los
+    calibradores. La inferencia en vivo son unas comparaciones por árbol: microsegundos.
+    """
+    trees: list[dict[str, Any]] = []
+    for est in model.estimators_:
+        t = est.tree_
+        # value[:, 0, :] = conteos por clase en cada hoja -> probabilidad de la clase 1
+        counts = t.value[:, 0, :]
+        totals = counts.sum(axis=1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            p1 = np.where(totals > 0, counts[:, 1] / np.maximum(totals, 1e-9), 0.5)
+        trees.append(
+            {
+                "feature": [int(x) for x in t.feature],
+                "threshold": [float(x) for x in t.threshold],
+                "left": [int(x) for x in t.children_left],
+                "right": [int(x) for x in t.children_right],
+                "value": [float(x) for x in p1],
+            }
+        )
+    return {"kind": "random_forest", "features": FEATURES, "trees": trees}
+
+
+def predict_forest(forest: dict[str, Any], x: list[float]) -> float:
+    """Aplica el bosque serializado (mirror exacto del applier de Node)."""
+    trees = forest["trees"]
+    if not trees:
+        return 0.5
+    total = 0.0
+    for tree in trees:
+        node = 0
+        while tree["left"][node] != -1:
+            f = tree["feature"][node]
+            node = tree["left"][node] if x[f] <= tree["threshold"][node] else tree["right"][node]
+        total += tree["value"][node]
+    return total / len(trees)

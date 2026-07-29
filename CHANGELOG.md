@@ -5,6 +5,20 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Módulo 2 cerrado · inferencia del meta-modelo en vivo
+
+- **Arquitectura:** el entrenamiento sigue 100 % en Python; el motor en vivo (Node) **evalúa** un
+  artefacto plano (`metamodel.json`, el bosque serializado) con el mismo patrón que `ensemble.yaml`
+  y `calibrators.json`. **Sin `onnxruntime-node`** (dependencia nativa frágil) y **sin salto de red**
+  por vela: la señal nace en Node y `quant` no entra en el camino en vivo. El `.onnx` se sigue
+  exportando como formato estándar. Ver `docs/metamodelo.md`.
+- **Política configurable** (`META_MODE`): `off` · `shadow` (por defecto: calcula y registra sin
+  afectar) · `modulate` (combina confianzas, peso configurable) · `veto` (descarta señales por
+  debajo de `META_VETO_THRESHOLD`).
+- **Señal:** nuevos campos `meta_confidence`, `meta_version`, `meta_mode`, `meta_vetoed`; chip 🧠 en
+  el Panel. `POST /reload` recarga también el meta-modelo.
+- **Paridad:** vectores dorados del bosque (Node≡Python) en la suite de CI.
+
 ### Added — Centro de ayuda, Laboratorio, Novedades y Estado del sistema
 
 - **web · Centro de ayuda:** manual de usuario paso a paso, base de conocimientos (cómo funciona por

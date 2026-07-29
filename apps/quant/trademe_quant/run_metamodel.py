@@ -6,12 +6,13 @@ También expone train_and_publish() para el servicio HTTP y el piloto automátic
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from typing import Any
 
 from .ensemble import artifacts_dir
-from .metamodel import export_onnx, train_metamodel
+from .metamodel import export_onnx, forest_to_dict, train_metamodel
 
 SNAPSHOT_COLUMNS = [
     "captured_at",
@@ -61,9 +62,24 @@ def train_and_publish(dsn: str | None = None) -> dict[str, Any]:
     if not result.get("trained"):
         return out
     if result.get("promote"):
-        path = str(artifacts_dir() / "metamodel.onnx")
         artifacts_dir().mkdir(parents=True, exist_ok=True)
-        export_onnx(result["model"], path, out)
+        path = str(artifacts_dir() / "metamodel.onnx")
+        export_onnx(
+            result["model"], path, out
+        )  # formato estándar (portabilidad/futuros consumidores)
+        # Artefacto plano que consume el motor en vivo (Node), igual que los calibradores.
+        flat = forest_to_dict(result["model"])
+        flat.update(
+            {
+                "version": f"meta-{out['trained_at']}",
+                "threshold": out["threshold"],
+                "auc": out["auc"],
+                "n": out["n"],
+                "trained_at": out["trained_at"],
+            }
+        )
+        with open(artifacts_dir() / "metamodel.json", "w", encoding="utf-8") as fh:
+            json.dump(flat, fh)
         out["published"] = True
         out["path"] = path
     else:

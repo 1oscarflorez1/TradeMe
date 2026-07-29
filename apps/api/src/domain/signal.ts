@@ -44,6 +44,10 @@ export interface Signal {
   confidence: number;
   calibrated_confidence?: number;
   calibration_version?: string;
+  meta_confidence?: number;
+  meta_version?: string;
+  meta_mode?: 'off' | 'shadow' | 'modulate' | 'veto';
+  meta_vetoed?: boolean;
   macro?: Macro;
   plan: PlanStep[];
   valid_until: string;

@@ -7,6 +7,7 @@ import { confluence, inferProbs, pickAction } from './inference.js';
 import { buildPlan } from './plan.js';
 import { applyCalibrator } from '../calibration/apply.js';
 import type { Calibrators } from '../calibration/load.js';
+import { featureVector, type MetaModel } from '../metamodel/apply.js';
 
 export interface BuildSignalParams {
   symbol: string;
@@ -18,6 +19,10 @@ export interface BuildSignalParams {
   macro?: Macro;
   ts?: string;
   calibrators?: Calibrators;
+  metaModel?: MetaModel;
+  metaMode?: 'off' | 'shadow' | 'modulate' | 'veto';
+  metaVetoThreshold?: number;
+  metaModulateWeight?: number;
 }
 
 function directionOf(action: Action): Direction {
@@ -55,10 +60,47 @@ export function buildSignal(params: BuildSignalParams): Signal {
     }
     macroOut = { ...params.macro, confluence: conf };
   }
-  const direction = directionOf(action);
+  let direction = directionOf(action);
   const calibratedConfidence = params.calibrators
     ? applyCalibrator(params.calibrators.forRegime(regime.label), confidence)
     : undefined;
+
+  // ---- Meta-modelo (Módulo 2): filtro anti-falsos-positivos ----
+  // El modelo se entrena en Python; aquí solo se evalúa el artefacto publicado.
+  const metaMode = params.metaMode ?? 'off';
+  let metaConfidence: number | undefined;
+  let metaVetoed: boolean | undefined;
+  if (metaMode !== 'off' && params.metaModel?.ready && action !== 'HOLD') {
+    const p = params.metaModel.predict(
+      featureVector({
+        net,
+        confidence,
+        probs,
+        adx: regime.adx,
+        atr,
+        price: params.price,
+        votes,
+        regimeLabel: regime.label,
+        direction,
+      }),
+    );
+    if (p !== null) {
+      metaConfidence = p;
+      if (metaMode === 'modulate' || metaMode === 'veto') {
+        // Media ponderada: la confianza final combina el ensemble y el juicio del meta-modelo.
+        const w = params.metaModulateWeight ?? 0.5;
+        confidence = (1 - w) * confidence + w * p;
+      }
+      if (metaMode === 'veto' && p < (params.metaVetoThreshold ?? 0.5)) {
+        action = 'HOLD';
+        confidence = probs.HOLD;
+        direction = 'FLAT';
+        metaVetoed = true;
+      } else if (metaMode === 'veto') {
+        metaVetoed = false;
+      }
+    }
+  }
   const plan = buildPlan({
     action,
     price: params.price,
@@ -84,6 +126,10 @@ export function buildSignal(params: BuildSignalParams): Signal {
     confidence,
     calibrated_confidence: calibratedConfidence,
     calibration_version: params.calibrators?.version ?? undefined,
+    meta_confidence: metaConfidence,
+    meta_version: params.metaModel?.version ?? undefined,
+    meta_mode: metaMode === 'off' ? undefined : metaMode,
+    meta_vetoed: metaVetoed,
     macro: macroOut,
     plan,
     valid_until: validUntil,

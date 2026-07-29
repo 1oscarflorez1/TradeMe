@@ -9,6 +9,7 @@ import { IndicatorRegistry } from '../src/indicators/registry.js';
 import { buildSignal } from '../src/ensemble/signal.js';
 import { computePlanLevels } from '../src/ensemble/plan.js';
 import { applyCalibrator, type Calibrator } from '../src/calibration/apply.js';
+import { predictForest, type MetaModelArtifact } from '../src/metamodel/apply.js';
 import type { Macro } from '../src/domain/signal.js';
 import type { Candle } from '../src/domain/candle.js';
 
@@ -177,6 +178,39 @@ const calibrationVectors = Object.entries(calibrators).flatMap(([name, cal]) =>
   })),
 );
 
+// ---- Vectores de paridad del meta-modelo (bosque serializado: Node<->Python) ----
+const forest: MetaModelArtifact = {
+  kind: 'random_forest',
+  features: ['f0', 'f1'],
+  trees: [
+    {
+      feature: [0, -2, 1, -2, -2],
+      threshold: [0.5, -2, 0.25, -2, -2],
+      left: [1, -1, 3, -1, -1],
+      right: [2, -1, 4, -1, -1],
+      value: [0, 0.2, 0, 0.6, 0.9],
+    },
+    {
+      feature: [1, -2, -2],
+      threshold: [0.75, -2, -2],
+      left: [1, -1, -1],
+      right: [2, -1, -1],
+      value: [0, 0.3, 0.8],
+    },
+  ],
+};
+const metaInputs = [
+  [0.1, 0.1],
+  [0.9, 0.1],
+  [0.9, 0.9],
+  [0.5, 0.75],
+  [0.6, 0.3],
+];
+const metamodelVectors = metaInputs.map((x) => ({
+  input: x,
+  expected: round(predictForest(forest, x)),
+}));
+
 writeFileSync(
   new URL('../../../packages/core-signals/parity/macro_vectors.json', import.meta.url),
   JSON.stringify(
@@ -189,6 +223,7 @@ writeFileSync(
       inference: inferenceVectors,
       decision: decisionVectors,
       calibration: calibrationVectors,
+      metamodel: { forest, vectors: metamodelVectors },
     },
     null,
     2,
