@@ -300,6 +300,12 @@ export interface AutomationStatus {
   metamodel_every_h?: number;
   hours_since_calibration?: number | null;
   hours_since_metamodel?: number | null;
+  meta_policy?: {
+    mode?: string;
+    reason?: string;
+    updated_at?: string | null;
+    evidence?: { n?: number; lift?: number; auc?: number; kept?: number };
+  };
   intervals: string[];
   last_cycle: string | null;
   per_tf: Array<{

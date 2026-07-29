@@ -163,9 +163,10 @@ def _dsn() -> str:
 
 def run_cycle(cfg: AutoConfig) -> list[str]:
     """Una pasada: mide lo vencido y optimiza solo cuando toca. Devuelve un log."""
+    from .meta_policy import decide_mode, evaluate_shadow, load_policy, save_policy
     from .run_backtest import run_and_save
     from .run_calibration import calibrate_and_publish
-    from .run_metamodel import train_and_publish
+    from .run_metamodel import fetch_shadow_rows, train_and_publish
     from .run_optimize import optimize_and_publish
 
     log: list[str] = []
@@ -250,6 +251,31 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
                     f"meta-modelo n={out['n']} AUC={out['auc']:.2f} "
                     f"publicado={out.get('published')}"
                 )
+                # Política automática: ¿ya se ganó el derecho a influir en las decisiones?
+                try:
+                    art = artifacts_dir()
+                    pol = load_policy(art)
+                    thr = float(out.get("threshold") or 0.5)
+                    ev = evaluate_shadow(fetch_shadow_rows(dsn), thr)
+                    new_mode, why = decide_mode(
+                        str(pol.get("mode", "shadow")),
+                        ev,
+                        os.environ.get("META_MAX_MODE", "veto"),
+                    )
+                    if new_mode != pol.get("mode"):
+                        save_policy(art, new_mode, why, ev)
+                        insert_alert(
+                            dsn,
+                            "metamodel",
+                            "success" if new_mode != "shadow" else "warning",
+                            f"Meta-modelo: modo {new_mode}",
+                            f"{why}. Cambia cómo influye el filtro ML en las decisiones.",
+                        )
+                        log.append(f"meta-política -> {new_mode} ({why})")
+                    else:
+                        save_policy(art, str(pol.get("mode", "shadow")), why, ev)
+                except Exception as err:  # noqa: BLE001
+                    log.append(f"error meta-política: {err}")
                 if out.get("published"):
                     insert_alert(
                         dsn,
@@ -266,6 +292,18 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
 
 
 _state: dict[str, object] = {"last_cycle": None, "last_log": []}
+
+
+def _meta_policy_summary() -> dict[str, object]:
+    from .meta_policy import load_policy
+
+    pol = load_policy(artifacts_dir())
+    return {
+        "mode": pol.get("mode"),
+        "reason": pol.get("reason"),
+        "updated_at": pol.get("updated_at"),
+        "evidence": pol.get("evidence"),
+    }
 
 
 def automation_status(cfg: AutoConfig) -> dict[str, object]:
@@ -296,6 +334,7 @@ def automation_status(cfg: AutoConfig) -> dict[str, object]:
         "metamodel_every_h": cfg.metamodel_every_h,
         "hours_since_calibration": _hours_since_file("calibrators.json"),
         "hours_since_metamodel": _hours_since_file("metamodel.json"),
+        "meta_policy": _meta_policy_summary(),
         "last_cycle": _state["last_cycle"],
         "last_log": _state["last_log"],
         "per_tf": per_tf,

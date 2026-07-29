@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   bbands_score     DOUBLE PRECISION,
   stoch14_score    DOUBLE PRECISION,
   supertrend_score DOUBLE PRECISION,
+  meta_confidence  DOUBLE PRECISION,
   adx14_value      DOUBLE PRECISION,
   atr14_value      DOUBLE PRECISION,
   reditum_sniper_score DOUBLE PRECISION,

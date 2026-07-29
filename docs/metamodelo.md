@@ -44,6 +44,22 @@ snapshots evaluados ──▶ apps/quant (entrena, valida, decide si publica)
 El umbral de veto por defecto es `0.5` y el modelo publica su propio umbral óptimo (calculado por
 expectancy en validación) en el artefacto, como referencia.
 
+## Ascenso automático de modo (el sistema decide cuándo confiar)
+
+No hace falta cambiar el modo a mano. El piloto **evalúa el modo sombra con decisiones reales ya
+cerradas** (compara lo que pasó con lo que habría pasado filtrando) y asciende solo cuando hay
+evidencia:
+
+| Paso | Requisitos |
+|---|---|
+| `shadow` → `modulate` | ≥40 decisiones evaluadas con predicción, mejora ≥ 0,05 R, AUC ≥ 0,55 y que el filtro conserve ≥25 % de las señales |
+| `modulate` → `veto` | Lo anterior sostenido con ≥100 decisiones |
+| Retroceso | Con muestra suficiente, si el filtro **empeora** el resultado (−0,05 R), baja un escalón |
+
+La decisión se publica en `artifacts/meta_policy.json` y se avisa por la campana. La variable
+`META_MODE` pasa a ser un **tope de seguridad**: la automatización nunca sube por encima de él
+(ponlo en `shadow` si quieres que jamás influya, o en `modulate` para que nunca vete).
+
 ## Campos en la señal
 
 - `meta_confidence` — probabilidad de éxito estimada (0–1).

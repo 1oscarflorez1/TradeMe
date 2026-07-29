@@ -23,9 +23,10 @@ const EnvSchema = z.object({
   ENSEMBLE_CONFIG: z.string().default('artifacts/ensemble.yaml'),
   CALIBRATORS_PATH: z.string().default('artifacts/calibrators.json'),
   METAMODEL_PATH: z.string().default('artifacts/metamodel.json'),
-  // off = no usar · shadow = calcular y registrar sin afectar · modulate = ajusta confianza
-  // · veto = además descarta señales por debajo del umbral.
-  META_MODE: z.enum(['off', 'shadow', 'modulate', 'veto']).default('shadow'),
+  META_POLICY_PATH: z.string().default('artifacts/meta_policy.json'),
+  // TOPE de seguridad: el piloto asciende el modo automáticamente, pero nunca por encima de esto.
+  // off = desactivado · shadow = solo observar · modulate = ajusta confianza · veto = filtra.
+  META_MODE: z.enum(['off', 'shadow', 'modulate', 'veto']).default('veto'),
   META_VETO_THRESHOLD: z.coerce.number().min(0).max(1).default(0.5),
   META_MODULATE_WEIGHT: z.coerce.number().min(0).max(1).default(0.5),
   VAPID_PUBLIC_KEY: z.string().default('BEg-pAQi-VrkEr0n9OpokYqzXsBq7Ub_ZqTpGkUrwPZSBb3PlMbj5Hb4qcjJGqydWcqcUnUFrO6EE5gnw0_BIss'),

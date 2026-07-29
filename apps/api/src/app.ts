@@ -33,6 +33,7 @@ export interface AppDeps {
   calibrators?: Calibrators;
   metaModel?: MetaModel;
   metaMode?: 'off' | 'shadow' | 'modulate' | 'veto';
+  metaPolicyReason?: () => string | null;
   metaVetoThreshold?: number;
   metaModulateWeight?: number;
   reloadArtifacts?: () => {
@@ -267,6 +268,16 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         detail: 'no configurado (QUANT_URL vacío)',
       });
     }
+
+    // Meta-modelo (Módulo 2)
+    components.push({
+      key: 'meta',
+      label: 'Meta-modelo (filtro ML)',
+      status: deps.metaModel?.ready ? 'ok' : 'na',
+      detail: deps.metaModel?.ready
+        ? `modo ${deps.metaMode ?? 'shadow'}${deps.metaPolicyReason?.() ? ` · ${deps.metaPolicyReason()}` : ''}`
+        : 'aún sin modelo publicado (necesita más registros evaluados)',
+    });
 
     // Notificaciones push
     components.push({

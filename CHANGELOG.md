@@ -5,6 +5,18 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — El filtro ML se gradúa solo (política automática)
+
+- **quant:** `meta_policy.py` — el piloto evalúa el **modo sombra** con decisiones reales cerradas
+  (compara lo ocurrido con lo que habría pasado filtrando) y **asciende el modo solo cuando hay
+  evidencia**: `shadow → modulate` (≥40 decisiones, mejora ≥0,05 R, AUC ≥0,55) y `modulate → veto`
+  (sostenido con ≥100). **Retrocede** si el filtro empeora los resultados. Avisa por la campana
+  (+8 tests).
+- **api:** lee `artifacts/meta_policy.json`; `META_MODE` pasa a ser **tope de seguridad** (la
+  automatización nunca lo supera). Nuevo componente «Meta-modelo» en `GET /status`.
+- **snapshots:** columna `meta_confidence` (migración 011) para poder evaluar el modo sombra.
+- **web:** el Laboratorio muestra el modo del filtro ML y por qué está en ese modo.
+
 ### Added — Módulo 2 cerrado · inferencia del meta-modelo en vivo
 
 - **Arquitectura:** el entrenamiento sigue 100 % en Python; el motor en vivo (Node) **evalúa** un
