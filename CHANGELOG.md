@@ -5,6 +5,21 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Centro de ayuda, Laboratorio, Novedades y Estado del sistema
+
+- **web · Centro de ayuda:** manual de usuario paso a paso, base de conocimientos (cómo funciona por
+  dentro), preguntas frecuentes y **glosario** de ~45 términos (de lo básico a lo técnico), con
+  buscador. Consolida la teoría que estaba dispersa.
+- **web · Laboratorio:** nueva pestaña que reúne lo de *afinar* — calibración, optimización de
+  pesos, dataset ML y piloto automático — con su propia guía. Backtest queda centrado en **medir**
+  (métricas, curva, informe y metodología).
+- **web · Novedades:** historial de versiones en lenguaje claro (nuevo / mejorado / corregido).
+- **web · Estado del sistema:** semáforo en vivo de API, base de datos, datos de mercado, servicio
+  quant (+ piloto), push y webhook, con latencias y qué implica cada fallo. Refresco cada 30 s.
+- **api:** `GET /status` — comprueba de verdad cada componente y su comunicación.
+- **web:** el botón 🧠 Entrenar ahora explica qué hace y cuándo pulsarlo; la barra de temporalidades
+  muestra de entrada el rango operativo (15m–1d) y el resto se alcanza deslizando.
+
 ### Added — Módulo 2 · Meta-modelo (meta-labeling) + calibración automatizada
 
 - **quant · meta-modelo:** `metamodel.py` + `run_metamodel.py` — aprende de los snapshots ya

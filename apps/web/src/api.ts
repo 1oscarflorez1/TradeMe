@@ -376,6 +376,32 @@ export async function trainMetamodel(): Promise<MetamodelResult | null> {
   }
 }
 
+export interface SystemComponent {
+  key: string;
+  label: string;
+  status: 'ok' | 'degradado' | 'caido' | 'na';
+  detail: string;
+  ms?: number;
+}
+
+export interface SystemStatus {
+  overall: 'ok' | 'degradado' | 'caido';
+  checked_at: string;
+  took_ms: number;
+  version: string;
+  components: SystemComponent[];
+}
+
+export async function fetchSystemStatus(): Promise<SystemStatus | null> {
+  try {
+    const res = await apiFetch('/status');
+    if (!res.ok) return null;
+    return (await res.json()) as SystemStatus;
+  } catch {
+    return null;
+  }
+}
+
 export async function runBacktest(
   symbol: string,
   interval: Interval,
