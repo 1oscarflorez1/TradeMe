@@ -26,6 +26,7 @@ import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/
 import { buildSignal } from './ensemble/signal.js';
 import type { Signal } from './domain/signal.js';
 import { Calibrators } from './calibration/load.js';
+import { MetaModel } from './metamodel/apply.js';
 import { MacroStore } from './macro/store.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
     return cfg;
   }
   const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
+  const metaModel = MetaModel.load(env.METAMODEL_PATH);
 
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
   const repo = pool ? new CandlesRepo(pool) : null;
@@ -97,6 +99,7 @@ async function main(): Promise<void> {
     Object.assign(ensemble, fresh);
     ensembleCache.clear();
     calibrators.reload();
+    metaModel.reload();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
@@ -129,6 +132,10 @@ async function main(): Promise<void> {
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
     ensemble,
     calibrators,
+    metaModel,
+    metaMode: env.META_MODE,
+    metaVetoThreshold: env.META_VETO_THRESHOLD,
+    metaModulateWeight: env.META_MODULATE_WEIGHT,
     reloadArtifacts,
     ensembleMeta,
     getEnsembleFor,
@@ -191,6 +198,10 @@ async function main(): Promise<void> {
         interval: iv,
         macro: macroEnabled ? macroStore.get(symbol) : undefined,
         calibrators,
+        metaModel,
+        metaMode: env.META_MODE,
+        metaVetoThreshold: env.META_VETO_THRESHOLD,
+        metaModulateWeight: env.META_MODULATE_WEIGHT,
       });
       hub.broadcastSignal(symbol, iv, signal);
       void maybePush(symbol, iv, signal);

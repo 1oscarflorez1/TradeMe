@@ -638,6 +638,19 @@ export function App() {
                       <span className="muted">
                         · {signal.action} · régimen {signal.regime.label} · net{' '}
                         {signal.net.toFixed(2)}
+                        {signal.meta_confidence !== undefined && (
+                          <span
+                            className={`meta-chip ${signal.meta_vetoed ? 'meta-veto' : ''}`}
+                            title={
+                              signal.meta_vetoed
+                                ? 'El meta-modelo (ML) considera poco fiable esta señal y la ha descartado.'
+                                : `Filtro ML: probabilidad de éxito estimada a partir de tus registros evaluados. Modo: ${signal.meta_mode}.`
+                            }
+                          >
+                            🧠 {(signal.meta_confidence * 100).toFixed(0)}%
+                            {signal.meta_vetoed ? ' · vetada' : ''}
+                          </span>
+                        )}
                       </span>
                     )}
                     <SnapshotButton symbol={symbol} interval={tf} />

@@ -1973,3 +1973,19 @@ pre.hint {
 .news-group li strong {
   color: var(--fg);
 }
+
+/* ---- Meta-modelo: chip de confianza ML en el Panel ---- */
+.meta-chip {
+  margin-left: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #b98cff;
+  background: rgba(185, 140, 255, 0.14);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  cursor: help;
+}
+.meta-chip.meta-veto {
+  color: #e0a44f;
+  background: rgba(224, 164, 79, 0.16);
+}

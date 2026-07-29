@@ -11,6 +11,7 @@ import type { ExternalMapper } from './signals/external-mapper.js';
 import type { EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
 import type { Calibrators } from './calibration/load.js';
+import type { MetaModel } from './metamodel/apply.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
 import { trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
 import type { AlertRow, AlertInput } from './db/alerts-repo.js';
@@ -30,6 +31,10 @@ export interface AppDeps {
   ensemble: EnsembleConfig;
   equity: number;
   calibrators?: Calibrators;
+  metaModel?: MetaModel;
+  metaMode?: 'off' | 'shadow' | 'modulate' | 'veto';
+  metaVetoThreshold?: number;
+  metaModulateWeight?: number;
   reloadArtifacts?: () => {
     ensembleVersion: string;
     calibrationVersion: string | null;
@@ -370,6 +375,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         interval,
         macro: deps.getMacro?.(sym),
         calibrators: deps.calibrators,
+        metaModel: deps.metaModel,
+        metaMode: deps.metaMode,
+        metaVetoThreshold: deps.metaVetoThreshold,
+        metaModulateWeight: deps.metaModulateWeight,
       });
       return { interval, signal };
     } catch (err) {
@@ -696,6 +705,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         interval,
         macro: deps.getMacro?.(sym),
         calibrators: deps.calibrators,
+        metaModel: deps.metaModel,
+        metaMode: deps.metaMode,
+        metaVetoThreshold: deps.metaVetoThreshold,
+        metaModulateWeight: deps.metaModulateWeight,
       });
       const levels = computePlanLevels(
         signal.action,

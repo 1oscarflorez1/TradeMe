@@ -7,6 +7,7 @@ from trademe_quant.ensemble import load_ensemble
 from trademe_quant.indicators import compute_readings
 from trademe_quant.inference import infer_probs, pick_action
 from trademe_quant.macro import compute_macro_bias
+from trademe_quant.metamodel import predict_forest
 
 VECTORS = json.loads(
     (pathlib.Path(__file__).parents[3] / "packages/core-signals/parity/vectors.json").read_text()
@@ -101,3 +102,11 @@ def test_parity_calibration() -> None:
     for v in MACRO["calibration"]:
         got = apply_calibrator(v["cal"], float(v["input"]))
         assert abs(got - v["expected"]) < 1e-6, (v["calibrator"], v["input"], got, v["expected"])
+
+
+def test_parity_metamodel() -> None:
+    """El bosque serializado debe evaluarse idéntico en Node y en Python."""
+    mm = MACRO["metamodel"]
+    for v in mm["vectors"]:
+        got = predict_forest(mm["forest"], v["input"])
+        assert abs(got - v["expected"]) < 1e-6, (v["input"], got, v["expected"])
