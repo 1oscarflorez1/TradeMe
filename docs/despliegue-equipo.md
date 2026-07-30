@@ -85,6 +85,24 @@ Windows: **Configuración → Sistema → Inicio/apagado → Suspensión: Nunca*
 corriente). En Docker Desktop activa **«Start Docker Desktop when you log in»**. Con
 `restart: unless-stopped` los contenedores vuelven solos tras un reinicio del PC.
 
+### 7b. Da memoria suficiente a Docker (importante)
+
+El servicio quant entrena modelos y optimiza: si Docker tiene poca RAM, **Windows lo mata sin aviso**
+(el contenedor desaparece y verás «Servicio quant · Caído» en la pestaña Estado). Con Docker Desktop
+sobre WSL2, crea o edita `C:\Users\hp\.wslconfig`:
+
+```
+[wsl2]
+memory=6GB
+processors=4
+```
+
+Cierra sesión de Docker Desktop y reinícialo (`wsl --shutdown` y volver a abrir Docker). Con 6 GB va
+sobrado; con menos de 4 GB es probable que quant muera durante una optimización.
+
+> Todos los servicios llevan `restart: unless-stopped`, así que si alguno cae vuelve solo; y quant
+> tiene *healthcheck*, de modo que `docker compose ps` te dirá si está sano.
+
 ### 8. El equipo entra
 Abren `https://trademe.TU-TAILNET.ts.net`, inician sesión y pueden **instalar la app** (PWA) y
 **activar las notificaciones push** — el HTTPS válido de Funnel lo permite.

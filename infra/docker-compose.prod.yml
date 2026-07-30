@@ -83,6 +83,12 @@ services:
       DATABASE_URL: postgresql://trademe:${POSTGRES_PASSWORD}@postgres:5432/trademe
     volumes:
       - ../artifacts:/app/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
