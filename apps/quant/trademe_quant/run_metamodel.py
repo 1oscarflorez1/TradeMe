@@ -50,6 +50,23 @@ def fetch_rows(dsn: str) -> list[dict[str, Any]]:
         return [dict(zip(SNAPSHOT_COLUMNS, r, strict=False)) for r in cur.fetchall()]
 
 
+def fetch_shadow_rows(dsn: str, limit: int = 500) -> list[dict[str, Any]]:
+    """Decisiones cerradas que además guardaron la predicción del meta-modelo (modo sombra)."""
+    import psycopg
+
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT meta_confidence, outcome_return_r FROM snapshots
+               WHERE meta_confidence IS NOT NULL AND outcome_result IN ('tp','sl')
+               ORDER BY captured_at DESC LIMIT %s""",
+            (limit,),
+        )
+        return [
+            {"meta_confidence": float(r[0]), "outcome_return_r": float(r[1])}
+            for r in cur.fetchall()
+        ]
+
+
 def train_and_publish(dsn: str | None = None) -> dict[str, Any]:
     """Reentrena con TODOS los registros evaluados; publica el ONNX solo si mejora."""
     dsn = dsn or os.environ.get(

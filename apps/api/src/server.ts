@@ -27,6 +27,7 @@ import { buildSignal } from './ensemble/signal.js';
 import type { Signal } from './domain/signal.js';
 import { Calibrators } from './calibration/load.js';
 import { MetaModel } from './metamodel/apply.js';
+import { MetaPolicy } from './metamodel/policy.js';
 import { MacroStore } from './macro/store.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
@@ -74,6 +75,7 @@ async function main(): Promise<void> {
   }
   const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
   const metaModel = MetaModel.load(env.METAMODEL_PATH);
+  const metaPolicy = MetaPolicy.load(env.META_POLICY_PATH, env.META_MODE);
 
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
   const repo = pool ? new CandlesRepo(pool) : null;
@@ -100,6 +102,7 @@ async function main(): Promise<void> {
     ensembleCache.clear();
     calibrators.reload();
     metaModel.reload();
+    metaPolicy.reload();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
@@ -133,7 +136,8 @@ async function main(): Promise<void> {
     ensemble,
     calibrators,
     metaModel,
-    metaMode: env.META_MODE,
+    metaMode: metaPolicy.mode,
+    metaPolicyReason: () => metaPolicy.reason,
     metaVetoThreshold: env.META_VETO_THRESHOLD,
     metaModulateWeight: env.META_MODULATE_WEIGHT,
     reloadArtifacts,
@@ -199,7 +203,7 @@ async function main(): Promise<void> {
         macro: macroEnabled ? macroStore.get(symbol) : undefined,
         calibrators,
         metaModel,
-        metaMode: env.META_MODE,
+        metaMode: metaPolicy.mode,
         metaVetoThreshold: env.META_VETO_THRESHOLD,
         metaModulateWeight: env.META_MODULATE_WEIGHT,
       });
