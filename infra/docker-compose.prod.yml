@@ -67,6 +67,9 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: ${PUBLIC_API_URL:?Definir en infra/.env.prod}
+    environment:
+      # Hosts extra permitidos por el preview de Vite (además de .ts.net y localhost).
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
     restart: unless-stopped
     ports:
       - '127.0.0.1:5173:5173'

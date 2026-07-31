@@ -77,13 +77,34 @@ salen a internet.
 ### 6. Crea los usuarios del equipo
 Uno por persona:
 ```powershell
-docker compose --env-file infra\.env.prod -f infra\docker-compose.prod.yml exec api node --experimental-strip-types apps/api/scripts/create-user.ts compañero@correo.com "clave-larga-y-unica"
+docker compose --env-file infra\.env.prod -f infra\docker-compose.prod.yml exec api pnpm --filter @trademe/api exec tsx scripts/create-user.ts compañero@correo.com "clave-larga-y-unica"
 ```
 
 ### 7. Que tu PC no se duerma
 Windows: **Configuración → Sistema → Inicio/apagado → Suspensión: Nunca** (al menos conectado a la
 corriente). En Docker Desktop activa **«Start Docker Desktop when you log in»**. Con
 `restart: unless-stopped` los contenedores vuelven solos tras un reinicio del PC.
+
+### 6b. Llevarte los registros del entorno de desarrollo (opcional pero recomendable)
+
+Producción usa su propio volumen, así que empieza sin tus registros. Para conservarlos (son el
+dataset que entrena el meta-modelo), **con el entorno de desarrollo aún encendido**:
+
+```powershell
+docker compose -f infra\docker-compose.yml exec postgres pg_dump -U trademe -d trademe --data-only --no-owner -t snapshots -t backtests -f /tmp/dataset.sql
+docker cp trademe-postgres-1:/tmp/dataset.sql dataset-backup.sql
+docker cp dataset-backup.sql trademe-prod-postgres-1:/tmp/backup.sql
+docker compose --env-file infra\.env.prod -f infra\docker-compose.prod.yml exec postgres psql -U trademe -d trademe -f /tmp/backup.sql
+```
+
+> **No uses `> archivo.sql` en PowerShell** para el volcado: escribe en UTF-16 y psql lo rechaza
+> (`invalid byte sequence for encoding "UTF8": 0xff`). Por eso se vuelca dentro del contenedor y se
+> mueve con `docker cp`.
+
+Cuando termines, **apaga el entorno de desarrollo** para que no compita por los puertos ni por la
+carpeta `artifacts/`: `docker compose -f infra\docker-compose.yml down`. Si la API de producción no
+publica su puerto (verás `3001/tcp` en vez de `127.0.0.1:3001->3001/tcp`), recréala:
+`docker compose --env-file infra\.env.prod -f infra\docker-compose.prod.yml up -d --force-recreate api`.
 
 ### 7b. Da memoria suficiente a Docker (importante)
 
