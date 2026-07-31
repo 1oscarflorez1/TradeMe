@@ -5,6 +5,23 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Multi-activo + visualizaciones del motor
+
+- **Multi-activo:** nueva tabla `watchlist` (migración 013) y endpoints `/assets*`; buscador sobre el
+  catálogo del proveedor (Binance spot, con caché de 6 h) y **suscripción en caliente**: al añadir un
+  activo, el motor se suscribe, siembra su histórico y el piloto lo incluye en sus ciclos, con
+  estrategia optimizada propia por símbolo+temporalidad. Se puede pausar o quitar sin perder
+  historial. `TRADEME_SYMBOLS` queda como respaldo.
+- **web:** gestor de activos (buscar, añadir, pausar, quitar) accesible desde la barra superior.
+- **Visualizaciones (`Viz.tsx`):** medidores, barras de progreso, comparativas, anillos y
+  *sparklines* en SVG puro, aplicados al **Dataset ML** (progreso hacia cada criterio + reparto
+  TP/SL), **Optimización** (comparativa base vs candidato y medidor de mejora), **Calibración**
+  (veredicto por régimen) y **Piloto** (frescura de mediciones y cuenta atrás de calibración y
+  reentrenamiento).
+- **Reditum/TradingView:** el Estado muestra la dirección exacta del webhook y nueva guía
+  `docs/reditum-tradingview.md` para configurar las alertas.
+- **docs:** `multiactivo.md`.
+
 ### Added — M10 (cierre) · captura server-side y auditoría
 
 - **Captura automática en el servidor:** la API registra las decisiones operables (confianza ≥ 40 %,

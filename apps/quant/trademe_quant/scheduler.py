@@ -157,6 +157,18 @@ def hours_since_optimize(symbol: str, interval: str) -> float | None:
     return (time.time() - p.stat().st_mtime) / 3600.0
 
 
+def watchlist_symbols(dsn: str) -> list[str]:
+    """Activos seguidos según la base de datos (la UI los gestiona). Vacío si no hay tabla."""
+    import psycopg
+
+    try:
+        with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+            cur.execute("SELECT symbol FROM watchlist WHERE enabled = true ORDER BY added_at")
+            return [str(r[0]) for r in cur.fetchall()]
+    except Exception:  # noqa: BLE001 - si aún no existe, se usa la config de entorno
+        return []
+
+
 def _dsn() -> str:
     return os.environ.get("DATABASE_URL", "postgresql://trademe:trademe@localhost:5432/trademe")
 
@@ -171,7 +183,8 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
 
     log: list[str] = []
     dsn = _dsn()
-    for symbol in cfg.symbols:
+    symbols = watchlist_symbols(dsn) or cfg.symbols
+    for symbol in symbols:
         for iv in cfg.intervals:
             try:
                 past = last_backtests(dsn, symbol, iv, 2)
@@ -309,7 +322,8 @@ def _meta_policy_summary() -> dict[str, object]:
 def automation_status(cfg: AutoConfig) -> dict[str, object]:
     per_tf = []
     dsn = _dsn()
-    for symbol in cfg.symbols:
+    symbols = watchlist_symbols(dsn) or cfg.symbols
+    for symbol in symbols:
         for iv in cfg.intervals:
             try:
                 past = last_backtests(dsn, symbol, iv, 1)

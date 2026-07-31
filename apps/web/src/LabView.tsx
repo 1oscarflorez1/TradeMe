@@ -11,6 +11,7 @@ import {
 } from './api';
 import type { AutomationStatus, DatasetReport, MetamodelResult } from './api';
 import type { CalibrationMeta, EnsembleMeta, Interval, RegimeCalibrator, ReliabilityBin } from './types';
+import { CompareBars, Donut, Gauge, ProgressBar, StatusPill } from './Viz';
 
 /** Laboratorio: todo lo que sirve para AFINAR el modelo (calibrar, optimizar, aprender). */
 export function LabView({ symbol, interval }: { symbol: string; interval: Interval }) {
@@ -116,7 +117,22 @@ function CalibrationSection({ symbol, interval }: { symbol: string; interval: In
           {regimes.map(([name, c]) => (
             <div key={name} className="calib-card">
               <div className="calib-title">
-                <strong>{name}</strong>
+                <strong>
+                  {name}{' '}
+                  <StatusPill
+                    tone={
+                      c.brier == null ? 'idle' : c.brier < 0.2 ? 'ok' : c.brier < 0.25 ? 'warn' : 'bad'
+                    }
+                  >
+                    {c.brier == null
+                      ? 'sin datos'
+                      : c.brier < 0.2
+                        ? 'bien calibrado'
+                        : c.brier < 0.25
+                          ? 'aceptable'
+                          : 'mejorable'}
+                  </StatusPill>
+                </strong>
                 <span className="muted">
                   {c.method} · n={c.n ?? 0} · Brier {c.brier != null ? c.brier.toFixed(3) : '—'}
                 </span>
@@ -187,6 +203,27 @@ function OptimizationSection({ symbol, interval }: { symbol: string; interval: I
             <span className="muted">
               {report.n_trials} trials · score val. {report.validation_score.toFixed(3)}
             </span>
+          </div>
+          <div className="viz-row">
+            <CompareBars
+              unit=" R"
+              items={[
+                { label: 'Actual', value: report.holdout.base_expectancy },
+                {
+                  label: 'Candidato',
+                  value: report.holdout.optimized_expectancy,
+                  good: report.promoted,
+                },
+              ]}
+            />
+            <Gauge
+              value={report.holdout.optimized_expectancy - report.holdout.base_expectancy}
+              min={-0.3}
+              max={0.3}
+              label="Mejora en hold-out"
+              sublabel="expectancy (R)"
+              good={report.holdout.optimized_expectancy > report.holdout.base_expectancy}
+            />
           </div>
           <table className="opt-table">
             <thead>
@@ -271,7 +308,38 @@ function DatasetSection() {
           {training ? 'Entrenando…' : '🧠 Entrenar ahora'}
         </button>
       </div>
-      <div className="reg-summary" style={{ marginTop: '0.6rem' }}>
+      <div className="viz-row">
+        <Donut
+          parts={[
+            { label: 'Objetivo (TP)', value: rep.tp, color: '#2fbf6b' },
+            { label: 'Stop (SL)', value: rep.sl, color: '#e0645f' },
+            { label: 'Sin evaluar', value: Math.max(0, rep.total - rep.evaluated), color: '#3a4658' },
+          ]}
+          center={`${rep.evaluated}`}
+        />
+        <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <ProgressBar
+            value={rep.evaluated}
+            target={rep.criteria.min_evaluated}
+            label="Decisiones evaluadas"
+            title="Registros que ya tocaron objetivo o stop: son los que pueden enseñar al modelo."
+          />
+          <ProgressBar
+            value={Math.min(rep.tp, rep.sl)}
+            target={rep.criteria.min_per_class}
+            label="Ejemplos de la clase minoritaria"
+            title="El modelo necesita ver suficientes casos de AMBOS desenlaces para aprender a distinguirlos."
+          />
+          <ProgressBar
+            value={Math.round(rep.feature_completeness * 100)}
+            target={Math.round(rep.criteria.min_feature_completeness * 100)}
+            label="Datos completos"
+            unit="%"
+            title="Porcentaje de registros con todas las columnas necesarias."
+          />
+        </div>
+      </div>
+      <div className="reg-summary">
         <span className="reg-chip" title="Snapshots guardados en total">
           Total <strong>{rep.total}</strong>
         </span>
@@ -489,6 +557,38 @@ function AutomationSection() {
           </p>
         </div>
       )}
+      <div className="viz-row">
+        <Gauge
+          value={
+            st.per_tf.length
+              ? st.per_tf.filter((t) => (t.hours_since_backtest ?? 999) <= st.backtest_every_h * 1.5)
+                  .length / st.per_tf.length
+              : 0
+          }
+          label="Mediciones al día"
+          sublabel={`${st.per_tf.filter((t) => (t.hours_since_backtest ?? 999) <= st.backtest_every_h * 1.5).length}/${st.per_tf.length} temporalidades`}
+          good={
+            st.per_tf.length > 0 &&
+            st.per_tf.every((t) => (t.hours_since_backtest ?? 999) <= st.backtest_every_h * 1.5)
+          }
+        />
+        <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <ProgressBar
+            value={Math.round(Math.min(st.hours_since_calibration ?? 0, st.calibrate_every_h ?? 168))}
+            target={Math.round(st.calibrate_every_h ?? 168)}
+            label="Próxima calibración (mantenimiento)"
+            unit=" h"
+            title="Cuando la barra se llena, el piloto recalibra por mantenimiento (también lo hace tras cada promoción)."
+          />
+          <ProgressBar
+            value={Math.round(Math.min(st.hours_since_metamodel ?? 0, st.metamodel_every_h ?? 12))}
+            target={Math.round(st.metamodel_every_h ?? 12)}
+            label="Próximo reentrenamiento del meta-modelo"
+            unit=" h"
+            title="El meta-modelo se reentrena periódicamente con los registros nuevos."
+          />
+        </div>
+      </div>
       <table className="opt-table">
         <thead>
           <tr>

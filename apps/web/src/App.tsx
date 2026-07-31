@@ -14,6 +14,7 @@ import { LabView } from './LabView';
 import { HelpView } from './HelpView';
 import { NewsView } from './NewsView';
 import { StatusView } from './StatusView';
+import { AssetManager } from './AssetManager';
 import { DrawingLayer } from './DrawingLayer';
 import {
   fetchCandles,
@@ -64,6 +65,7 @@ export function App() {
   const [alerts, setAlerts] = useState<Record<string, TfAlert>>({});
   const [thresholds, setThresholds] = useState<Record<string, number>>(loadThresholds);
   const [showGear, setShowGear] = useState(false);
+  const [showAssets, setShowAssets] = useState(false);
   const tfRef = useRef<HTMLDivElement>(null);
   const { alerts: alertHistory, unread, create: createAlert, markRead } = useAlerts();
   const [cooldownMin, setCooldownMin] = useState<number>(() =>
@@ -466,6 +468,15 @@ export function App() {
               ))}
             </select>
           </label>
+          <button
+            type="button"
+            className="gear-btn asset-btn"
+            title="Gestionar activos: buscar, añadir o pausar los que TradeMe analiza"
+            aria-label="Gestionar activos"
+            onClick={() => setShowAssets(true)}
+          >
+            ＋
+          </button>
 
           <div className="tf-alert-wrap">
             <div className="tf-group" role="group" aria-label="Temporalidad" ref={tfRef}>
@@ -569,6 +580,18 @@ export function App() {
             {STATUS_LABEL[status]}
           </span>
         </div>
+        {showAssets && (
+          <AssetManager
+            onClose={() => setShowAssets(false)}
+            onChanged={() => {
+              void fetchSymbols().then((r) => {
+                setSymbols(r.symbols);
+                setIntervals(r.intervals);
+                setSymbol((cur) => (r.symbols.includes(cur) ? cur : (r.symbols[0] ?? '')));
+              });
+            }}
+          />
+        )}
       </header>
 
       <main className="content">

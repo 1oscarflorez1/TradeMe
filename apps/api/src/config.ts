@@ -43,6 +43,8 @@ const EnvSchema = z.object({
 
   MIGRATIONS_DIR: z.string().default('infra/postgres/migrations'),
   QUANT_URL: z.string().optional(),
+  // URL pública (para mostrar la dirección exacta del webhook en la interfaz).
+  PUBLIC_API_URL: z.string().optional(),
   ACCOUNT_EQUITY: z.coerce.number().positive().default(10_000),
 });
 

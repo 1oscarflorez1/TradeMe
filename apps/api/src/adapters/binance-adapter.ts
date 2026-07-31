@@ -56,6 +56,24 @@ export class BinanceAdapter implements DataAdapter {
     this.connect();
   }
 
+  /** Cambia la lista de suscripciones en caliente (al añadir o quitar activos). */
+  resubscribe(subscriptions: Subscription[]): void {
+    const before = this.streamNames().join(',');
+    this.subscriptions = subscriptions;
+    if (this.streamNames().join(',') === before) return; // nada que cambiar
+    this.log.info({ streams: this.subscriptions.length }, 'resuscribiendo al cambiar los activos');
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.attempt = 0;
+    try {
+      this.ws?.removeAllListeners();
+      this.ws?.close();
+    } catch {
+      /* si ya estaba cerrado, seguimos */
+    }
+    this.ws = null;
+    this.connect();
+  }
+
   private streamNames(): string[] {
     return this.subscriptions.map((s) => `${s.symbol.toLowerCase()}@kline_${s.interval}`);
   }

@@ -408,6 +408,75 @@ export async function fetchSystemStatus(): Promise<SystemStatus | null> {
   }
 }
 
+export interface AssetRow {
+  symbol: string;
+  label: string | null;
+  enabled: boolean;
+}
+export interface CatalogHit {
+  symbol: string;
+  base: string;
+  quote: string;
+  label: string;
+}
+
+export async function fetchAssets(): Promise<AssetRow[]> {
+  try {
+    const res = await apiFetch('/assets');
+    if (!res.ok) return [];
+    return ((await res.json()) as { assets: AssetRow[] }).assets;
+  } catch {
+    return [];
+  }
+}
+
+export async function searchAssets(q: string): Promise<CatalogHit[]> {
+  try {
+    const res = await apiFetch(`/assets/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    return ((await res.json()) as { results: CatalogHit[] }).results;
+  } catch {
+    return [];
+  }
+}
+
+export async function addAsset(symbol: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await apiFetch('/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol }),
+    });
+    if (res.ok) return { ok: true };
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function removeAsset(symbol: string): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/assets/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function toggleAsset(symbol: string, enabled: boolean): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/assets/${encodeURIComponent(symbol)}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function runBacktest(
   symbol: string,
   interval: Interval,
