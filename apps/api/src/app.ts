@@ -35,6 +35,12 @@ export interface AppDeps {
   metaModel?: MetaModel;
   metaMode?: 'off' | 'shadow' | 'modulate' | 'veto';
   metaPolicyReason?: () => string | null;
+  captureInfo?: () => {
+    enabled: boolean;
+    intervals: string;
+    minConfidence: number;
+    cooldownMin: number;
+  };
   metaVetoThreshold?: number;
   metaModulateWeight?: number;
   reloadArtifacts?: () => {
@@ -65,6 +71,12 @@ export interface AppDeps {
   savePushSub?: (sub: PushSub) => Promise<void>;
   quantUrl?: string;
   pingDb?: () => Promise<boolean>;
+  logAccess?: (
+    event: 'login_ok' | 'login_fail' | 'login_blocked',
+    email: string | null,
+    ip: string,
+    detail?: string,
+  ) => Promise<void>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -129,9 +141,28 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     return payload;
   });
 
+  // Freno general de peticiones por IP: evita que un cliente sature la API (o barra endpoints).
+  const generalLimiter = new LoginRateLimiter({
+    maxAttempts: 600, // ~10 req/s sostenidas por IP; muy por encima del uso normal del portal
+    windowMs: 60_000,
+    blockMs: 30_000,
+    maxBlockMs: 5 * 60_000,
+  });
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.url === '/health' || request.url === '/status') return;
+    const v = generalLimiter.fail(`req|${request.ip}`);
+    if (!v.allowed) {
+      reply.header('Retry-After', String(v.retryAfterSec));
+      return reply.status(429).send({ error: 'demasiadas peticiones; baja el ritmo' });
+    }
+  });
+
   // Freno a la fuerza bruta en el login.
   const loginLimiter = new LoginRateLimiter();
-  const sweep = setInterval(() => loginLimiter.sweep(), 10 * 60_000);
+  const sweep = setInterval(() => {
+    loginLimiter.sweep();
+    generalLimiter.sweep();
+  }, 10 * 60_000);
   sweep.unref?.();
   app.addHook('onClose', async () => clearInterval(sweep));
 
@@ -169,6 +200,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const verdict = loginLimiter.check(key);
     if (!verdict.allowed) {
       request.log.warn({ ip, email: parsed.data.email }, 'login bloqueado por demasiados intentos');
+      void deps.logAccess?.('login_blocked', parsed.data.email, ip, `bloqueado ${verdict.retryAfterSec}s`);
       reply.header('Retry-After', String(verdict.retryAfterSec));
       return reply.status(429).send({
         error: `Demasiados intentos. Inténtalo de nuevo en ${Math.ceil(verdict.retryAfterSec / 60)} min.`,
@@ -182,11 +214,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         { ip, email: parsed.data.email, remaining: after.remaining },
         'intento de acceso fallido',
       );
+      void deps.logAccess?.('login_fail', parsed.data.email, ip, `quedan ${after.remaining}`);
       return reply.status(401).send({ error: 'email o contraseña incorrectos' });
     }
 
     loginLimiter.succeed(key);
     request.log.info({ ip, email: user.email }, 'acceso concedido');
+    void deps.logAccess?.('login_ok', user.email, ip);
     const token = signJwt({ sub: user.id, email: user.email }, deps.authSecret);
     return { token, user: { id: user.id, email: user.email } };
   });
@@ -308,6 +342,16 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         detail: 'no configurado (QUANT_URL vacío)',
       });
     }
+
+    // Captura automática de decisiones (alimenta el dataset del meta-modelo)
+    components.push({
+      key: 'capture',
+      label: 'Captura automática de registros',
+      status: deps.captureInfo?.().enabled ? 'ok' : 'na',
+      detail: deps.captureInfo?.().enabled
+        ? `activa · ${deps.captureInfo!().intervals} · confianza ≥ ${Math.round(deps.captureInfo!().minConfidence * 100)}% · 1 cada ${deps.captureInfo!().cooldownMin} min`
+        : 'desactivada (solo se registran los snapshots manuales del portal)',
+    });
 
     // Meta-modelo (Módulo 2)
     components.push({

@@ -5,6 +5,20 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M10 (cierre) · captura server-side y auditoría
+
+- **Captura automática en el servidor:** la API registra las decisiones operables (confianza ≥ 40 %,
+  con cooldown y por temporalidad configurable) **sin depender de que alguien tenga el portal
+  abierto**. Antes los snapshots solo nacían en el navegador, así que el dataset del meta-modelo se
+  congelaba cuando nadie miraba. Configurable con `AUTO_CAPTURE*`.
+- **Auditoría de accesos:** tabla `access_log` (migración 012) con cada acceso concedido, fallido o
+  bloqueado (correo, IP, motivo).
+- **Freno general por IP** además del específico del login (protege toda la API de abuso).
+- **Accesibilidad:** foco visible al navegar con teclado, respeto por «reducir movimiento» y áreas
+  táctiles cómodas en móvil.
+- **Estado del sistema:** nuevo componente «Captura automática de registros».
+- **Novedades:** al día con las versiones 0.24.0 y 0.25.0.
+
 ### Added — M10 (seguridad base) + pulido de interfaz para móvil
 
 **Seguridad (la plataforma ya está expuesta a internet):**

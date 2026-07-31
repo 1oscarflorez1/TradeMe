@@ -11,6 +11,7 @@ import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { BacktestsRepo } from './db/backtests-repo.js';
 import { AlertsRepo } from './db/alerts-repo.js';
+import { AccessLogRepo } from './db/access-log-repo.js';
 import { PushSubsRepo } from './db/push-subs-repo.js';
 import { UsersRepo } from './db/users-repo.js';
 import { verifyJwt } from './auth/jwt.js';
@@ -24,6 +25,7 @@ import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
 import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
+import { computePlanLevels } from './ensemble/plan.js';
 import type { Signal } from './domain/signal.js';
 import { Calibrators } from './calibration/load.js';
 import { MetaModel } from './metamodel/apply.js';
@@ -76,6 +78,10 @@ async function main(): Promise<void> {
   const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
   const metaModel = MetaModel.load(env.METAMODEL_PATH);
   const metaPolicy = MetaPolicy.load(env.META_POLICY_PATH, env.META_MODE);
+  // Captura automática server-side: registra decisiones operables aunque nadie tenga el portal
+  // abierto. Es lo que mantiene vivo el dataset del meta-modelo.
+  const captureIntervals = new Set(env.AUTO_CAPTURE_INTERVALS.split(',').map((x) => x.trim()));
+  const lastCapture = new Map<string, number>();
 
   const pool = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
   const repo = pool ? new CandlesRepo(pool) : null;
@@ -85,6 +91,7 @@ async function main(): Promise<void> {
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
+  const accessLogRepo = pool ? new AccessLogRepo(pool) : null;
   const pushSubsRepo = pool ? new PushSubsRepo(pool) : null;
   const usersRepo = pool ? new UsersRepo(pool) : null;
   if (env.JWT_SECRET && !usersRepo) {
@@ -138,6 +145,12 @@ async function main(): Promise<void> {
     metaModel,
     metaMode: metaPolicy.mode,
     metaPolicyReason: () => metaPolicy.reason,
+    captureInfo: () => ({
+      enabled: env.AUTO_CAPTURE === 'true',
+      intervals: env.AUTO_CAPTURE_INTERVALS,
+      minConfidence: env.AUTO_CAPTURE_MIN_CONFIDENCE,
+      cooldownMin: env.AUTO_CAPTURE_COOLDOWN_MIN,
+    }),
     metaVetoThreshold: env.META_VETO_THRESHOLD,
     metaModulateWeight: env.META_MODULATE_WEIGHT,
     reloadArtifacts,
@@ -154,6 +167,10 @@ async function main(): Promise<void> {
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
     markAlertsRead: alertsRepo ? () => alertsRepo.markAllRead() : undefined,
     quantUrl: env.QUANT_URL,
+    logAccess: accessLogRepo
+      ? (event, email, ip, detail) =>
+          accessLogRepo.record(event, email, ip, detail).catch(() => undefined)
+      : undefined,
     pingDb: pool
       ? async () => {
           await pool.query('SELECT 1');
@@ -209,7 +226,30 @@ async function main(): Promise<void> {
       });
       hub.broadcastSignal(symbol, iv, signal);
       void maybePush(symbol, iv, signal);
+      void maybeCapture(symbol, iv, signal);
     }
+  }
+
+  /** Guarda un snapshot cuando hay una decisión operable con confianza suficiente. */
+  async function maybeCapture(symbol: string, iv: Interval, signal: Signal): Promise<void> {
+    if (env.AUTO_CAPTURE !== 'true' || !snapshotsRepo) return;
+    if (!captureIntervals.has(iv)) return;
+    if (signal.action !== 'BUY' && signal.action !== 'SELL') return;
+    if (signal.confidence < env.AUTO_CAPTURE_MIN_CONFIDENCE) return;
+    const key = `${symbol}:${iv}`;
+    const now = Date.now();
+    if (now - (lastCapture.get(key) ?? 0) < env.AUTO_CAPTURE_COOLDOWN_MIN * 60_000) return;
+    lastCapture.set(key, now);
+    const levels = computePlanLevels(
+      signal.action,
+      signal.price,
+      signal.atr,
+      getEnsembleFor(symbol, iv).risk,
+      env.ACCOUNT_EQUITY,
+    );
+    await snapshotsRepo
+      .record(signal, iv, levels, 'auto-servidor')
+      .catch((err: unknown) => app.log.warn({ err: String(err) }, 'no se pudo capturar el snapshot'));
   }
 
   // Regla en el servidor: push en segundo plano ante decisión accionable de alta confianza.
