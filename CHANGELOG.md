@@ -5,6 +5,15 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Fixed — Despliegue tras un túnel (Tailscale Funnel)
+
+- **web:** el servidor de *preview* de Vite bloqueaba el dominio del túnel («Blocked request… not
+  allowed»). Ahora autoriza `localhost`, `.ts.net` y `.trycloudflare.com`, más los que añadas en
+  `ALLOWED_HOSTS` (variable del servicio web en producción).
+- **docs:** guía corregida con lo aprendido en el despliegue real — migración del dataset entre
+  entornos (sin `>` de PowerShell, que corrompe el volcado a UTF-16), creación de usuarios con `tsx`
+  (Node 20 no admite `--experimental-strip-types`) y recreación de la API si no publica su puerto.
+
 ### Added — El filtro ML se gradúa solo (política automática)
 
 - **quant:** `meta_policy.py` — el piloto evalúa el **modo sombra** con decisiones reales cerradas
