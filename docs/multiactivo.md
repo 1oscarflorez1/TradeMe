@@ -27,8 +27,12 @@ lista. Quitarlo no borra sus registros ni sus backtests.
 
 - Tabla `watchlist` (migración 013). Sustituye a la antigua lista fija en `TRADEME_SYMBOLS`, que
   queda solo como respaldo si la base de datos no está disponible.
-- Endpoints: `GET /assets`, `GET /assets/search?q=`, `POST /assets`, `DELETE /assets/:symbol`,
-  `POST /assets/:symbol/toggle`.
+- Migración 014: cada activo recuerda su `provider`, `asset_class` y `tv_symbol`.
+- Endpoints: `GET /assets`, `GET /assets/providers`, `GET /assets/search?q=&assetClass=`,
+  `POST /assets`, `DELETE /assets/:symbol`, `POST /assets/:symbol/toggle`.
+
+> **De qué mercados se puede tirar y por qué TradingView no cuenta como fuente de datos:**
+> ver [`proveedores.md`](proveedores.md).
 
 ## Consejo de uso
 

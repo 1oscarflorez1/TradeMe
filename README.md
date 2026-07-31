@@ -81,6 +81,9 @@ La API (`apps/api`) sirve, además de `/health`:
 - `GET /calibration` — calibradores por régimen (fiabilidad + Brier). Ver [`docs/calibracion.md`](docs/calibracion.md).
 - `GET /ensemble` — ensemble activo (base/optimizado) + informe de optimización. Ver [`docs/optimizacion.md`](docs/optimizacion.md).
 - `POST /reload` — recarga en caliente de artefactos (ensemble optimizado + calibradores) publicados por quant.
+- `GET /assets`, `GET /assets/providers`, `GET /assets/search?q=&assetClass=`, `POST /assets`,
+  `DELETE /assets/:symbol`, `POST /assets/:symbol/toggle` — activos seguidos y catálogo combinado de
+  todos los proveedores. Ver [`docs/proveedores.md`](docs/proveedores.md).
 - `GET /alerts`, `POST /alerts`, `POST /alerts/read` — centro de notificaciones (M8). Ver [`docs/notificaciones.md`](docs/notificaciones.md).
 - `GET /push/vapid`, `POST /push/subscribe` — PWA + Web Push en segundo plano (M9). Ver [`docs/pwa-push.md`](docs/pwa-push.md).
 - `POST /auth/login`, `GET /auth/me` — login del equipo (JWT). Con `JWT_SECRET` configurado,
@@ -130,4 +133,7 @@ un PR por hito; Conventional Commits; nunca commits directos a `main`.
 - [`docs/arquitectura.md`](docs/arquitectura.md) — arquitectura híbrida
 - [`docs/contrato.md`](docs/contrato.md) — contrato Node↔Python
 - [`docs/indicadores.md`](docs/indicadores.md) — motor de indicadores (plugin)
+- [`docs/multiactivo.md`](docs/multiactivo.md) — lista de activos seguidos y suscripción en caliente
+- [`docs/proveedores.md`](docs/proveedores.md) — proveedores de datos, modos de entrega y por qué
+  TradingView no puede ser fuente de velas
 - [`docs/riesgo.md`](docs/riesgo.md) — seguridad, riesgo y cumplimiento

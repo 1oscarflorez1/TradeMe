@@ -10,6 +10,20 @@ interface Release {
 /** Novedades visibles para el equipo (resumen del CHANGELOG en lenguaje claro). */
 const RELEASES: Release[] = [
   {
+    version: '0.27.0',
+    date: '2026-07',
+    title: 'Más allá del cripto: acciones, divisas e índices',
+    added: [
+      '**Nuevos mercados**: además de cripto, TradeMe puede seguir **acciones, divisas, índices y ETF**. En el gestor de activos (＋) hay un filtro por clase y cada resultado indica de qué proveedor salen sus velas.',
+      '**Insignias de fuente**: ⚡ tiempo real (cripto, streaming continuo) frente a ⏱ consulta periódica (el resto, cada pocos minutos). Para activos ⏱ conviene usar temporalidades de 15m en adelante.',
+      'La pestaña **Estado** muestra ahora los proveedores de datos: cuáles están activos, cuáles faltan por configurar y qué cubre cada uno.',
+      'El gráfico de TradingView abre el **mercado correcto** de cada activo (NASDAQ, FX, Binance…), no solo el par de cripto.',
+    ],
+    changed: [
+      'Para activar acciones y divisas hace falta una **clave gratuita de Twelve Data** en el `.env`. Sin ella no se rompe nada: el proveedor aparece como «sin configurar» y todo sigue igual con cripto.',
+    ],
+  },
+  {
     version: '0.26.0',
     date: '2026-07',
     title: 'Multi-activo y visualizaciones del motor',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { fetchSystemStatus } from './api';
-import type { SystemStatus } from './api';
+import { fetchProviders, fetchSystemStatus } from './api';
+import type { ProviderInfo, SystemStatus } from './api';
 
 const DOT: Record<string, string> = { ok: '🟢', degradado: '🟡', caido: '🔴', na: '⚪' };
 const LABEL: Record<string, string> = {
@@ -14,6 +14,7 @@ export function StatusView() {
   const [st, setSt] = useState<SystemStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
 
   const load = () =>
     fetchSystemStatus().then((r) => {
@@ -24,6 +25,7 @@ export function StatusView() {
 
   useEffect(() => {
     void load();
+    void fetchProviders().then(setProviders);
     const id = setInterval(() => void load(), 30000);
     return () => clearInterval(id);
   }, []);
@@ -98,6 +100,49 @@ export function StatusView() {
               </tbody>
             </table>
           </div>
+
+          {providers.length > 0 && (
+            <>
+              <h3 className="asset-h">Proveedores de datos de mercado</h3>
+              <div className="snap-scroll">
+                <table className="snap-table">
+                  <thead>
+                    <tr>
+                      <th>Proveedor</th>
+                      <th>Estado</th>
+                      <th>Entrega</th>
+                      <th>Clases de activo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {providers.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.label}</td>
+                        <td className={p.available ? 'wh-long' : 'muted'}>
+                          {p.available ? '🟢 Activo' : '⚪ Sin configurar'}
+                        </td>
+                        <td className="muted">
+                          {p.mode === 'stream'
+                            ? '⚡ Tiempo real (streaming)'
+                            : '⏱ Consulta periódica'}
+                        </td>
+                        <td className="muted">
+                          {p.assetClasses.join(', ')}
+                          {p.unavailableReason ? ` · ${p.unavailableReason}` : ''}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="muted calib-legend">
+                Un proveedor «sin configurar» no es un fallo: TradeMe sigue funcionando con los
+                activos de los proveedores activos. TradingView aparece como gráfico y como origen de
+                alertas Reditum, pero <strong>no es un proveedor de datos</strong>: no ofrece API
+                pública de velas, así que no puede alimentar decisiones ni backtests.
+              </p>
+            </>
+          )}
 
           <p className="muted calib-legend">
             <strong>Cómo leerlo:</strong> 🟢 operativo · 🟡 degradado (funciona con limitaciones) ·

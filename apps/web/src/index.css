@@ -2460,3 +2460,22 @@ pre.hint {
   background: rgba(139, 151, 167, 0.16);
   color: var(--muted);
 }
+
+/* --- Multi-proveedor: insignias de clase de activo y de fuente de datos --- */
+.asset-providers { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.asset-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.asset-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.asset-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; line-height: 1; padding: 3px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted); background: var(--bg-elev);
+  white-space: nowrap;
+}
+.asset-chip.prov { border-style: dashed; }
+.asset-chip.prov-state.ok { color: var(--buy); border-color: color-mix(in srgb, var(--buy) 45%, transparent); }
+.asset-chip.prov-state.off { color: var(--muted); opacity: 0.8; }
+.asset-chip.clase-cripto { color: #f7c948; border-color: color-mix(in srgb, #f7c948 40%, transparent); }
+.asset-chip.clase-acciones { color: #6ea8fe; border-color: color-mix(in srgb, #6ea8fe 40%, transparent); }
+.asset-chip.clase-forex { color: #7ee0b8; border-color: color-mix(in srgb, #7ee0b8 40%, transparent); }
+.asset-chip.clase-indices { color: #c9a0ff; border-color: color-mix(in srgb, #c9a0ff 40%, transparent); }
+.asset-chip.clase-materias { color: #ffab70; border-color: color-mix(in srgb, #ffab70 40%, transparent); }

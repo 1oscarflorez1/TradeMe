@@ -15,11 +15,13 @@ import { HelpView } from './HelpView';
 import { NewsView } from './NewsView';
 import { StatusView } from './StatusView';
 import { AssetManager } from './AssetManager';
+import { setTvSymbols } from './tvSymbol';
 import { DrawingLayer } from './DrawingLayer';
 import {
   fetchCandles,
   fetchSignal,
   fetchSnapshots,
+  fetchAssets,
   fetchSymbols,
   fetchVotes,
   logout,
@@ -131,6 +133,9 @@ export function App() {
         setSymbol((current) => current || r.symbols[0] || '');
       })
       .catch((e: unknown) => setError(String(e)));
+    // Cada activo trae su equivalente en TradingView según el proveedor de sus velas
+    // (BINANCE:BTCUSDT, NASDAQ:AAPL…), para que la pestaña del widget muestre el mercado correcto.
+    void fetchAssets().then(setTvSymbols);
   }, []);
 
   useEffect(() => {
@@ -584,6 +589,7 @@ export function App() {
           <AssetManager
             onClose={() => setShowAssets(false)}
             onChanged={() => {
+              void fetchAssets().then(setTvSymbols);
               void fetchSymbols().then((r) => {
                 setSymbols(r.symbols);
                 setIntervals(r.intervals);
