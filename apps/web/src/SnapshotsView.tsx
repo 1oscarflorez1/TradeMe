@@ -475,9 +475,13 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                 </DrawingLayer>
               )}
             </div>
-            <p className="muted">
-              Niveles del plan marcados (entrada/stop/objetivo). Usa el ✏️ para dibujar sobre el
-              gráfico.
+            <p className="muted chart-legend">
+              <span className="lg lg-entry" /> Entrada <span className="lg lg-stop" /> Stop
+              <span className="lg lg-tp" /> Objetivo
+              {chartFor.outcome_result
+                ? ` · resultado: ${chartFor.outcome_result.toUpperCase()} (${num(chartFor.outcome_return_r)} R)`
+                : ' · operación aún sin cerrar'}
+              . Usa el ✏️ para dibujar sobre el gráfico.
             </p>
           </div>
         </div>

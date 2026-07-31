@@ -1989,3 +1989,238 @@ pre.hint {
   color: #e0a44f;
   background: rgba(224, 164, 79, 0.16);
 }
+
+/* ---- Backtest: la métrica clave destaca ---- */
+.bt-card-hero {
+  border-width: 2px;
+  background: var(--bg);
+}
+.bt-card-hero .bt-k::after {
+  content: ' · clave';
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+.bt-card-hero.hero-good {
+  border-color: rgba(47, 191, 107, 0.65);
+}
+.bt-card-hero.hero-good .bt-v {
+  color: #2fbf6b;
+}
+.bt-card-hero.hero-bad {
+  border-color: rgba(224, 100, 95, 0.65);
+}
+.bt-card-hero.hero-bad .bt-v {
+  color: #e0645f;
+}
+
+/* ============================================================
+   RESPONSIVE · móvil y tablet
+   La plataforma la abrirá el equipo desde el teléfono: la barra superior deja de amontonarse,
+   el Panel pasa a una sola columna con alturas naturales y todo lo ancho gana scroll propio.
+   ============================================================ */
+@media (max-width: 900px) {
+  .app {
+    height: auto;
+    min-height: 100vh;
+  }
+  .content {
+    overflow-y: visible;
+    padding: 0.85rem 0.7rem;
+  }
+
+  /* --- Barra superior en tres filas: marca · pestañas · controles --- */
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.6rem 0.7rem;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+  .brand {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .brand h1 {
+    font-size: 1.05rem;
+  }
+  .nav-tabs {
+    margin-left: 0;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.15rem;
+  }
+  .nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-tabs .nav {
+    flex: 0 0 auto;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+  }
+  .controls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: space-between;
+  }
+  .asset-selector select {
+    max-width: 8.5rem;
+  }
+  .tf-alert-wrap {
+    order: 3;
+    width: 100%;
+  }
+  .tf-group {
+    max-width: none;
+    flex: 1;
+  }
+  .status {
+    font-size: 0.78rem;
+  }
+
+  /* --- Panel: una sola columna, sin alturas fijas --- */
+  .panel-view {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    gap: 0.7rem;
+  }
+  .panel-left {
+    gap: 0.7rem;
+  }
+  .panel-view .chart-panel,
+  .panel-left .chart-panel {
+    flex: none;
+  }
+  .panel-view .chart,
+  .panel-view .tv-chart,
+  .draw-wrap {
+    height: 320px;
+    min-height: 320px;
+  }
+  .panel-view .side {
+    overflow: visible;
+    min-height: 0;
+  }
+  .panel-view .signal-panel,
+  .panel-view .webhooks-panel {
+    flex: none;
+  }
+  .decision {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .panel-view .ring {
+    width: 96px;
+    height: 96px;
+  }
+  .panel-view .indicators-row .heatmap {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  /* --- Backtest / Laboratorio: guía debajo, no al lado --- */
+  .bt-layout {
+    flex-direction: column;
+  }
+  .bt-guide {
+    max-width: none;
+    width: 100%;
+  }
+  .bt-cards {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+  .bt-actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+  .bt-actions-hint {
+    text-align: left;
+  }
+
+  /* --- Ayuda y Novedades --- */
+  .help-search {
+    margin-left: 0;
+    width: 100%;
+  }
+  .help-nav {
+    gap: 0.3rem;
+  }
+  .help-tab {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.55rem;
+  }
+
+  /* --- Paneles y modales --- */
+  .panel {
+    padding: 0.85rem 0.9rem;
+  }
+  .modal {
+    width: min(94vw, 420px);
+  }
+  .modal-chart {
+    width: 94vw;
+  }
+  .modal-chart-body {
+    height: 260px;
+  }
+  .bell-pop,
+  .gear-pop {
+    width: min(88vw, 320px);
+  }
+  .reg-filters {
+    gap: 0.5rem;
+  }
+  .reg-filters-hint {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand h1 {
+    font-size: 1rem;
+  }
+  .nav-tabs .nav {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+  }
+  .panel-view .chart,
+  .panel-view .tv-chart,
+  .draw-wrap {
+    height: 260px;
+    min-height: 260px;
+  }
+  .bt-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .reg-summary .reg-chip {
+    font-size: 0.78rem;
+    padding: 0.25rem 0.55rem;
+  }
+  .det-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---- Leyenda de niveles en el gráfico del registro ---- */
+.chart-legend .lg {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  margin: 0 0.25rem 0 0.6rem;
+  vertical-align: middle;
+}
+.chart-legend .lg-entry {
+  background: #4da3ff;
+}
+.chart-legend .lg-stop {
+  background: #ff5c5c;
+}
+.chart-legend .lg-tp {
+  background: #2ecc71;
+}
