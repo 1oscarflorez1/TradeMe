@@ -10,6 +10,32 @@ interface Release {
 /** Novedades visibles para el equipo (resumen del CHANGELOG en lenguaje claro). */
 const RELEASES: Release[] = [
   {
+    version: '0.25.0',
+    date: '2026-07',
+    title: 'El sistema captura decisiones por su cuenta + auditoría de accesos',
+    added: [
+      '**Captura automática en el servidor**: TradeMe registra las decisiones operables aunque nadie tenga el portal abierto. Antes, los registros solo se creaban desde el navegador.',
+      '**Registro de accesos** persistente: queda constancia de cada entrada y de los intentos fallidos.',
+      'Freno general de peticiones por IP, además del ya existente en el inicio de sesión.',
+      'Mejoras de accesibilidad: foco visible al navegar con teclado y respeto por «reducir movimiento».',
+    ],
+  },
+  {
+    version: '0.24.0',
+    date: '2026-07',
+    title: 'Seguridad del acceso y interfaz móvil',
+    added: [
+      '**Protección contra fuerza bruta** en el inicio de sesión: 5 intentos por ventana y bloqueo creciente.',
+      'Cabeceras de seguridad en todas las respuestas (anti-clickjacking, etc.).',
+    ],
+    changed: [
+      '**Interfaz adaptada al móvil**: barra superior en tres filas, Panel en una sola columna y tablas y modales que se ajustan a la pantalla.',
+      'El chip 🧠 del meta-modelo se ve **siempre**, también cuando la decisión es MANTENER.',
+      '**Expectancy destacada** en Backtest con color y veredicto de ventaja.',
+      'Los niveles de entrada, stop y objetivo se etiquetan en el gráfico de cada registro.',
+    ],
+  },
+  {
     version: '0.21.0',
     date: '2026-07',
     title: 'Centro de ayuda, Laboratorio y Estado del sistema',

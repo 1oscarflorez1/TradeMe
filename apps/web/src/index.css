@@ -2224,3 +2224,35 @@ pre.hint {
 .chart-legend .lg-tp {
   background: #2ecc71;
 }
+
+/* ---- Accesibilidad (M10) ---- */
+:focus-visible {
+  outline: 2px solid #4da3ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.nav:focus-visible,
+.tf:focus-visible,
+.help-tab:focus-visible {
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* Área táctil mínima cómoda en móvil */
+@media (max-width: 900px) {
+  .row-btn,
+  .gear-btn,
+  .bell-btn,
+  .draw-btn {
+    min-width: 34px;
+    min-height: 34px;
+  }
+}
