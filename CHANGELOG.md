@@ -5,6 +5,28 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — M10 (seguridad base) + pulido de interfaz para móvil
+
+**Seguridad (la plataforma ya está expuesta a internet):**
+- **Freno a la fuerza bruta en el login:** ventana deslizante por IP+email, 5 intentos por 15 min y
+  bloqueo con *backoff* creciente (1 → 30 min). Responde `429` con `Retry-After` (+6 tests).
+- **Registro de accesos:** cada intento fallido y cada acceso concedido queda en el log con IP y
+  correo.
+- **Cabeceras de seguridad** en toda respuesta: `X-Content-Type-Options`, `X-Frame-Options: DENY`
+  (anti-clickjacking), `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`.
+- (Ya existía: sesiones JWT con caducidad de 12 h y comparación *timing-safe*.)
+
+**Interfaz:**
+- **Responsive real en móvil:** la barra superior se reorganiza en tres filas (marca · pestañas
+  deslizables · controles), el Panel pasa a una sola columna con alturas naturales, y guías, tablas
+  y modales se adaptan. Segundo punto de corte para pantallas pequeñas.
+- **Panel:** el chip 🧠 del meta-modelo se muestra **siempre** (también en HOLD): la modulación/veto
+  solo se aplica si hay acción operable, pero ahora ves qué opina el filtro en todo momento.
+- **Backtest:** la **Expectancy** se destaca como métrica clave (verde/rojo según signo) y aparece un
+  veredicto «✓ Con ventaja / ⚠ Sin ventaja clara».
+- **Registros:** los niveles de entrada, stop y objetivo se dibujan con etiqueta en el eje del
+  gráfico del snapshot, con leyenda y el resultado real si ya cerró.
+
 ### Fixed — Despliegue tras un túnel (Tailscale Funnel)
 
 - **web:** el servidor de *preview* de Vite bloqueaba el dominio del túnel («Blocked request… not

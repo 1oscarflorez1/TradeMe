@@ -75,9 +75,28 @@ export function CandleChart({
     const series = seriesRef.current;
     if (!series || !levels) return;
     const lines = [
-      series.createPriceLine({ price: levels.entry, color: '#4da3ff', lineWidth: 1, title: 'Entrada' }),
-      series.createPriceLine({ price: levels.stop, color: '#ff5c5c', lineWidth: 1, title: 'Stop' }),
-      series.createPriceLine({ price: levels.tp, color: '#2ecc71', lineWidth: 1, title: 'Objetivo' }),
+      series.createPriceLine({
+        price: levels.entry,
+        color: '#4da3ff',
+        lineWidth: 2,
+        lineStyle: 2, // discontinua: es el precio de referencia, no un objetivo
+        title: 'Entrada',
+        axisLabelVisible: true,
+      }),
+      series.createPriceLine({
+        price: levels.stop,
+        color: '#ff5c5c',
+        lineWidth: 2,
+        title: 'Stop',
+        axisLabelVisible: true,
+      }),
+      series.createPriceLine({
+        price: levels.tp,
+        color: '#2ecc71',
+        lineWidth: 2,
+        title: 'Objetivo',
+        axisLabelVisible: true,
+      }),
     ];
     return () => lines.forEach((l) => series.removePriceLine(l));
   }, [levels, candles]);

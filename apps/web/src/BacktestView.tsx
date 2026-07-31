@@ -303,10 +303,18 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
     }
     return { text, cls };
   };
-  const cards: Array<{ k: string; v: string; tip: string; delta: { text: string; cls: string } | null }> = [
+  const edge = (bt.expectancy ?? 0) > 0 && (bt.profit_factor ?? 0) > 1;
+  const cards: Array<{
+    k: string;
+    v: string;
+    tip: string;
+    delta: { text: string; cls: string } | null;
+    hero?: boolean;
+    good?: boolean;
+  }> = [
     { k: 'Trades', v: String(bt.n_trades ?? 0), tip: 'Operaciones simuladas sobre el histórico. Cuantas más, más fiable la estadística.', delta: dlt(bt.n_trades, P?.n_trades, 'neutral', 'num') },
     { k: 'Win rate', v: pct(bt.win_rate), tip: 'Porcentaje de operaciones ganadoras. Por sí solo no dice si el sistema gana dinero.', delta: dlt(bt.win_rate, P?.win_rate, 'up', 'pct') },
-    { k: 'Expectancy', v: `${num(bt.expectancy, 3)} R`, tip: 'Ganancia media por operación en R. Positiva = hay ventaja. Es la métrica clave.', delta: dlt(bt.expectancy, P?.expectancy, 'up', 'r') },
+    { k: 'Expectancy', v: `${num(bt.expectancy, 3)} R`, tip: 'LA MÉTRICA CLAVE: ganancia media por operación en R. Positiva = el sistema tiene ventaja; negativa = pierde dinero de media.', delta: dlt(bt.expectancy, P?.expectancy, 'up', 'r'), hero: true, good: (bt.expectancy ?? 0) > 0 },
     { k: 'Profit factor', v: num(bt.profit_factor), tip: 'Ganancias brutas ÷ pérdidas brutas. >1 rentable; cerca de 1 = ventaja pequeña.', delta: dlt(bt.profit_factor, P?.profit_factor, 'up', 'dec') },
     { k: 'Max drawdown', v: `${num(bt.max_drawdown, 2)} R`, tip: 'Peor caída acumulada (en R) desde un pico. Menos es mejor.', delta: dlt(bt.max_drawdown, P?.max_drawdown, 'down', 'r') },
     { k: 'Sharpe', v: num(bt.sharpe), tip: 'Rentabilidad ajustada a la volatilidad. Mayor = más estable.', delta: dlt(bt.sharpe, P?.sharpe, 'up', 'dec') },
@@ -323,12 +331,26 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
           <span className="muted">
             · {bt.symbol} · {bt.interval} · sin look-ahead · peor caso SL
           </span>
+          <span
+            className={`opt-badge ${edge ? 'opt-ok' : 'opt-no'}`}
+            title={
+              edge
+                ? 'Expectancy positiva y profit factor > 1: el sistema muestra ventaja estadística en este histórico.'
+                : 'Sin ventaja clara en este histórico: expectancy ≤ 0 o profit factor ≤ 1.'
+            }
+          >
+            {edge ? '✓ Con ventaja' : '⚠ Sin ventaja clara'}
+          </span>
           {actions}
         </div>
         {runMsg && <p className="bt-runmsg">{runMsg}</p>}
         <div className="bt-cards">
           {cards.map((c) => (
-            <div key={c.k} className="bt-card" title={c.tip}>
+            <div
+              key={c.k}
+              className={`bt-card${c.hero ? ' bt-card-hero' : ''}${c.hero ? (c.good ? ' hero-good' : ' hero-bad') : ''}`}
+              title={c.tip}
+            >
               {c.delta && <span className={`bt-delta ${c.delta.cls}`}>{c.delta.text}</span>}
               <span className="bt-k">{c.k}</span>
               <span className="bt-v">{c.v}</span>

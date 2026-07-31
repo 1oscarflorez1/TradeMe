@@ -70,7 +70,9 @@ export function buildSignal(params: BuildSignalParams): Signal {
   const metaMode = params.metaMode ?? 'off';
   let metaConfidence: number | undefined;
   let metaVetoed: boolean | undefined;
-  if (metaMode !== 'off' && params.metaModel?.ready && action !== 'HOLD') {
+  // Se evalúa SIEMPRE (también en HOLD): así el Panel muestra qué opina el filtro ML en todo
+  // momento. La política de modulación/veto solo se aplica cuando hay acción operable.
+  if (metaMode !== 'off' && params.metaModel?.ready) {
     const p = params.metaModel.predict(
       featureVector({
         net,
@@ -86,17 +88,17 @@ export function buildSignal(params: BuildSignalParams): Signal {
     );
     if (p !== null) {
       metaConfidence = p;
-      if (metaMode === 'modulate' || metaMode === 'veto') {
+      if (action !== 'HOLD' && (metaMode === 'modulate' || metaMode === 'veto')) {
         // Media ponderada: la confianza final combina el ensemble y el juicio del meta-modelo.
         const w = params.metaModulateWeight ?? 0.5;
         confidence = (1 - w) * confidence + w * p;
       }
-      if (metaMode === 'veto' && p < (params.metaVetoThreshold ?? 0.5)) {
+      if (action !== 'HOLD' && metaMode === 'veto' && p < (params.metaVetoThreshold ?? 0.5)) {
         action = 'HOLD';
         confidence = probs.HOLD;
         direction = 'FLAT';
         metaVetoed = true;
-      } else if (metaMode === 'veto') {
+      } else if (action !== 'HOLD' && metaMode === 'veto') {
         metaVetoed = false;
       }
     }

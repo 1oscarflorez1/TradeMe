@@ -21,6 +21,7 @@ import type { Macro, Signal } from './domain/signal.js';
 import type { UserRow } from './db/users-repo.js';
 import { verifyPassword } from './auth/password.js';
 import { signJwt, verifyJwt } from './auth/jwt.js';
+import { LoginRateLimiter } from './auth/rate-limit.js';
 
 export interface AppDeps {
   getHistory: (symbol: string, interval: string, limit: number, endTime?: number) => Promise<Candle[]>;
@@ -117,6 +118,23 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const corsOrigin = env.CORS_ORIGIN ? env.CORS_ORIGIN.split(',').map((o) => o.trim()) : true;
   void app.register(cors, { origin: corsOrigin });
 
+  // ---- M10 · Hardening ----
+  // Cabeceras de seguridad en toda respuesta (la plataforma está expuesta a internet).
+  app.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY'); // no embebible: evita clickjacking
+    reply.header('Referrer-Policy', 'no-referrer');
+    reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    reply.header('Cross-Origin-Opener-Policy', 'same-origin');
+    return payload;
+  });
+
+  // Freno a la fuerza bruta en el login.
+  const loginLimiter = new LoginRateLimiter();
+  const sweep = setInterval(() => loginLimiter.sweep(), 10 * 60_000);
+  sweep.unref?.();
+  app.addHook('onClose', async () => clearInterval(sweep));
+
   // Auth (Módulo 3): si hay `authSecret` configurado, toda ruta exige `Authorization: Bearer
   // <jwt>` salvo la allowlist (salud, webhook de TradingView con su propio secreto, y login).
   // Sin `authSecret` (dev/tests) la API queda abierta, igual que antes de este módulo.
@@ -143,10 +161,32 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     }
     const parsed = LoginBody.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'credenciales inválidas' });
+
+    // Clave del limitador: IP + email. Frena tanto a quien prueba muchas contraseñas de una
+    // cuenta como a quien barre cuentas desde la misma dirección.
+    const ip = request.ip || 'desconocida';
+    const key = `${ip}|${parsed.data.email.toLowerCase()}`;
+    const verdict = loginLimiter.check(key);
+    if (!verdict.allowed) {
+      request.log.warn({ ip, email: parsed.data.email }, 'login bloqueado por demasiados intentos');
+      reply.header('Retry-After', String(verdict.retryAfterSec));
+      return reply.status(429).send({
+        error: `Demasiados intentos. Inténtalo de nuevo en ${Math.ceil(verdict.retryAfterSec / 60)} min.`,
+      });
+    }
+
     const user = await deps.findUserByEmail(parsed.data.email);
     if (!user || !verifyPassword(parsed.data.password, user.password_hash)) {
+      const after = loginLimiter.fail(key);
+      request.log.warn(
+        { ip, email: parsed.data.email, remaining: after.remaining },
+        'intento de acceso fallido',
+      );
       return reply.status(401).send({ error: 'email o contraseña incorrectos' });
     }
+
+    loginLimiter.succeed(key);
+    request.log.info({ ip, email: user.email }, 'acceso concedido');
     const token = signJwt({ sub: user.id, email: user.email }, deps.authSecret);
     return { token, user: { id: user.id, email: user.email } };
   });
