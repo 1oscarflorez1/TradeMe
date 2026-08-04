@@ -143,3 +143,13 @@ CREATE TABLE IF NOT EXISTS access_log (
   detail     TEXT
 );
 CREATE INDEX IF NOT EXISTS access_log_at_idx ON access_log (at DESC);
+
+-- Multi-activo: lista de activos seguidos.
+CREATE TABLE IF NOT EXISTS watchlist (
+  symbol     TEXT PRIMARY KEY,
+  label      TEXT,
+  enabled    BOOLEAN NOT NULL DEFAULT true,
+  added_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO watchlist (symbol, label) VALUES ('BTCUSDT', 'Bitcoin / USDT')
+ON CONFLICT (symbol) DO NOTHING;

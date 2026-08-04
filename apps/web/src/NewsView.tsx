@@ -10,6 +10,31 @@ interface Release {
 /** Novedades visibles para el equipo (resumen del CHANGELOG en lenguaje claro). */
 const RELEASES: Release[] = [
   {
+    version: '0.27.0',
+    date: '2026-07',
+    title: 'Más allá del cripto: acciones, divisas e índices',
+    added: [
+      '**Nuevos mercados**: además de cripto, TradeMe puede seguir **acciones, divisas, índices y ETF**. En el gestor de activos (＋) hay un filtro por clase y cada resultado indica de qué proveedor salen sus velas.',
+      '**Insignias de fuente**: ⚡ tiempo real (cripto, streaming continuo) frente a ⏱ consulta periódica (el resto, cada pocos minutos). Para activos ⏱ conviene usar temporalidades de 15m en adelante.',
+      'La pestaña **Estado** muestra ahora los proveedores de datos: cuáles están activos, cuáles faltan por configurar y qué cubre cada uno.',
+      'El gráfico de TradingView abre el **mercado correcto** de cada activo (NASDAQ, FX, Binance…), no solo el par de cripto.',
+    ],
+    changed: [
+      'Para activar acciones y divisas hace falta una **clave gratuita de Twelve Data** en el `.env`. Sin ella no se rompe nada: el proveedor aparece como «sin configurar» y todo sigue igual con cripto.',
+    ],
+  },
+  {
+    version: '0.26.0',
+    date: '2026-07',
+    title: 'Multi-activo y visualizaciones del motor',
+    added: [
+      '**Cualquier activo, no solo Bitcoin**: busca y añade pares desde la barra superior (botón ＋). El motor se suscribe al instante y el piloto empieza a medirlo y a entrenar su propia estrategia.',
+      'Pausar o quitar activos sin perder su historial.',
+      '**Gráficos y medidores** en el Laboratorio: progreso del dataset hacia el entrenamiento, comparativa visual de la optimización, estado de calibración y frescura del piloto.',
+      'Guía para conectar los algoritmos Reditum de TradingView, con la dirección exacta del webhook visible en Estado.',
+    ],
+  },
+  {
     version: '0.25.0',
     date: '2026-07',
     title: 'El sistema captura decisiones por su cuenta + auditoría de accesos',

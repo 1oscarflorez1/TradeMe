@@ -45,6 +45,8 @@ services:
       DATABASE_URL: postgres://trademe:trademe@postgres:5432/trademe
       REDIS_URL: redis://redis:6379
       QUANT_URL: http://quant:8000
+      # Acciones, divisas e índices (opcional). Vacío = solo cripto vía Binance.
+      TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
     volumes:
       - ../artifacts:/repo/artifacts
     ports:

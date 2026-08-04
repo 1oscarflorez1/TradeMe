@@ -35,6 +35,45 @@ export interface AppDeps {
   metaModel?: MetaModel;
   metaMode?: 'off' | 'shadow' | 'modulate' | 'veto';
   metaPolicyReason?: () => string | null;
+  // Multi-activo
+  listAssets?: () => Promise<
+    Array<{
+      symbol: string;
+      label: string | null;
+      enabled: boolean;
+      provider: string;
+      assetClass: string;
+      tvSymbol: string | null;
+    }>
+  >;
+  searchAssets?: (
+    q: string,
+    assetClass?: string,
+  ) => Promise<
+    Array<{
+      symbol: string;
+      base: string;
+      quote: string;
+      label: string;
+      provider: string;
+      assetClass: string;
+      tvSymbol?: string;
+    }>
+  >;
+  addAsset?: (
+    symbol: string,
+    provider?: string,
+  ) => Promise<{ ok: boolean; error?: string; label?: string; provider?: string }>;
+  listProviders?: () => Array<{
+    id: string;
+    label: string;
+    assetClasses: string[];
+    mode: 'stream' | 'poll';
+    available: boolean;
+    unavailableReason?: string;
+  }>;
+  removeAsset?: (symbol: string) => Promise<boolean>;
+  toggleAsset?: (symbol: string, enabled: boolean) => Promise<boolean>;
   captureInfo?: () => {
     enabled: boolean;
     intervals: string;
@@ -70,6 +109,7 @@ export interface AppDeps {
   vapidPublicKey?: string;
   savePushSub?: (sub: PushSub) => Promise<void>;
   quantUrl?: string;
+  publicApiUrl?: string;
   pingDb?: () => Promise<boolean>;
   logAccess?: (
     event: 'login_ok' | 'login_fail' | 'login_blocked',
@@ -379,8 +419,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       label: 'Webhook Reditum (TradingView)',
       status: deps.tvSecret ? 'ok' : 'na',
       detail: deps.tvSecret
-        ? 'endpoint protegido y listo para recibir alertas'
-        : 'sin secreto configurado (no se aceptan alertas)',
+        ? `listo para recibir alertas en ${deps.publicApiUrl ?? 'http://localhost:3001'}/tv-hook`
+        : 'sin secreto configurado: define TV_WEBHOOK_SECRET para aceptar alertas de TradingView',
     });
 
     const worst = components.some((c) => c.status === 'caido')
@@ -405,6 +445,64 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     authRequired: Boolean(deps.authSecret),
     ts: new Date().toISOString(),
   }));
+
+  // ---- Multi-activo: catálogo, búsqueda y gestión de la lista seguida ----
+  app.get('/assets', async (_request, reply) => {
+    if (!deps.listAssets) return reply.status(503).send({ error: 'persistencia no disponible' });
+    return { assets: await deps.listAssets() };
+  });
+
+  app.get('/assets/providers', async (_request, reply) => {
+    if (!deps.listProviders) return reply.status(503).send({ error: 'registro no disponible' });
+    return { providers: deps.listProviders() };
+  });
+
+  app.get('/assets/search', async (request, reply) => {
+    if (!deps.searchAssets) return reply.status(503).send({ error: 'catálogo no disponible' });
+    const q = z
+      .object({ q: z.string().default(''), assetClass: z.string().optional() })
+      .parse(request.query);
+    try {
+      return { results: await deps.searchAssets(q.q, q.assetClass) };
+    } catch (err) {
+      request.log.warn({ err: String(err) }, 'fallo al buscar activos');
+      return reply.status(502).send({ error: 'no se pudo consultar el catálogo' });
+    }
+  });
+
+  app.post('/assets', async (request, reply) => {
+    if (!deps.addAsset) return reply.status(503).send({ error: 'persistencia no disponible' });
+    const body = z
+      .object({ symbol: z.string().min(2).max(40), provider: z.string().max(30).optional() })
+      .safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: 'símbolo inválido' });
+    const out = await deps.addAsset(body.data.symbol.toUpperCase(), body.data.provider);
+    if (!out.ok) return reply.status(400).send({ error: out.error ?? 'no se pudo añadir' });
+    return {
+      added: true,
+      symbol: body.data.symbol.toUpperCase(),
+      label: out.label,
+      provider: out.provider,
+    };
+  });
+
+  app.delete('/assets/:symbol', async (request, reply) => {
+    if (!deps.removeAsset) return reply.status(503).send({ error: 'persistencia no disponible' });
+    const { symbol } = request.params as { symbol: string };
+    const ok = await deps.removeAsset(symbol);
+    if (!ok) return reply.status(404).send({ error: 'activo no encontrado' });
+    return { removed: true, symbol: symbol.toUpperCase() };
+  });
+
+  app.post('/assets/:symbol/toggle', async (request, reply) => {
+    if (!deps.toggleAsset) return reply.status(503).send({ error: 'persistencia no disponible' });
+    const { symbol } = request.params as { symbol: string };
+    const body = z.object({ enabled: z.boolean() }).safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: 'parámetro inválido' });
+    const ok = await deps.toggleAsset(symbol, body.data.enabled);
+    if (!ok) return reply.status(404).send({ error: 'activo no encontrado' });
+    return { ok: true, symbol: symbol.toUpperCase(), enabled: body.data.enabled };
+  });
 
   app.get('/symbols', async () => ({ symbols: deps.symbols, intervals: INTERVALS }));
 

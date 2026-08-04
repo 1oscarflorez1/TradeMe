@@ -45,8 +45,11 @@ services:
       DATABASE_URL: postgres://trademe:${POSTGRES_PASSWORD}@postgres:5432/trademe
       REDIS_URL: redis://redis:6379
       QUANT_URL: http://quant:8000
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
       JWT_SECRET: ${JWT_SECRET:?Definir en infra/.env.prod}
       TV_WEBHOOK_SECRET: ${TV_WEBHOOK_SECRET:-}
+      # Acciones, divisas e índices (opcional). Vacío = solo cripto vía Binance.
+      TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
       CORS_ORIGIN: ${PUBLIC_WEB_ORIGIN:?Definir en infra/.env.prod}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}

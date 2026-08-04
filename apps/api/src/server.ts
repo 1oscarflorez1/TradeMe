@@ -2,8 +2,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { buildApp } from './app.js';
 import { attachStream } from './ws.js';
-import { buildSubscriptions, loadEnv, parseSymbols } from './config.js';
-import { BinanceAdapter } from './adapters/binance-adapter.js';
+import { buildSubscriptions, loadEnv, parseIntervals, parseSymbols } from './config.js';
+import { BinanceProvider } from './providers/binance-provider.js';
+import { TwelveDataProvider } from './providers/twelvedata-provider.js';
+import { ProviderRegistry } from './providers/registry.js';
+import type { AssetClass } from './providers/types.js';
 import { StreamHub } from './stream/hub.js';
 import { createPool } from './db/pool.js';
 import { CandlesRepo } from './db/candles-repo.js';
@@ -12,6 +15,7 @@ import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { BacktestsRepo } from './db/backtests-repo.js';
 import { AlertsRepo } from './db/alerts-repo.js';
 import { AccessLogRepo } from './db/access-log-repo.js';
+import { WatchlistRepo } from './db/watchlist-repo.js';
 import { PushSubsRepo } from './db/push-subs-repo.js';
 import { UsersRepo } from './db/users-repo.js';
 import { verifyJwt } from './auth/jwt.js';
@@ -58,7 +62,12 @@ function loadEnsembleSafe(path: string, warn: (msg: string) => void): EnsembleCo
 async function main(): Promise<void> {
   const env = loadEnv();
   const hub = new StreamHub();
-  const adapter = new BinanceAdapter();
+  // Registro de proveedores: Binance (cripto, WebSocket) primero; Twelve Data (acciones,
+  // forex, índices) se activa solo si hay clave. Añadir otra fuente = otra entrada aquí.
+  const providers = new ProviderRegistry([
+    new BinanceProvider(),
+    new TwelveDataProvider({ apiKey: env.TWELVEDATA_API_KEY }),
+  ]);
   const registry = new IndicatorRegistry();
   const buffer = new CandleBuffer(300);
   const externalStore = new ExternalSignalStore();
@@ -92,6 +101,9 @@ async function main(): Promise<void> {
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
   const accessLogRepo = pool ? new AccessLogRepo(pool) : null;
+  const watchlistRepo = pool ? new WatchlistRepo(pool) : null;
+  // Lista viva de activos: arranca con la de entorno y se sustituye por la de la base de datos.
+  const activeSymbols: string[] = parseSymbols(env);
   const pushSubsRepo = pool ? new PushSubsRepo(pool) : null;
   const usersRepo = pool ? new UsersRepo(pool) : null;
   if (env.JWT_SECRET && !usersRepo) {
@@ -135,8 +147,8 @@ async function main(): Promise<void> {
 
   const app = buildApp({
     getHistory: (symbol: string, interval: string, limit: number, endTime?: number): Promise<Candle[]> =>
-      adapter.getHistory(symbol, interval as Interval, limit, endTime),
-    symbols: parseSymbols(env),
+      providers.getHistory(symbol, interval as Interval, limit, endTime),
+    symbols: activeSymbols,
     registry,
     externalStore,
     mapper: loadMapper(env.EXTERNAL_SIGNALS_CONFIG, (m) => app.log.warn(m)),
@@ -167,6 +179,55 @@ async function main(): Promise<void> {
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
     markAlertsRead: alertsRepo ? () => alertsRepo.markAllRead() : undefined,
     quantUrl: env.QUANT_URL,
+    publicApiUrl: env.PUBLIC_API_URL,
+    listAssets: watchlistRepo
+      ? async () =>
+          (await watchlistRepo.list()).map((a) => ({
+            symbol: a.symbol,
+            label: a.label,
+            enabled: a.enabled,
+            provider: a.provider,
+            assetClass: a.asset_class,
+            tvSymbol: a.tv_symbol,
+          }))
+      : undefined,
+    listProviders: () => providers.info(),
+    searchAssets: (q: string, assetClass?: string) =>
+      providers.search(q, 25, assetClass as AssetClass | undefined),
+    addAsset: watchlistRepo
+      ? async (symbol: string, provider?: string) => {
+          const found = await providers.exists(symbol, provider).catch(() => null);
+          if (!found) {
+            return {
+              ok: false,
+              error: 'ningún proveedor configurado ofrece velas de ese símbolo',
+            };
+          }
+          await watchlistRepo.add(
+            found.symbol,
+            found.label,
+            found.provider,
+            found.assetClass,
+            found.tvSymbol ?? null,
+          );
+          await applyWatchlist();
+          return { ok: true, label: found.label, provider: found.provider };
+        }
+      : undefined,
+    removeAsset: watchlistRepo
+      ? async (symbol: string) => {
+          const ok = await watchlistRepo.remove(symbol);
+          if (ok) await applyWatchlist();
+          return ok;
+        }
+      : undefined,
+    toggleAsset: watchlistRepo
+      ? async (symbol: string, enabled: boolean) => {
+          const ok = await watchlistRepo.setEnabled(symbol, enabled);
+          if (ok) await applyWatchlist();
+          return ok;
+        }
+      : undefined,
     logAccess: accessLogRepo
       ? (event, email, ip, detail) =>
           accessLogRepo.record(event, email, ip, detail).catch(() => undefined)
@@ -196,7 +257,37 @@ async function main(): Promise<void> {
       : undefined,
   });
 
-  adapter.setLogger({
+  /** Aplica la lista de activos: siembra histórico de los nuevos y resuscribe el stream. */
+  async function applyWatchlist(): Promise<void> {
+    if (!watchlistRepo) return;
+    const entradas = await watchlistRepo.enabled();
+    const symbols = entradas.map((e) => e.symbol);
+    if (symbols.length === 0) return; // nunca dejamos el motor sin activos
+    // El registro necesita saber de qué proveedor sale cada símbolo antes de repartir suscripciones.
+    for (const e of entradas) providers.setRoute(e.symbol, e.provider);
+    const nuevos = symbols.filter((s) => !activeSymbols.includes(s));
+    activeSymbols.splice(0, activeSymbols.length, ...symbols);
+    const intervals = parseIntervals(env);
+    for (const symbol of nuevos) {
+      for (const interval of intervals) {
+        try {
+          const history = await providers.getHistory(symbol, interval, 300);
+          buffer.seed(symbol, interval, history);
+        } catch (err) {
+          app.log.warn({ err: String(err), symbol, interval }, 'sin histórico inicial del activo');
+        }
+      }
+      void refreshMacro(symbol);
+    }
+    providers.resubscribe(
+      symbols.flatMap((symbol) =>
+        intervals.map((interval: Interval) => ({ symbol, interval })),
+      ),
+    );
+    app.log.info({ activos: symbols.length, nuevos: nuevos.length }, 'lista de activos aplicada');
+  }
+
+  providers.setLogger({
     info: (obj, msg) => app.log.info(obj as object, msg),
     warn: (obj, msg) => app.log.warn(obj as object, msg),
     error: (obj, msg) => app.log.error(obj as object, msg),
@@ -319,19 +410,22 @@ async function main(): Promise<void> {
   const subscriptions = buildSubscriptions(env);
   for (const sub of subscriptions) {
     try {
-      const history = await adapter.getHistory(sub.symbol, sub.interval, 300);
+      const history = await providers.getHistory(sub.symbol, sub.interval, 300);
       buffer.seed(sub.symbol, sub.interval, history);
     } catch (err) {
       app.log.warn({ err: String(err), sub }, 'no se pudo sembrar histórico inicial');
     }
   }
 
-  await adapter.start(subscriptions, onCandle);
+  await providers.start(subscriptions, onCandle);
 
-  const symbols = parseSymbols(env);
-  for (const symbol of symbols) await refreshMacro(symbol);
+  // La lista definitiva de activos vive en la base de datos (con la de entorno como respaldo).
+  await applyWatchlist().catch((err: unknown) =>
+    app.log.warn({ err: String(err) }, 'no se pudo aplicar la lista de activos'),
+  );
+  for (const symbol of activeSymbols) await refreshMacro(symbol);
   setInterval(() => {
-    for (const symbol of symbols) void refreshMacro(symbol);
+    for (const symbol of activeSymbols) void refreshMacro(symbol);
   }, MACRO_REFRESH_MS);
   app.log.info(
     {

@@ -5,6 +5,39 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Multi-activo, multi-proveedor + visualizaciones del motor
+
+- **Arquitectura multi-proveedor:** nueva capa `apps/api/src/providers` con el contrato
+  `MarketProvider` (identidad, clases de activo, modo de entrega, catálogo, histórico, suscripción) y
+  un `ProviderRegistry` que enruta cada símbolo a su proveedor, combina los catálogos en una sola
+  búsqueda y reparte las suscripciones. Binance queda envuelto como proveedor de **streaming**.
+- **Proveedor por sondeo:** `PollingProvider` resuelve de una vez el caso de las fuentes sin
+  WebSocket gratuito — cadencia derivada de la temporalidad (≈¼ de vela, con suelo y techo),
+  presupuesto de peticiones por minuto y por día, y emisión únicamente de velas cerradas nuevas.
+  Sobre él, **Twelve Data** aporta acciones, divisas, índices y ETF; se activa con
+  `TWELVEDATA_API_KEY` y, sin clave, aparece como «sin configurar» sin romper nada.
+- **Migración 014:** `watchlist` recuerda `provider`, `asset_class` y `tv_symbol` de cada activo, de
+  modo que el widget de TradingView muestra el mercado correcto (`NASDAQ:AAPL`, `FX:EURUSD`…).
+- **web:** filtro por clase de activo e insignias de clase y proveedor en el gestor de activos;
+  panel de proveedores en **Estado del sistema** (activo/sin configurar, tiempo real o sondeo).
+- **docs:** `docs/proveedores.md`, que explica el contrato, los dos modos de entrega, los límites del
+  plan gratuito y **por qué TradingView no puede ser proveedor de datos**.
+
+- **Multi-activo:** nueva tabla `watchlist` (migración 013) y endpoints `/assets*`; buscador sobre el
+  catálogo del proveedor (Binance spot, con caché de 6 h) y **suscripción en caliente**: al añadir un
+  activo, el motor se suscribe, siembra su histórico y el piloto lo incluye en sus ciclos, con
+  estrategia optimizada propia por símbolo+temporalidad. Se puede pausar o quitar sin perder
+  historial. `TRADEME_SYMBOLS` queda como respaldo.
+- **web:** gestor de activos (buscar, añadir, pausar, quitar) accesible desde la barra superior.
+- **Visualizaciones (`Viz.tsx`):** medidores, barras de progreso, comparativas, anillos y
+  *sparklines* en SVG puro, aplicados al **Dataset ML** (progreso hacia cada criterio + reparto
+  TP/SL), **Optimización** (comparativa base vs candidato y medidor de mejora), **Calibración**
+  (veredicto por régimen) y **Piloto** (frescura de mediciones y cuenta atrás de calibración y
+  reentrenamiento).
+- **Reditum/TradingView:** el Estado muestra la dirección exacta del webhook y nueva guía
+  `docs/reditum-tradingview.md` para configurar las alertas.
+- **docs:** `multiactivo.md`.
+
 ### Added — M10 (cierre) · captura server-side y auditoría
 
 - **Captura automática en el servidor:** la API registra las decisiones operables (confianza ≥ 40 %,

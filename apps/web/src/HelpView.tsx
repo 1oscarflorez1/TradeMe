@@ -286,6 +286,33 @@ const KB: Article[] = [
     ),
   },
   {
+    title: 'Proveedores de datos: de dónde salen las velas',
+    body: (
+      <p>
+        TradeMe separa <strong>quién entrega los datos</strong> de <strong>qué hace con ellos</strong>.
+        Binance aporta cripto en <strong>⚡ tiempo real</strong> (streaming, sin clave). Twelve Data
+        aporta <strong>acciones, divisas, índices y ETF</strong> por <strong>⏱ consulta periódica</strong>:
+        su plan gratuito no tiene streaming, así que TradeMe pregunta cada pocos minutos y emite las
+        velas ya cerradas. Por eso, en activos ⏱ conviene trabajar de <strong>15m en adelante</strong>.
+        Añadir otro proveedor no toca la matemática de la decisión: todos entregan la misma vela.
+      </p>
+    ),
+  },
+  {
+    title: '¿Por qué TradingView no es un proveedor de datos?',
+    body: (
+      <p>
+        Porque no publica una API de velas para terceros. Su widget <em>dibuja</em> casi cualquier
+        mercado y sus alertas <em>avisan</em>, pero sus feeds internos son privados, cambian sin aviso
+        y su uso automatizado va contra sus condiciones. Construir el motor sobre eso sería frágil y
+        arriesgado. De ahí el reparto: <strong>TradingView es pantalla y sensor</strong> (gráfico +
+        alertas Reditum), y los <strong>proveedores son la fuente</strong> con la que se decide,
+        calibra, se hace backtest y se entrena. Consecuencia práctica: el gráfico puede mostrar un
+        mercado que TradeMe todavía no sabe analizar.
+      </p>
+    ),
+  },
+  {
     title: 'Señales externas Reditum (TradingView)',
     body: (
       <p>

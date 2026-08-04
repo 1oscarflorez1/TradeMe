@@ -2256,3 +2256,226 @@ pre.hint {
     min-height: 34px;
   }
 }
+
+/* ---- Gestor de activos ---- */
+.asset-btn {
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0.28rem 0.5rem;
+}
+.modal-assets {
+  width: min(760px, 95vw);
+}
+.asset-search {
+  width: 100%;
+  margin: 0.6rem 0;
+}
+.asset-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.asset-h {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.asset-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.asset-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+.asset-item.is-off {
+  opacity: 0.55;
+}
+.asset-actions {
+  display: flex;
+  gap: 0.15rem;
+}
+@media (max-width: 900px) {
+  .asset-cols {
+    grid-template-columns: 1fr;
+  }
+  .asset-list {
+    max-height: 210px;
+  }
+}
+
+/* ---- Visualizaciones (Viz) ---- */
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  margin: 0.6rem 0;
+}
+.viz-gauge {
+  text-align: center;
+}
+.viz-gauge-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+.viz-gauge-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: -0.2rem;
+}
+.viz-gauge-sub {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.viz-prog {
+  min-width: 190px;
+  flex: 1 1 190px;
+}
+.viz-prog-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.viz-prog-head strong {
+  color: var(--fg);
+}
+.viz-prog-track {
+  height: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.viz-prog-fill {
+  display: block;
+  height: 100%;
+  background: #4da3ff;
+  transition: width 0.3s ease;
+}
+.viz-prog-fill.is-done {
+  background: #2fbf6b;
+}
+.viz-cmp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 260px;
+}
+.viz-cmp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.viz-cmp-label {
+  width: 5.5rem;
+  color: var(--muted);
+}
+.viz-cmp-track {
+  flex: 1;
+  height: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.viz-cmp-fill {
+  display: block;
+  height: 100%;
+}
+.viz-cmp-fill.pos {
+  background: rgba(47, 191, 107, 0.65);
+}
+.viz-cmp-fill.neg {
+  background: rgba(224, 100, 95, 0.65);
+}
+.viz-cmp-fill.is-best {
+  background: #2fbf6b;
+}
+.viz-cmp-value {
+  width: 4.6rem;
+  text-align: right;
+  font-weight: 600;
+}
+.viz-donut {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.viz-donut-center {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--fg);
+}
+.viz-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.viz-donut-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 0.3rem;
+}
+.viz-spark {
+  display: block;
+}
+.viz-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+.viz-ok {
+  background: rgba(47, 191, 107, 0.16);
+  color: #2fbf6b;
+}
+.viz-warn {
+  background: rgba(224, 164, 79, 0.16);
+  color: #e0a44f;
+}
+.viz-bad {
+  background: rgba(224, 100, 95, 0.16);
+  color: #e0645f;
+}
+.viz-idle {
+  background: rgba(139, 151, 167, 0.16);
+  color: var(--muted);
+}
+
+/* --- Multi-proveedor: insignias de clase de activo y de fuente de datos --- */
+.asset-providers { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.asset-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.asset-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.asset-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; line-height: 1; padding: 3px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted); background: var(--bg-elev);
+  white-space: nowrap;
+}
+.asset-chip.prov { border-style: dashed; }
+.asset-chip.prov-state.ok { color: var(--buy); border-color: color-mix(in srgb, var(--buy) 45%, transparent); }
+.asset-chip.prov-state.off { color: var(--muted); opacity: 0.8; }
+.asset-chip.clase-cripto { color: #f7c948; border-color: color-mix(in srgb, #f7c948 40%, transparent); }
+.asset-chip.clase-acciones { color: #6ea8fe; border-color: color-mix(in srgb, #6ea8fe 40%, transparent); }
+.asset-chip.clase-forex { color: #7ee0b8; border-color: color-mix(in srgb, #7ee0b8 40%, transparent); }
+.asset-chip.clase-indices { color: #c9a0ff; border-color: color-mix(in srgb, #c9a0ff 40%, transparent); }
+.asset-chip.clase-materias { color: #ffab70; border-color: color-mix(in srgb, #ffab70 40%, transparent); }

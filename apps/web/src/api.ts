@@ -408,6 +408,103 @@ export async function fetchSystemStatus(): Promise<SystemStatus | null> {
   }
 }
 
+export interface AssetRow {
+  symbol: string;
+  label: string | null;
+  enabled: boolean;
+  provider: string;
+  assetClass: string;
+  tvSymbol: string | null;
+}
+export interface CatalogHit {
+  symbol: string;
+  base: string;
+  quote: string;
+  label: string;
+  provider: string;
+  assetClass: string;
+  tvSymbol?: string;
+}
+export interface ProviderInfo {
+  id: string;
+  label: string;
+  assetClasses: string[];
+  mode: 'stream' | 'poll';
+  available: boolean;
+  unavailableReason?: string;
+}
+
+export async function fetchProviders(): Promise<ProviderInfo[]> {
+  try {
+    const res = await apiFetch('/assets/providers');
+    if (!res.ok) return [];
+    return ((await res.json()) as { providers: ProviderInfo[] }).providers;
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchAssets(): Promise<AssetRow[]> {
+  try {
+    const res = await apiFetch('/assets');
+    if (!res.ok) return [];
+    return ((await res.json()) as { assets: AssetRow[] }).assets;
+  } catch {
+    return [];
+  }
+}
+
+export async function searchAssets(q: string, assetClass?: string): Promise<CatalogHit[]> {
+  try {
+    const clase = assetClass ? `&assetClass=${encodeURIComponent(assetClass)}` : '';
+    const res = await apiFetch(`/assets/search?q=${encodeURIComponent(q)}${clase}`);
+    if (!res.ok) return [];
+    return ((await res.json()) as { results: CatalogHit[] }).results;
+  } catch {
+    return [];
+  }
+}
+
+export async function addAsset(
+  symbol: string,
+  provider?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await apiFetch('/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, provider }),
+    });
+    if (res.ok) return { ok: true };
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function removeAsset(symbol: string): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/assets/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function toggleAsset(symbol: string, enabled: boolean): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/assets/${encodeURIComponent(symbol)}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function runBacktest(
   symbol: string,
   interval: Interval,
