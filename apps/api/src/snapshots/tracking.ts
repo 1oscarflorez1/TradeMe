@@ -24,6 +24,28 @@ export interface SnapshotRow {
 
 export type TrackingStatus = 'tp' | 'sl' | 'en_curso' | 'sin_plan';
 
+/**
+ * Estado autoritativo de un registro.
+ *
+ * Regla: `outcome_result` manda SIEMPRE. Lo calcula el evaluador de quant recorriendo las velas
+ * posteriores con la regla del primer toque, así que es el resultado real e inmutable.
+ *
+ * El seguimiento en vivo (`trackSnapshot`) solo describe dónde está el precio AHORA MISMO, y por
+ * tanto únicamente tiene sentido mientras el registro sigue sin evaluar. Confundir ambos hacía que
+ * una operación que tocó su objetivo hace días volviera a aparecer como «en curso» si el precio
+ * regresaba al medio, y que el mismo registro se contara dos veces en el resumen.
+ */
+export type EstadoFinal = 'tp' | 'sl' | 'timeout' | 'abierto' | 'sin_plan';
+
+export function estadoFinal(row: SnapshotRow): EstadoFinal {
+  if (row.outcome_result === 'tp' || row.outcome_result === 'sl') return row.outcome_result;
+  if (row.outcome_result === 'timeout') return 'timeout';
+  if (row.direction === 'FLAT' || row.plan_entry === null || row.plan_stop === null) {
+    return 'sin_plan';
+  }
+  return 'abierto';
+}
+
 export interface SnapshotTracking {
   status: TrackingStatus;
   liveR: number | null;

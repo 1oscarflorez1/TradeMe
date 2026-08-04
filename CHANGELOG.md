@@ -5,6 +5,42 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Fixed — El resumen de Registros contaba mal
+
+- **Estado autoritativo de un snapshot.** Se mezclaban dos conceptos distintos: `outcome_result`
+  (resultado real, calculado por quant sobre las velas posteriores con la regla del primer toque) y
+  `tracking.status` (dónde está el precio AHORA). Un registro cerrado en stop cuyo precio volviera al
+  medio sumaba a la vez en «En curso» y en «SL», y los totales no cuadraban (138+164+210=512 sobre un
+  total de 413). Nuevo `estadoFinal()` con precedencia única y estados excluyentes, más 6 pruebas.
+- **Las cifras se calculaban sobre la página cargada** (500 filas) en vez de sobre todos los
+  registros. Nuevo `SnapshotsRepo.stats()` que agrega en SQL, con desglose por temporalidad.
+- El aprendizaje **nunca estuvo afectado**: el dataset y el meta-modelo siempre usaron
+  `outcome_result`.
+
+### Added — Legibilidad de los datos y de la interfaz
+
+- **Veredicto en Registros:** compara el acierto real con el mínimo necesario según la relación
+  riesgo:beneficio configurada (2:1 → 33,3 %) y dice si el sistema tiene ventaja, con la expectancy
+  media en R. Responde a la duda de «¿es malo que haya más SL que TP?».
+- **`GET /backtest/history`** y sección **Evolución entre ejecuciones** en Backtest: sparkline de
+  expectancy por corrida, variación respecto a la anterior y tabla desplegable con todas.
+- **`GET /timeframes`**: en qué procesos participa cada temporalidad (captura automática, pesos
+  optimizados, backtest guardado, registros acumulados).
+- **Barra de temporalidades nueva:** navegación con botones `‹ ›` en lugar de tira deslizable, con
+  distintivos de uso por temporalidad y leyenda desplegable.
+
+### Changed — Presentación
+
+- **Backtest y Laboratorio a lo ancho:** se retiran las guías laterales (`BacktestGuide`,
+  `LabGuide`) y su contenido se refunde en el Centro de ayuda.
+- **Centro de ayuda rediseñado:** entrada por tarea («¿qué necesitas ahora?»), recorrido sugerido
+  para el primer día, búsqueda que atraviesa las cuatro secciones a la vez, y artículos con resumen
+  de una línea y tiempo de lectura (divulgación progresiva).
+- **Novedades reconstruida:** historial completo desde M0 (27 versiones) con **fecha y hora exactas**
+  tomadas del repositorio, línea de tiempo compacta y **dos niveles de despliegue**: qué cambió y,
+  opcionalmente, por qué se hizo así.
+- Laboratorio: introducción que sitúa las cuatro secciones y márgenes uniformes.
+
 ### Added — Multi-activo, multi-proveedor + visualizaciones del motor
 
 - **Arquitectura multi-proveedor:** nueva capa `apps/api/src/providers` con el contrato

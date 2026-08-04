@@ -13,7 +13,7 @@ import { buildSignal } from './ensemble/signal.js';
 import type { Calibrators } from './calibration/load.js';
 import type { MetaModel } from './metamodel/apply.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
-import { trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
+import { estadoFinal, trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
 import type { AlertRow, AlertInput } from './db/alerts-repo.js';
 import type { PushSub } from './push/push.js';
 import type { BacktestRow } from './db/backtests-repo.js';
@@ -98,6 +98,7 @@ export interface AppDeps {
     levels: PlanLevels | null,
     note?: string,
   ) => Promise<string>;
+  snapshotStats?: (symbol: string) => Promise<unknown>;
   listSnapshots?: (
     symbol: string,
     limit: number,
@@ -118,6 +119,7 @@ export interface AppDeps {
     detail?: string,
   ) => Promise<void>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
+  getBacktestHistory?: (symbol: string, interval: string, limit: number) => Promise<unknown[]>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -506,6 +508,59 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   app.get('/symbols', async () => ({ symbols: deps.symbols, intervals: INTERVALS }));
 
+  /**
+   * En qué procesos participa cada temporalidad. Sirve para que la barra superior deje de ser una
+   * lista muda: cada temporalidad muestra si el motor la captura sola, si tiene configuración
+   * optimizada propia, si hay backtest guardado y cuántos registros ha acumulado.
+   */
+  /** Evolución de los backtests de una temporalidad: ¿el sistema mejora o se degrada? */
+  app.get('/backtest/history', async (request, reply) => {
+    if (!deps.getBacktestHistory) {
+      return reply.status(503).send({ error: 'persistencia no disponible' });
+    }
+    const q = z
+      .object({
+        symbol: z.string().default(deps.symbols[0] ?? 'BTCUSDT'),
+        interval: z.string().default('5m'),
+        limit: z.coerce.number().int().min(2).max(100).default(30),
+      })
+      .parse(request.query);
+    const runs = await deps.getBacktestHistory(q.symbol.toUpperCase(), q.interval, q.limit);
+    return { symbol: q.symbol.toUpperCase(), interval: q.interval, runs };
+  });
+
+  app.get('/timeframes', async (request) => {
+    const q = z
+      .object({ symbol: z.string().default(deps.symbols[0] ?? 'BTCUSDT') })
+      .parse(request.query);
+    const sym = q.symbol.toUpperCase();
+    const captura = deps.captureInfo?.();
+    const capturados = new Set(
+      (captura?.intervals ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+    );
+    const stats = (await deps.snapshotStats?.(sym).catch(() => null)) as
+      | { porTf?: Array<{ interval: string; total: number; tp: number; sl: number; expectancy: number | null }> }
+      | null;
+    const porTf = new Map((stats?.porTf ?? []).map((t) => [t.interval, t]));
+
+    const usage = await Promise.all(
+      INTERVALS.map(async (interval) => {
+        const meta = deps.ensembleMeta?.(sym, interval);
+        const bt = deps.getBacktest ? await deps.getBacktest(sym, interval).catch(() => null) : null;
+        const t = porTf.get(interval);
+        return {
+          interval,
+          captura: (captura?.enabled ?? false) && capturados.has(interval),
+          optimizado: meta?.optimized ?? false,
+          backtest: bt !== null,
+          registros: t?.total ?? 0,
+          expectancy: t?.expectancy ?? null,
+        };
+      }),
+    );
+    return { symbol: sym, capturaActiva: captura?.enabled ?? false, usage };
+  });
+
   app.get('/indicators', async () => ({ indicators: deps.registry.catalog() }));
 
   app.get('/candles', async (request, reply) => {
@@ -861,11 +916,15 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       currentPrice = 0;
     }
     const now = Date.now();
+    // `estado` es el estado autoritativo (manda el resultado evaluado); `tracking` solo describe
+    // dónde está el precio ahora y únicamente importa mientras el registro sigue abierto.
     const snapshots = rows.map((row) => ({
       ...row,
+      estado: estadoFinal(row),
       tracking: currentPrice > 0 ? trackSnapshot(row, currentPrice, now) : null,
     }));
-    return { symbol: sym, currentPrice, snapshots, total };
+    const stats = deps.snapshotStats ? await deps.snapshotStats(sym).catch(() => null) : null;
+    return { symbol: sym, currentPrice, snapshots, total, stats };
   });
 
   const SnapshotBody = z.object({

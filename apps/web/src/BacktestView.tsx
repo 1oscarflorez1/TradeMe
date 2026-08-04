@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { fetchBacktest, postReload, runBacktest, runOptimize } from './api';
+import { fetchBacktest, fetchBacktestHistory, postReload, runBacktest, runOptimize } from './api';
+import type { BacktestHistoryRow } from './api';
+import { Sparkline } from './Viz';
 import type { BacktestResult, Interval } from './types';
 
 function pct(n: number | null): string {
@@ -273,7 +275,6 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
             </p>
           </section>
         </div>
-        <BacktestGuide />
       </div>
     );
   }
@@ -371,196 +372,138 @@ export function BacktestView({ symbol, interval }: { symbol: string; interval: I
         <EquityCurve equity={bt.equity_curve} />
         <EquityReport bt={bt} />
       </section>
+
+      <BacktestHistory symbol={symbol} interval={interval} />
       </div>
-      <BacktestGuide />
     </div>
   );
 }
 
-const DEFINITIONS: Array<[string, string]> = [
-  [
-    'Trades',
-    'Número de operaciones que la lógica de decisión habría abierto sobre el histórico. Cuantas más, más fiable la estadística.',
-  ],
-  [
-    'Win rate',
-    'Porcentaje de operaciones ganadoras. Por sí solo no dice si el sistema gana dinero: una estrategia puede acertar poco pero ganar mucho cuando acierta.',
-  ],
-  [
-    'Expectancy',
-    'La métrica reina: ganancia media por operación medida en R. Una R es lo que arriesgas en cada trade (la distancia entrada→stop). Positiva = el sistema tiene ventaja; 0,058 R significa ganar de media un 5,8 % del riesgo por operación.',
-  ],
-  [
-    'Profit factor',
-    'Ganancias brutas ÷ pérdidas brutas. Mayor que 1 = rentable. 1,10 indica que apenas gana un 10 % más de lo que pierde: ventaja pequeña.',
-  ],
-  [
-    'Max drawdown',
-    'La peor caída acumulada (en R) desde un punto alto. Mide cuánto “duele” en la peor racha; ayuda a saber si podrías aguantarlo psicológica y financieramente.',
-  ],
-  [
-    'Sharpe',
-    'Rentabilidad ajustada a la volatilidad: cuánto ganas por unidad de riesgo asumido. Cuanto mayor, más estable y menos dependiente de la suerte.',
-  ],
-  [
-    'Win rate / Expectancy OOS',
-    'Las mismas métricas, pero solo sobre el 30 % final de los datos (out-of-sample), un tramo que no influyó en nada. Es la prueba de honestidad: si se parecen al resto, el sistema no está sobreajustado al pasado.',
-  ],
-];
+/**
+ * Evolución entre ejecuciones. Un backtest suelto no dice si el sistema mejora; la serie sí.
+ */
+function BacktestHistory({ symbol, interval }: { symbol: string; interval: string }) {
+  const [runs, setRuns] = useState<BacktestHistoryRow[]>([]);
+  const [abierto, setAbierto] = useState(false);
 
-function BacktestGuide() {
+  useEffect(() => {
+    void fetchBacktestHistory(symbol, interval).then(setRuns);
+  }, [symbol, interval]);
+
+  const fecha = (iso: string) =>
+    new Date(iso).toLocaleString('es', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  if (runs.length < 2) {
+    return (
+      <section className="panel">
+        <div className="chart-head">
+          <strong>Evolución entre ejecuciones</strong>
+          <span className="muted">
+            · {symbol} · {interval}
+          </span>
+        </div>
+        <p className="muted">
+          Con una sola ejecución no hay evolución que mostrar. Corre el backtest otra vez dentro de
+          unos días —o deja que lo haga el piloto automático— y aquí verás si la ventaja se mantiene,
+          crece o se está perdiendo.
+        </p>
+      </section>
+    );
+  }
+
+  const exps = runs.map((r) => r.expectancy ?? 0);
+  const ultima = runs[runs.length - 1]!;
+  const previa = runs[runs.length - 2]!;
+  const delta = (ultima.expectancy ?? 0) - (previa.expectancy ?? 0);
+  const conVentaja = runs.filter((r) => (r.expectancy ?? 0) > 0).length;
+
   return (
-    <aside className="panel bt-guide">
-      <details className="bt-acc" open>
-        <summary>¿Qué es un backtest?</summary>
-        <div className="bt-acc-body">
-          <p>
-            Reproduce la lógica de decisión de TradeMe sobre el histórico real, operación por
-            operación, para responder una pregunta <strong>antes de arriesgar dinero</strong>:
-            ¿esta forma de decidir tiene ventaja estadística o es solo suerte?
-          </p>
-          <p>
-            Se hace <strong>sin look-ahead</strong> (nunca usa información futura que no existiría
-            en vivo) y en <strong>peor caso SL</strong> (si en una misma vela se tocan el stop y el
-            objetivo, se asume la pérdida). Así los resultados son conservadores y creíbles.
+    <section className="panel">
+      <div className="chart-head">
+        <strong>Evolución entre ejecuciones</strong>
+        <span className="muted">
+          · {runs.length} corridas guardadas · {conVentaja} con ventaja positiva
+        </span>
+      </div>
+
+      <div className="bt-evo">
+        <div className="bt-evo-chart">
+          <span className="det-label">Expectancy por corrida (R por operación)</span>
+          <Sparkline values={exps} height={64} />
+          <div className="bt-evo-axis muted">
+            <span>{fecha(runs[0]!.created_at)}</span>
+            <span>{fecha(ultima.created_at)}</span>
+          </div>
+        </div>
+        <div className="bt-evo-now">
+          <span className="det-label">Respecto a la corrida anterior</span>
+          <strong className={delta >= 0 ? 'wh-long' : 'wh-short'}>
+            {delta >= 0 ? '▲ +' : '▼ '}
+            {delta.toFixed(3)} R
+          </strong>
+          <p className="muted">
+            {delta >= 0
+              ? 'La última ejecución mantiene o mejora la ventaja.'
+              : 'La última ejecución empeora. Si se repite, el piloto lanzará una optimización.'}
           </p>
         </div>
-      </details>
-
-      <div className="bt-acc-group">
-        <h4>Términos · pulsa para desplegar</h4>
-        {DEFINITIONS.map(([term, desc]) => (
-          <details key={term} className="bt-acc">
-            <summary>{term}</summary>
-            <div className="bt-acc-body">
-              <p>{desc}</p>
-            </div>
-          </details>
-        ))}
       </div>
 
-      <details className="bt-acc">
-        <summary>Cómo leer estos resultados</summary>
-        <div className="bt-acc-body">
-          <p>
-            La regla base: <strong>Expectancy &gt; 0</strong> y{' '}
-            <strong>Profit factor &gt; 1</strong> indican ventaja; el <strong>Max drawdown</strong>{' '}
-            te dice el precio en riesgo por esa ventaja; y las métricas <strong>OOS</strong>{' '}
-            parecidas a las del resto confirman que no hay sobreajuste.
-          </p>
-          <p className="bt-note">
-            Herramienta de validación y apoyo a la decisión, no una promesa de rentabilidad. El
-            rendimiento pasado no asegura resultados futuros.
-          </p>
+      <button type="button" className="bt-evo-toggle" onClick={() => setAbierto((v) => !v)}>
+        {abierto ? '▴ Ocultar el detalle de cada corrida' : '▾ Ver el detalle de cada corrida'}
+      </button>
+
+      {abierto && (
+        <div className="snap-scroll">
+          <table className="snap-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th title="Operaciones simuladas en esa corrida">Trades</th>
+                <th title="Porcentaje de operaciones ganadoras">Acierto</th>
+                <th title="Ganancia media por operación, en múltiplos del riesgo">Expectancy</th>
+                <th title="Ganancias brutas divididas entre pérdidas brutas. Por encima de 1 es rentable">
+                  P. factor
+                </th>
+                <th title="Peor caída acumulada desde un máximo">Drawdown</th>
+                <th title="Expectancy sobre el tramo que el ajuste no vio. Es el número honesto">
+                  Fuera de muestra
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...runs].reverse().map((r) => (
+                <tr key={r.id}>
+                  <td>{fecha(r.created_at)}</td>
+                  <td>{r.n_trades ?? '—'}</td>
+                  <td>{r.win_rate === null ? '—' : `${(r.win_rate * 100).toFixed(1)}%`}</td>
+                  <td className={(r.expectancy ?? 0) >= 0 ? 'wh-long' : 'wh-short'}>
+                    {r.expectancy === null ? '—' : r.expectancy.toFixed(3)}
+                  </td>
+                  <td>{r.profit_factor === null ? '—' : r.profit_factor.toFixed(2)}</td>
+                  <td>{r.max_drawdown === null ? '—' : r.max_drawdown.toFixed(2)}</td>
+                  <td className={(r.oos_expectancy ?? 0) >= 0 ? 'wh-long' : 'wh-short'}>
+                    {r.oos_expectancy === null ? '—' : r.oos_expectancy.toFixed(3)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </details>
+      )}
 
-      <div className="bt-acc-group">
-        <h4>Metodología · por qué fiarse · pulsa para desplegar</h4>
-        <details className="bt-acc">
-          <summary>Sin look-ahead (sin trampa)</summary>
-          <div className="bt-acc-body">
-            <p>
-              En cada vela la decisión se toma usando <strong>solo</strong> la información disponible
-              hasta ese momento, nunca datos futuros. Es lo que separa un backtest honesto de uno que
-              se engaña a sí mismo mirando el resultado antes de decidir.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Peor caso en el stop (conservador)</summary>
-          <div className="bt-acc-body">
-            <p>
-              Cuando una misma vela toca el stop y el objetivo, se asume la <strong>pérdida</strong>
-              (no se sabe cuál ocurrió primero dentro de la vela). Así los resultados pecan de
-              prudentes: en la realidad no serían peores por este motivo.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Reserva out-of-sample (70/30)</summary>
-          <div className="bt-acc-body">
-            <p>
-              El 30% final del histórico se aparta y no influye en nada; sirve de examen. Si las
-              métricas de ese tramo se parecen a las del resto, el sistema no está memorizando el
-              pasado (no hay sobreajuste). Es la prueba de honestidad clave.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>De dónde sale el número de operaciones</summary>
-          <div className="bt-acc-body">
-            <p>
-              No se fija: es cuántas veces la lógica dijo COMPRAR o VENDER (no MANTENER) sobre las
-              ~1000 velas, sin solapar (tras abrir una operación se salta hasta que cierra). Ejemplo:
-              si de 950 velas evaluadas el modelo opera y cada operación dura ~10 velas, salen del
-              orden de decenas de operaciones. Cambia con la temporalidad (muchas más en 1m, pocas en
-              4h) y con la ventana de mercado, por eso el número varía entre ejecuciones.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Qué NO incluye (modo solo-técnico)</summary>
-          <div className="bt-acc-body">
-            <p>
-              El backtest reproduce la decisión <strong>solo con el análisis técnico</strong> (mismos
-              indicadores y ensemble que en vivo). No incluye el sesgo macro/fundamental —que ahora
-              está en pausa— ni las alertas Reditum en vivo (son eventos externos, no reconstruibles
-              del histórico de velas). Por eso el backtest y la decisión en vivo son ahora
-              <strong> consistentes</strong>.
-            </p>
-          </div>
-        </details>
-      </div>
-
-      <div className="bt-acc-group">
-        <h4>Los botones ▶ / ⚙ · pulsa para desplegar</h4>
-        <details className="bt-acc">
-          <summary>▶ Correr backtest</summary>
-          <div className="bt-acc-body">
-            <p>
-              Genera el backtest de la <strong>temporalidad seleccionada</strong> (cada TF tiene el
-              suyo; por eso en 15m dice "aún no hay backtest" hasta que lo corres ahí). Lo ejecuta el
-              servicio quant en el servidor, tarda ~10–30s y al terminar refresca las cifras. Si no
-              cambia nada o falla, verás un aviso: casi siempre es que el servicio quant no está
-              arriba (<code>docker compose up -d --build</code>).
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>⚙ Optimizar (Optuna) — ¿qué es?</summary>
-          <div className="bt-acc-body">
-            <p>
-              <strong>Definición:</strong> "Optimizar" pone a un buscador inteligente (Optuna) a
-              probar cientos de combinaciones de los parámetros de la estrategia —los pesos de cada
-              indicador, los multiplicadores de régimen, la zona neutra (hold_band), la decisión
-              (temperature) y la sensibilidad del ADX— para encontrar la que <strong>más ventaja
-              habría dado</strong> sobre el histórico.
-            </p>
-            <p>
-              <strong>Cómo funciona:</strong> mide cada combinación en un tramo de validación y solo
-              <strong> promociona</strong> la ganadora si además supera a la actual en un tramo
-              hold-out reservado (nunca usado en la búsqueda). Así se evita el sobreajuste. Si gana,
-              la aplica en vivo y re-corre el backtest para que veas el efecto (mira los Δ).
-            </p>
-            <p className="bt-note">
-              Es la forma rigurosa de <strong>afinar la estrategia con datos</strong>, en vez de
-              ajustar los parámetros a ojo. Tarda ~1 minuto.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Los indicadores Δ (verde/rojo)</summary>
-          <div className="bt-acc-body">
-            <p>
-              El numerito arriba a la derecha de cada métrica es el <strong>cambio respecto a la
-              corrida anterior</strong> del backtest: verde = mejor, rojo = peor (en el drawdown es al
-              revés, porque menos es mejor). Solo aparece si ya hay dos corridas para comparar.
-            </p>
-          </div>
-        </details>
-      </div>
-
-    </aside>
+      <p className="muted calib-legend">
+        <strong>Cómo leerlo:</strong> lo que importa no es una cifra suelta sino la tendencia. Una
+        expectancy que baja corrida tras corrida indica que el mercado cambió y el ajuste se quedó
+        viejo — es justo lo que el piloto automático vigila para decidir cuándo reoptimizar. La
+        columna <strong>fuera de muestra</strong> es la más honesta: mide sobre datos que el ajuste
+        nunca vio.
+      </p>
+    </section>
   );
 }

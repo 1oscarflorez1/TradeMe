@@ -408,6 +408,53 @@ export async function fetchSystemStatus(): Promise<SystemStatus | null> {
   }
 }
 
+export interface BacktestHistoryRow {
+  id: string;
+  created_at: string;
+  n_trades: number | null;
+  win_rate: number | null;
+  expectancy: number | null;
+  profit_factor: number | null;
+  max_drawdown: number | null;
+  sharpe: number | null;
+  oos_win_rate: number | null;
+  oos_expectancy: number | null;
+}
+
+export async function fetchBacktestHistory(
+  symbol: string,
+  interval: string,
+): Promise<BacktestHistoryRow[]> {
+  try {
+    const res = await apiFetch(
+      `/backtest/history?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+    );
+    if (!res.ok) return [];
+    return ((await res.json()) as { runs: BacktestHistoryRow[] }).runs;
+  } catch {
+    return [];
+  }
+}
+
+export interface TimeframeUsage {
+  interval: string;
+  captura: boolean;
+  optimizado: boolean;
+  backtest: boolean;
+  registros: number;
+  expectancy: number | null;
+}
+
+export async function fetchTimeframeUsage(symbol: string): Promise<TimeframeUsage[]> {
+  try {
+    const res = await apiFetch(`/timeframes?symbol=${encodeURIComponent(symbol)}`);
+    if (!res.ok) return [];
+    return ((await res.json()) as { usage: TimeframeUsage[] }).usage;
+  } catch {
+    return [];
+  }
+}
+
 export interface AssetRow {
   symbol: string;
   label: string | null;

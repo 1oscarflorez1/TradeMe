@@ -174,6 +174,7 @@ async function main(): Promise<void> {
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
+    snapshotStats: snapshotsRepo ? (symbol: string) => snapshotsRepo.stats(symbol) : undefined,
     deleteSnapshot: snapshotsRepo ? (id) => snapshotsRepo.delete(id) : undefined,
     createAlert: alertsRepo ? (a) => alertsRepo.create(a) : undefined,
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
@@ -242,6 +243,10 @@ async function main(): Promise<void> {
     savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
+      : undefined,
+    getBacktestHistory: backtestsRepo
+      ? (symbol: string, interval: string, limit: number) =>
+          backtestsRepo.history(symbol, interval, limit)
       : undefined,
     tvSecret: env.TV_WEBHOOK_SECRET,
     authSecret: env.JWT_SECRET,

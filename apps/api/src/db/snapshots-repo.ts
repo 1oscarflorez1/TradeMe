@@ -11,6 +11,30 @@ function value(signal: Signal, key: string): number | null {
 }
 
 /** Persiste una instantánea completa del escenario (para análisis y entrenamiento de IA). */
+export interface SnapshotStatsTf {
+  interval: string;
+  total: number;
+  tp: number;
+  sl: number;
+  timeout: number;
+  abiertos: number;
+  winRate: number | null;
+  expectancy: number | null;
+}
+
+export interface SnapshotStats {
+  total: number;
+  tp: number;
+  sl: number;
+  timeout: number;
+  abiertos: number;
+  sinPlan: number;
+  resueltos: number;
+  winRate: number | null;
+  expectancy: number | null;
+  porTf: SnapshotStatsTf[];
+}
+
 export class SnapshotsRepo {
   constructor(private readonly pool: pg.Pool) {}
 
@@ -100,6 +124,76 @@ export class SnapshotsRepo {
       [symbol.toUpperCase()],
     );
     return { rows: res.rows, total: Number(count.rows[0]?.n ?? 0) };
+  }
+
+  /**
+   * Resumen calculado en la base de datos sobre TODOS los registros del símbolo.
+   *
+   * Antes el resumen se calculaba en el navegador sobre la página cargada (500 filas como mucho) y
+   * mezclando resultado histórico con seguimiento en vivo, así que los totales no cuadraban.
+   */
+  async stats(symbol: string): Promise<SnapshotStats> {
+    const sym = symbol.toUpperCase();
+    const res = await this.pool.query<{
+      total: number; tp: number; sl: number; timeout: number;
+      abiertos: number; sin_plan: number; expectancy: string | null;
+    }>(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE outcome_result = 'tp')::int AS tp,
+              COUNT(*) FILTER (WHERE outcome_result = 'sl')::int AS sl,
+              COUNT(*) FILTER (WHERE outcome_result = 'timeout')::int AS timeout,
+              COUNT(*) FILTER (WHERE outcome_result IS NULL
+                               AND direction IN ('LONG','SHORT')
+                               AND plan_entry IS NOT NULL)::int AS abiertos,
+              COUNT(*) FILTER (WHERE direction = 'FLAT' OR plan_entry IS NULL)::int AS sin_plan,
+              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
+         FROM snapshots WHERE symbol = $1`,
+      [sym],
+    );
+    const porTf = await this.pool.query<{
+      interval: string; total: number; tp: number; sl: number;
+      timeout: number; abiertos: number; expectancy: string | null;
+    }>(
+      `SELECT interval,
+              COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE outcome_result = 'tp')::int AS tp,
+              COUNT(*) FILTER (WHERE outcome_result = 'sl')::int AS sl,
+              COUNT(*) FILTER (WHERE outcome_result = 'timeout')::int AS timeout,
+              COUNT(*) FILTER (WHERE outcome_result IS NULL
+                               AND direction IN ('LONG','SHORT')
+                               AND plan_entry IS NOT NULL)::int AS abiertos,
+              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
+         FROM snapshots WHERE symbol = $1 GROUP BY interval`,
+      [sym],
+    );
+    const fila = res.rows[0];
+    const num = (v: string | null): number | null => (v === null ? null : Number(v));
+    const base = {
+      total: fila?.total ?? 0,
+      tp: fila?.tp ?? 0,
+      sl: fila?.sl ?? 0,
+      timeout: fila?.timeout ?? 0,
+      abiertos: fila?.abiertos ?? 0,
+      sinPlan: fila?.sin_plan ?? 0,
+      expectancy: num(fila?.expectancy ?? null),
+    };
+    return {
+      ...base,
+      resueltos: base.tp + base.sl + base.timeout,
+      // Tasa de acierto solo entre las que tocaron objetivo o stop: un «timeout» no es ni acierto
+      // ni fallo, se cerró por tiempo con el resultado que llevara.
+      winRate: base.tp + base.sl > 0 ? base.tp / (base.tp + base.sl) : null,
+      porTf: porTf.rows.map((r) => ({
+        interval: r.interval,
+        total: r.total,
+        tp: r.tp,
+        sl: r.sl,
+        timeout: r.timeout,
+        abiertos: r.abiertos,
+        winRate: r.tp + r.sl > 0 ? r.tp / (r.tp + r.sl) : null,
+        expectancy: num(r.expectancy),
+      })),
+    };
   }
 
   async delete(id: string): Promise<boolean> {
