@@ -121,6 +121,14 @@ export interface AppDeps {
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   getBacktestHistory?: (symbol: string, interval: string, limit: number) => Promise<unknown[]>;
   getEvidencia?: (symbol: string, interval: string) => Promise<unknown[]>;
+  askAssistant?: (
+    pregunta: string,
+    historial: Array<{ role: 'user' | 'assistant'; content: string }>,
+    symbol: string,
+    interval: string,
+    usuario: string,
+  ) => Promise<{ texto: string; modelo: string }>;
+  assistantInfo?: () => { enabled: boolean; model: string; host: string };
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -514,6 +522,51 @@ export function buildApp(deps: AppDeps): FastifyInstance {
    * lista muda: cada temporalidad muestra si el motor la captura sola, si tiene configuración
    * optimizada propia, si hay backtest guardado y cuántos registros ha acumulado.
    */
+  /** Qué proveedor usa el asistente, sin revelar la clave. */
+  app.get('/assistant/info', async () => deps.assistantInfo?.() ?? { enabled: false, model: '', host: '' });
+
+  /**
+   * Pregunta al asistente. La llamada al proveedor ocurre AQUÍ, nunca en el navegador: así la clave
+   * no viaja al cliente y el cupo se controla por usuario.
+   */
+  app.post('/assistant/ask', async (request, reply) => {
+    if (!deps.askAssistant) {
+      return reply.status(503).send({ error: 'asistente sin proveedor configurado' });
+    }
+    const body = z
+      .object({
+        pregunta: z.string().min(2).max(1000),
+        symbol: z.string().default(deps.symbols[0] ?? 'BTCUSDT'),
+        interval: z.string().default('15m'),
+        historial: z
+          .array(
+            z.object({
+              role: z.enum(['user', 'assistant']),
+              content: z.string().max(4000),
+            }),
+          )
+          .max(8)
+          .default([]),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: 'petición inválida' });
+    // El cupo se cuenta por sesión; sin autenticación, por IP.
+    const usuario = (request as { user?: { email?: string } }).user?.email ?? request.ip;
+    try {
+      const r = await deps.askAssistant(
+        body.data.pregunta,
+        body.data.historial,
+        body.data.symbol.toUpperCase(),
+        body.data.interval,
+        usuario,
+      );
+      return r;
+    } catch (err) {
+      request.log.warn({ err: String(err) }, 'el asistente no pudo responder');
+      return reply.status(502).send({ error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
   /**
    * Sustento de la decisión: qué pesa cada indicador, cuánto aporta ahora mismo y qué evidencia
    * histórica respalda ese peso. Es lo que convierte «EMA pesa 1.0» en «EMA pesa 1.0 y cuando

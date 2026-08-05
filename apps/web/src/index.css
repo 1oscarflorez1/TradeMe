@@ -2815,3 +2815,4 @@ html, body { overflow-x: hidden; }
   .bot-panel { right: 10px; left: 10px; width: auto; bottom: 78px; }
   .bot-fab { right: 14px; bottom: 14px; }
 }
+.bot-pensando p { color: var(--muted); font-style: italic; }

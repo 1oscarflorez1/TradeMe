@@ -14,6 +14,8 @@ import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { BacktestsRepo } from './db/backtests-repo.js';
 import { EvidenceRepo } from './db/evidence-repo.js';
+import { AssistantProvider, AssistantQuota } from './assistant/provider.js';
+import { SYSTEM_PROMPT, construirContexto } from './assistant/context.js';
 import { AlertsRepo } from './db/alerts-repo.js';
 import { AccessLogRepo } from './db/access-log-repo.js';
 import { WatchlistRepo } from './db/watchlist-repo.js';
@@ -42,6 +44,7 @@ import { fetchFundingRate } from './macro/funding.js';
 import { EMA } from 'technicalindicators';
 
 const MIN_CANDLES_FOR_VOTES = 40;
+const pkgVersion = process.env.npm_package_version ?? 'desconocida';
 
 function loadMapper(path: string, warn: (msg: string) => void): ExternalMapper {
   try {
@@ -102,6 +105,14 @@ async function main(): Promise<void> {
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
   const evidenceRepo = pool ? new EvidenceRepo(pool) : null;
+  const asistente = new AssistantProvider({
+    baseUrl: env.ASSISTANT_BASE_URL,
+    apiKey: env.ASSISTANT_API_KEY,
+    model: env.ASSISTANT_MODEL,
+    maxTokens: env.ASSISTANT_MAX_TOKENS,
+    timeoutMs: env.ASSISTANT_TIMEOUT_MS,
+  });
+  const cupoAsistente = new AssistantQuota();
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
   const accessLogRepo = pool ? new AccessLogRepo(pool) : null;
   const watchlistRepo = pool ? new WatchlistRepo(pool) : null;
@@ -246,6 +257,61 @@ async function main(): Promise<void> {
     savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
+      : undefined,
+    assistantInfo: () => asistente.describe(),
+    askAssistant: asistente.enabled
+      ? async (pregunta, historial, symbol, interval, usuario) => {
+          const cupo = cupoAsistente.intentar(usuario);
+          if (!cupo.ok) throw new Error(cupo.motivo ?? 'cupo agotado');
+          const iv = (parseIntervals(env).includes(interval as Interval)
+            ? interval
+            : '15m') as Interval;
+          // El contexto se arma en el servidor: el modelo solo puede citar lo que le damos.
+          const ventana = buffer.get(symbol, iv);
+          const signal =
+            ventana.length >= MIN_CANDLES_FOR_VOTES
+              ? buildSignal({
+                  symbol,
+                  price: ventana[ventana.length - 1]!.close,
+                  votes: [...registry.computeVotes(ventana), ...externalStore.active(symbol)],
+                  config: getEnsembleFor(symbol, iv),
+                  equity: env.ACCOUNT_EQUITY,
+                  interval: iv,
+                  macro: macroEnabled ? macroStore.get(symbol) : undefined,
+                  calibrators,
+                  metaModel,
+                  metaMode: metaPolicy.mode,
+                  metaVetoThreshold: env.META_VETO_THRESHOLD,
+                  metaModulateWeight: env.META_MODULATE_WEIGHT,
+                })
+              : null;
+          const [stats, evidencia] = await Promise.all([
+            snapshotsRepo?.stats(symbol).catch(() => null) ?? null,
+            evidenceRepo?.porIndicador(symbol, iv).catch(() => []) ?? [],
+          ]);
+          const cfg = getEnsembleFor(symbol, iv);
+          const contexto = construirContexto({
+            symbol,
+            interval: iv,
+            signal,
+            stats,
+            sustento: {
+              optimizado: ensembleMeta(symbol, iv).optimized,
+              version: cfg.version,
+              holdBand: cfg.holdBand,
+              pesos: cfg.weights,
+              evidencia,
+            },
+            version: pkgVersion,
+            liveTrading: env.ENABLE_LIVE_TRADING === 'true',
+          });
+          return asistente.ask([
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: contexto },
+            ...historial,
+            { role: 'user', content: pregunta },
+          ]);
+        }
       : undefined,
     getEvidencia: evidenceRepo
       ? (symbol: string, interval: string) => evidenceRepo.porIndicador(symbol, interval)

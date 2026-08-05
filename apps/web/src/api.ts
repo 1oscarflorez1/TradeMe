@@ -408,6 +408,43 @@ export async function fetchSystemStatus(): Promise<SystemStatus | null> {
   }
 }
 
+export interface AssistantInfo {
+  enabled: boolean;
+  model: string;
+  host: string;
+}
+
+export async function fetchAssistantInfo(): Promise<AssistantInfo> {
+  try {
+    const res = await apiFetch('/assistant/info');
+    if (!res.ok) return { enabled: false, model: '', host: '' };
+    return (await res.json()) as AssistantInfo;
+  } catch {
+    return { enabled: false, model: '', host: '' };
+  }
+}
+
+/** Pregunta al modelo a través de la API. La clave nunca llega al navegador. */
+export async function askAssistant(
+  pregunta: string,
+  historial: Array<{ role: 'user' | 'assistant'; content: string }>,
+  symbol: string,
+  interval: string,
+): Promise<{ texto: string; modelo: string } | { error: string }> {
+  try {
+    const res = await apiFetch('/assistant/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pregunta, historial, symbol, interval }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { texto?: string; modelo?: string; error?: string };
+    if (!res.ok || !body.texto) return { error: body.error ?? `HTTP ${res.status}` };
+    return { texto: body.texto, modelo: body.modelo ?? '' };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
 export interface EvidenciaIndicador {
   clave: string;
   etiqueta: string;

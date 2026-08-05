@@ -5,6 +5,22 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — El asistente puede usar un modelo de lenguaje gratuito
+
+- **`POST /assistant/ask`**: la llamada al proveedor ocurre en el servidor, nunca en el navegador,
+  para que la clave no viaje al cliente. Un solo adaptador compatible con el formato de OpenAI cubre
+  **Groq, Cerebras, Mistral, OpenRouter y Ollama**: cambiar de proveedor son dos variables.
+- El contexto lo construye la API (`assistant/context.ts`): decisión en vivo con sus votos, régimen,
+  estadísticas de registros, configuración activa y aporte medido de cada indicador. **No se envían
+  claves, correos ni datos personales**, solo cifras agregadas.
+- **Instrucciones que el modelo no puede saltarse**: no da asesoría financiera, no recomienda operar,
+  no promete rentabilidad y no puede inventar datos que no estén en el contexto.
+- **Cupo por usuario** (6/min, 120/día) para que una pestaña abierta no agote el plan gratuito.
+- **Reserva automática**: si no hay proveedor, o si falla, responde la base de conocimiento local.
+  El asistente nunca se queda mudo.
+- `docs/asistente.md` con la comparativa de proveedores gratuitos, qué se envía exactamente y cómo
+  montar Ollama si se prefiere que nada salga de la red.
+
 ### Added — Asistente de la plataforma
 
 - **Botón flotante 🤖** abajo a la derecha con un asistente que responde sobre TradeMe: por qué

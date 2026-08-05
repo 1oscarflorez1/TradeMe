@@ -45,6 +45,14 @@ const EnvSchema = z.object({
   QUANT_URL: z.string().optional(),
   // Multi-proveedor: clave gratuita de Twelve Data (acciones, forex, índices). Vacía = desactivado.
   TWELVEDATA_API_KEY: z.string().default(''),
+  // Asistente con modelo de lenguaje. Vacío = solo la base de conocimiento local (sin coste, sin
+  // red). Cualquier servicio compatible con el formato de OpenAI sirve cambiando la URL base:
+  // Groq, Cerebras, Mistral, OpenRouter o un Ollama propio.
+  ASSISTANT_BASE_URL: z.string().default(''),
+  ASSISTANT_API_KEY: z.string().default(''),
+  ASSISTANT_MODEL: z.string().default(''),
+  ASSISTANT_MAX_TOKENS: z.coerce.number().int().min(64).max(4096).default(700),
+  ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(20000),
   // URL pública (para mostrar la dirección exacta del webhook en la interfaz).
   PUBLIC_API_URL: z.string().optional(),
   ACCOUNT_EQUITY: z.coerce.number().positive().default(10_000),

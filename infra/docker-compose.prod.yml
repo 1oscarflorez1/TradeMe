@@ -50,6 +50,10 @@ services:
       TV_WEBHOOK_SECRET: ${TV_WEBHOOK_SECRET:-}
       # Acciones, divisas e índices (opcional). Vacío = solo cripto vía Binance.
       TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
+      # Asistente con modelo de lenguaje (opcional). Ver docs/asistente.md.
+      ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-}
+      ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
       CORS_ORIGIN: ${PUBLIC_WEB_ORIGIN:?Definir en infra/.env.prod}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}

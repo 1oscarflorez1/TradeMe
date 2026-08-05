@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchSignal, fetchSnapshots, fetchSustento, fetchSystemStatus, fetchTimeframeUsage } from './api';
-import type { Sustento, SystemStatus, TimeframeUsage } from './api';
+import {
+  askAssistant,
+  fetchAssistantInfo,
+  fetchSignal,
+  fetchSnapshots,
+  fetchSustento,
+  fetchSystemStatus,
+  fetchTimeframeUsage,
+} from './api';
+import type { AssistantInfo, Sustento, SystemStatus, TimeframeUsage } from './api';
 import type { Interval, Signal, SnapshotStats } from './types';
 
 /** Lo que el asistente sabe del sistema en este instante. Se refresca al abrirlo. */
@@ -17,6 +25,8 @@ interface Contexto {
 interface Mensaje {
   de: 'yo' | 'bot';
   texto: string;
+  /** De dónde salió la respuesta: el modelo o la base local. */
+  fuente?: 'modelo' | 'local';
 }
 
 const pct = (n: number | null | undefined, d = 0) =>
@@ -291,6 +301,8 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
   const [abierto, setAbierto] = useState(false);
   const [texto, setTexto] = useState('');
   const [ctx, setCtx] = useState<Contexto | null>(null);
+  const [info, setInfo] = useState<AssistantInfo>({ enabled: false, model: '', host: '' });
+  const [pensando, setPensando] = useState(false);
   const [mensajes, setMensajes] = useState<Mensaje[]>([
     {
       de: 'bot',
@@ -303,6 +315,9 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
   useEffect(() => {
     if (!abierto || !symbol) return;
     let cancelado = false;
+    void fetchAssistantInfo().then((i) => {
+      if (!cancelado) setInfo(i);
+    });
     void Promise.all([
       fetchSignal(symbol, interval),
       fetchSnapshots(symbol),
@@ -322,12 +337,41 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
     finRef.current?.scrollIntoView({ block: 'nearest' });
   }, [mensajes, abierto]);
 
-  const preguntar = (q: string) => {
+  /**
+   * Con modelo configurado se le pregunta a él, que entiende cualquier formulación. Si no lo hay,
+   * o si falla —red caída, cupo agotado, proveedor con problemas—, responde la base local. El
+   * asistente nunca se queda mudo.
+   */
+  const preguntar = async (q: string) => {
     const pregunta = q.trim();
-    if (!pregunta) return;
+    if (!pregunta || pensando) return;
     const c: Contexto = ctx ?? { symbol, interval, signal: null, stats: null, sustento: null, estado: null, usage: [] };
-    setMensajes((m) => [...m, { de: 'yo', texto: pregunta }, { de: 'bot', texto: responder(pregunta, c) }]);
+    setMensajes((m) => [...m, { de: 'yo', texto: pregunta }]);
     setTexto('');
+
+    if (!info.enabled) {
+      setMensajes((m) => [...m, { de: 'bot', texto: responder(pregunta, c), fuente: 'local' }]);
+      return;
+    }
+
+    setPensando(true);
+    const historial = mensajes
+      .slice(-6)
+      .map((m) => ({ role: (m.de === 'yo' ? 'user' : 'assistant') as 'user' | 'assistant', content: m.texto }));
+    const r = await askAssistant(pregunta, historial, symbol, interval);
+    setPensando(false);
+    if ('texto' in r) {
+      setMensajes((m) => [...m, { de: 'bot', texto: r.texto, fuente: 'modelo' }]);
+    } else {
+      setMensajes((m) => [
+        ...m,
+        {
+          de: 'bot',
+          texto: `${responder(pregunta, c)}\n\n_(El modelo no está disponible ahora mismo: ${r.error}. Esta respuesta viene de la base local.)_`,
+          fuente: 'local',
+        },
+      ]);
+    }
   };
 
   return (
@@ -348,7 +392,9 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
           <div className="bot-head">
             <strong>Asistente de TradeMe</strong>
             <span className="muted">
-              {symbol} · {interval} {ctx ? '· con datos en vivo' : '· cargando estado…'}
+              {symbol} · {interval} ·{' '}
+              {info.enabled ? `modelo ${info.model}` : 'base de conocimiento local'}
+              {ctx ? ' · con datos en vivo' : ' · cargando estado…'}
             </span>
           </div>
 
@@ -358,13 +404,18 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
                 <Formato texto={m.texto} />
               </div>
             ))}
+            {pensando && (
+              <div className="bot-msg bot bot-pensando">
+                <p>Pensando…</p>
+              </div>
+            )}
             <div ref={finRef} />
           </div>
 
           {mensajes.length <= 1 && (
             <div className="bot-sugerencias">
               {SUGERENCIAS.map((s) => (
-                <button key={s} type="button" onClick={() => preguntar(s)}>
+                <button key={s} type="button" onClick={() => void preguntar(s)}>
                   {s}
                 </button>
               ))}
@@ -375,7 +426,7 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
             className="bot-entrada"
             onSubmit={(e) => {
               e.preventDefault();
-              preguntar(texto);
+              void preguntar(texto);
             }}
           >
             <input
@@ -384,14 +435,16 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
               placeholder="Pregunta lo que quieras…"
               aria-label="Escribe tu pregunta"
             />
-            <button type="submit" disabled={!texto.trim()}>
-              Enviar
+            <button type="submit" disabled={!texto.trim() || pensando}>
+              {pensando ? '…' : 'Enviar'}
             </button>
           </form>
 
           <p className="bot-pie muted">
-            Responde con la base de conocimiento de la plataforma y su estado en vivo. No sale nada de
-            tu red. No es asesoría financiera.
+            {info.enabled
+              ? `Responde un modelo alojado en ${info.host}, al que se le envía el estado del sistema (cifras, no credenciales). Si falla, contesta la base local.`
+              : 'Responde la base de conocimiento local con el estado en vivo. No sale nada de tu red.'}{' '}
+            No es asesoría financiera.
           </p>
         </aside>
       )}
