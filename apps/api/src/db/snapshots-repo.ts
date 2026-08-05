@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { intervalMs, type Interval } from '../domain/candle.js';
 import type { Signal } from '../domain/signal.js';
 import type { PlanLevels } from '../ensemble/plan.js';
 import type { SnapshotRow } from '../snapshots/tracking.js';
@@ -52,7 +53,7 @@ export class SnapshotsRepo {
         ema_cross_score, macd_score, rsi14_score, rsi14_value, bbands_score,
         stoch14_score, supertrend_score, meta_confidence, adx14_value, atr14_value, reditum_sniper_score, reditum_poc_score,
         plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr, valid_until,
-        model_version, source, note, raw_signal
+        model_version, source, note, raw_signal, candle_open
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
         $7,$8,$9,$10,$11,$12,$13,
@@ -60,7 +61,9 @@ export class SnapshotsRepo {
         $19,$20,$21,$22,$23,
         $24,$25,$26,$27,$28,$29,$30,
         $31,$32,$33,$34,$35,$36,
-        $37,'manual',$38,$39
+        $37,'manual',$38,$39,
+        -- Vela a la que pertenece la decisión: es lo que garantiza una sola por vela.
+        to_timestamp(floor(extract(epoch FROM now()) / $40) * $40)
       ) RETURNING id`,
       [
         signal.symbol,
@@ -102,6 +105,7 @@ export class SnapshotsRepo {
         signal.model_version,
         note ?? null,
         JSON.stringify(signal),
+        Math.round(intervalMs(interval as Interval) / 1000),
       ],
     );
     return res.rows[0]?.id ?? '';
@@ -131,6 +135,10 @@ export class SnapshotsRepo {
    *
    * Antes el resumen se calculaba en el navegador sobre la página cargada (500 filas como mucho) y
    * mezclando resultado histórico con seguimiento en vivo, así que los totales no cuadraban.
+   *
+   * Además se cuenta UNA decisión por vela: la captura antigua, con enfriamiento fijo de 20 minutos,
+   * generaba hasta 12 registros de la misma vela de 4h. Contarlos por separado fingía tener doce
+   * observaciones independientes cuando en realidad era una sola.
    */
   async stats(symbol: string): Promise<SnapshotStats> {
     const sym = symbol.toUpperCase();
@@ -138,7 +146,12 @@ export class SnapshotsRepo {
       total: number; tp: number; sl: number; timeout: number;
       abiertos: number; sin_plan: number; expectancy: string | null;
     }>(
-      `SELECT COUNT(*)::int AS total,
+      `WITH una_por_vela AS (
+         SELECT DISTINCT ON (interval, candle_open) *
+           FROM snapshots WHERE symbol = $1
+          ORDER BY interval, candle_open, captured_at ASC
+       )
+       SELECT COUNT(*)::int AS total,
               COUNT(*) FILTER (WHERE outcome_result = 'tp')::int AS tp,
               COUNT(*) FILTER (WHERE outcome_result = 'sl')::int AS sl,
               COUNT(*) FILTER (WHERE outcome_result = 'timeout')::int AS timeout,
@@ -147,14 +160,19 @@ export class SnapshotsRepo {
                                AND plan_entry IS NOT NULL)::int AS abiertos,
               COUNT(*) FILTER (WHERE direction = 'FLAT' OR plan_entry IS NULL)::int AS sin_plan,
               AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
-         FROM snapshots WHERE symbol = $1`,
+         FROM una_por_vela`,
       [sym],
     );
     const porTf = await this.pool.query<{
       interval: string; total: number; tp: number; sl: number;
       timeout: number; abiertos: number; expectancy: string | null;
     }>(
-      `SELECT interval,
+      `WITH una_por_vela AS (
+         SELECT DISTINCT ON (interval, candle_open) *
+           FROM snapshots WHERE symbol = $1
+          ORDER BY interval, candle_open, captured_at ASC
+       )
+       SELECT interval,
               COUNT(*)::int AS total,
               COUNT(*) FILTER (WHERE outcome_result = 'tp')::int AS tp,
               COUNT(*) FILTER (WHERE outcome_result = 'sl')::int AS sl,
@@ -163,7 +181,7 @@ export class SnapshotsRepo {
                                AND direction IN ('LONG','SHORT')
                                AND plan_entry IS NOT NULL)::int AS abiertos,
               AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
-         FROM snapshots WHERE symbol = $1 GROUP BY interval`,
+         FROM una_por_vela GROUP BY interval`,
       [sym],
     );
     const fila = res.rows[0];

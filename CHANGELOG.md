@@ -5,6 +5,24 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Fixed — Integridad de los registros (auditoría del 5 de agosto)
+
+- **Una decisión por vela, no una por reloj.** La captura automática usaba un enfriamiento fijo de
+  20 minutos para todas las temporalidades: en 4h producía hasta 12 registros de la misma vela y en
+  1d hasta 72. Esos duplicados se contaban como observaciones independientes —si la decisión acababa
+  en stop se anotaban doce stops en vez de uno— y sesgaban tanto las estadísticas como el dataset
+  del meta-modelo. Ahora la captura se ancla a la vela, que es además como decide el backtest.
+- **El evaluador cerraba antes de tiempo.** Pedía 20 velas futuras pero evaluaba con las que
+  hubiera; al no tocar ningún nivel marcaba `timeout` y, como el resultado dejaba de ser nulo, no
+  volvía a mirarse nunca. En 1d eso convertía el 100 % de los registros en timeouts artificiales.
+  Regla nueva y asimétrica: un toque de objetivo o stop es definitivo aunque ocurra en la primera
+  vela; un timeout solo vale si transcurrió el horizonte completo.
+- **Migración 015:** columna `candle_open` (retroactiva) para poder quedarse con una decisión por
+  vela sin borrar nada, y reapertura de los timeouts cerrados prematuramente para que el piloto los
+  vuelva a medir bien. No se elimina ningún registro.
+- Las estadísticas de Registros y el entrenamiento del meta-modelo deduplican por vela, preservando
+  el orden cronológico que necesita la división temporal.
+
 ### Fixed — El resumen de Registros contaba mal
 
 - **Estado autoritativo de un snapshot.** Se mezclaban dos conceptos distintos: `outcome_result`
