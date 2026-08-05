@@ -16,6 +16,7 @@ import { NewsView } from './NewsView';
 import { StatusView } from './StatusView';
 import { AssetManager } from './AssetManager';
 import { TimeframeBar } from './TimeframeBar';
+import { SustentoView } from './SustentoView';
 import { setTvSymbols } from './tvSymbol';
 import { DrawingLayer } from './DrawingLayer';
 import {
@@ -49,7 +50,7 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
   reconnecting: 'Reconectando…',
 };
 
-type View = 'panel' | 'registros' | 'backtest' | 'lab' | 'ayuda' | 'novedades' | 'estado';
+type View = 'panel' | 'sustento' | 'registros' | 'backtest' | 'lab' | 'ayuda' | 'novedades' | 'estado';
 
 export function App() {
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -400,6 +401,14 @@ export function App() {
             </button>
             <button
               type="button"
+              className={view === 'sustento' ? 'nav active' : 'nav'}
+              onClick={() => setView('sustento')}
+              title="Por qué el motor decide lo que decide"
+            >
+              Sustento
+            </button>
+            <button
+              type="button"
               className={view === 'registros' ? 'nav active' : 'nav'}
               onClick={() => setView('registros')}
             >
@@ -583,7 +592,9 @@ export function App() {
       </header>
 
       <main className="content">
-        {view === 'registros' ? (
+        {view === 'sustento' ? (
+          <SustentoView symbol={symbol} interval={tf} />
+        ) : view === 'registros' ? (
           <SnapshotsView symbol={symbol} />
         ) : view === 'backtest' ? (
           <BacktestView symbol={symbol} interval={tf} />

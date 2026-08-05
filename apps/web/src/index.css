@@ -2713,3 +2713,29 @@ pre.hint {
   .nv-txt { grid-column: 1 / -1; }
   .nv-chev { display: none; }
 }
+
+/* --- Panel de decisión (Sustento) --- */
+.sus-cabecera { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: center; }
+.sus-taco { display: grid; place-items: center; }
+.taco { width: 100%; max-width: 320px; }
+.taco-act { font-size: 19px; font-weight: 800; letter-spacing: .5px; }
+.taco-conf { font-size: 11px; fill: var(--muted); }
+.taco-eje { font-size: 10px; fill: var(--muted); }
+.sus-ctx { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.sus-ctx-item { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); }
+.sus-ctx-item strong { font-size: 14px; }
+.sus-ctx-item span.muted { font-size: 11px; line-height: 1.4; }
+.sus-tabla td, .sus-tabla th { vertical-align: middle; }
+.sus-fam {
+  display: block; font-size: 10px; letter-spacing: .3px; margin-top: 2px;
+  color: var(--muted);
+}
+.fam-trend { color: #6ea8fe; }
+.fam-mom { color: #c9a0ff; }
+.fam-rev { color: #7ee0b8; }
+.aporte { position: relative; height: 12px; min-width: 120px; }
+.aporte-eje { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border); }
+.aporte-barra { position: absolute; top: 2px; height: 8px; border-radius: 3px; }
+.aporte-barra.pos { background: var(--buy); }
+.aporte-barra.neg { background: var(--sell); }
+@media (max-width: 900px) { .sus-cabecera { grid-template-columns: 1fr; } }

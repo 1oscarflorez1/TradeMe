@@ -120,6 +120,7 @@ export interface AppDeps {
   ) => Promise<void>;
   getBacktest?: (symbol: string, interval: string) => Promise<BacktestRow | null>;
   getBacktestHistory?: (symbol: string, interval: string, limit: number) => Promise<unknown[]>;
+  getEvidencia?: (symbol: string, interval: string) => Promise<unknown[]>;
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;
@@ -513,6 +514,41 @@ export function buildApp(deps: AppDeps): FastifyInstance {
    * lista muda: cada temporalidad muestra si el motor la captura sola, si tiene configuración
    * optimizada propia, si hay backtest guardado y cuántos registros ha acumulado.
    */
+  /**
+   * Sustento de la decisión: qué pesa cada indicador, cuánto aporta ahora mismo y qué evidencia
+   * histórica respalda ese peso. Es lo que convierte «EMA pesa 1.0» en «EMA pesa 1.0 y cuando
+   * acompaña se acierta un 12 % más, sobre 84 operaciones».
+   */
+  app.get('/decision/sustento', async (request, reply) => {
+    const q = z
+      .object({
+        symbol: z.string().default(deps.symbols[0] ?? 'BTCUSDT'),
+        interval: z.string().default('30m'),
+      })
+      .parse(request.query);
+    const sym = q.symbol.toUpperCase();
+    if (!isInterval(q.interval)) return reply.status(400).send({ error: 'temporalidad inválida' });
+
+    const cfg = deps.getEnsembleFor ? deps.getEnsembleFor(sym, q.interval) : deps.ensemble;
+    const meta = deps.ensembleMeta?.(sym, q.interval);
+    const evidencia = deps.getEvidencia
+      ? await deps.getEvidencia(sym, q.interval).catch(() => [])
+      : [];
+    return {
+      symbol: sym,
+      interval: q.interval,
+      version: cfg.version,
+      optimizado: meta?.optimized ?? false,
+      pesos: cfg.weights,
+      pesosExternos: cfg.externalWeights,
+      regimen: cfg.regime,
+      temperature: cfg.temperature,
+      holdBand: cfg.holdBand,
+      riesgo: cfg.risk,
+      evidencia,
+    };
+  });
+
   /** Evolución de los backtests de una temporalidad: ¿el sistema mejora o se degrada? */
   app.get('/backtest/history', async (request, reply) => {
     if (!deps.getBacktestHistory) {

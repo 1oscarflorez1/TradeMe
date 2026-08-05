@@ -408,6 +408,49 @@ export async function fetchSystemStatus(): Promise<SystemStatus | null> {
   }
 }
 
+export interface EvidenciaIndicador {
+  clave: string;
+  etiqueta: string;
+  familia: string;
+  nAcuerdo: number;
+  aciertoAcuerdo: number | null;
+  nDesacuerdo: number;
+  aciertoDesacuerdo: number | null;
+  lift: number | null;
+}
+
+export interface Sustento {
+  symbol: string;
+  interval: string;
+  version: string;
+  optimizado: boolean;
+  pesos: Record<string, number>;
+  pesosExternos: Record<string, number>;
+  regimen: {
+    adx_threshold: number;
+    adx_lo: number;
+    adx_hi: number;
+    trend: Record<string, number>;
+    range: Record<string, number>;
+  };
+  temperature: number;
+  holdBand: number;
+  riesgo: { atrStopMult: number; tpRMultiple: number; riskPct: number };
+  evidencia: EvidenciaIndicador[];
+}
+
+export async function fetchSustento(symbol: string, interval: string): Promise<Sustento | null> {
+  try {
+    const res = await apiFetch(
+      `/decision/sustento?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Sustento;
+  } catch {
+    return null;
+  }
+}
+
 export interface BacktestHistoryRow {
   id: string;
   created_at: string;

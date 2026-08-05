@@ -13,6 +13,7 @@ import { CandlesRepo } from './db/candles-repo.js';
 import { ExternalSignalsRepo } from './db/external-signals-repo.js';
 import { SnapshotsRepo } from './db/snapshots-repo.js';
 import { BacktestsRepo } from './db/backtests-repo.js';
+import { EvidenceRepo } from './db/evidence-repo.js';
 import { AlertsRepo } from './db/alerts-repo.js';
 import { AccessLogRepo } from './db/access-log-repo.js';
 import { WatchlistRepo } from './db/watchlist-repo.js';
@@ -100,6 +101,7 @@ async function main(): Promise<void> {
   const macroEnabled = env.MACRO_ENABLED === 'true';
   const snapshotsRepo = pool ? new SnapshotsRepo(pool) : null;
   const backtestsRepo = pool ? new BacktestsRepo(pool) : null;
+  const evidenceRepo = pool ? new EvidenceRepo(pool) : null;
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
   const accessLogRepo = pool ? new AccessLogRepo(pool) : null;
   const watchlistRepo = pool ? new WatchlistRepo(pool) : null;
@@ -244,6 +246,9 @@ async function main(): Promise<void> {
     savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
+      : undefined,
+    getEvidencia: evidenceRepo
+      ? (symbol: string, interval: string) => evidenceRepo.porIndicador(symbol, interval)
       : undefined,
     getBacktestHistory: backtestsRepo
       ? (symbol: string, interval: string, limit: number) =>
