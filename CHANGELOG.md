@@ -5,6 +5,26 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Asistente de la plataforma
+
+- **Botón flotante 🤖** abajo a la derecha con un asistente que responde sobre TradeMe: por qué
+  decide lo que decide ahora mismo, qué significan las métricas, cómo aprende, de dónde salen los
+  datos, cómo está montado por dentro y qué estado tiene cada componente.
+- No es un buscador de documentación: **lee el estado en vivo** (decisión actual y sus votos,
+  estadísticas de registros, configuración activa, salud de los servicios, uso por temporalidad) y
+  responde con las cifras reales del sistema. Todo se resuelve en el navegador; no sale nada de la
+  red y no hay coste por consulta.
+
+### Fixed — Barra de temporalidades
+
+- **Las flechas ya no arrastran la página.** Faltaba `min-width: 0` en la tira y en su contenedor,
+  así que la barra crecía hasta su contenido, empujaba la cabecera y desplazaba la vista entera en
+  horizontal. Además las flechas ahora **recorren la tira** en lugar de cambiar de temporalidad:
+  navegar y elegir son cosas distintas.
+- **Una sola marca en vez de tres glifos.** Los símbolos `● ◆ ▮` no se entendían sin consultar la
+  leyenda. Queda un punto que se enciende cuando el motor analiza y registra esa temporalidad; el
+  detalle vive en el tooltip y en el botón «?».
+
 ### Added — Panel de decisión (pestaña «Sustento»)
 
 - **`GET /decision/sustento`**: configuración activa (pesos, multiplicadores de régimen, banda

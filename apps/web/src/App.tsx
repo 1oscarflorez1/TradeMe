@@ -17,6 +17,7 @@ import { StatusView } from './StatusView';
 import { AssetManager } from './AssetManager';
 import { TimeframeBar } from './TimeframeBar';
 import { SustentoView } from './SustentoView';
+import { Asistente } from './Asistente';
 import { setTvSymbols } from './tvSymbol';
 import { DrawingLayer } from './DrawingLayer';
 import {
@@ -721,6 +722,7 @@ export function App() {
         Apoyo a la decisión, no asesoría financiera. Ningún modelo garantiza rentabilidad; el
         rendimiento pasado no asegura resultados futuros.
       </footer>
+      <Asistente symbol={symbol} interval={tf} />
     </div>
   );
 }

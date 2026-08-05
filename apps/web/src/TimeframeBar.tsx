@@ -85,7 +85,8 @@ export function TimeframeBar({
     return () => obs.disconnect();
   }, [intervals]);
 
-  // Al cambiar de temporalidad, traer la seleccionada a la vista.
+  // Traer la seleccionada a la vista moviendo SOLO la tira. Nunca scrollIntoView: eso desplaza
+  // también la página y saca la cabecera de la pantalla.
   useEffect(() => {
     const el = pistaRef.current;
     const btn = el?.querySelector<HTMLElement>(`[data-tf="${tf}"]`);
@@ -96,14 +97,18 @@ export function TimeframeBar({
     revisarBordes();
   }, [tf, intervals]);
 
-  /** Salta a la temporalidad anterior o siguiente de la lista. */
+  /**
+   * Desplaza la tira, no la selección.
+   *
+   * Antes las flechas cambiaban de temporalidad, lo que además arrastraba la vista y sacaba la
+   * cabecera de la pantalla. Navegar y elegir son dos cosas distintas: las flechas recorren la
+   * barra, y para analizar otra temporalidad se pulsa sobre ella.
+   */
   const mover = (paso: -1 | 1) => {
-    const i = intervals.indexOf(tf);
-    const siguiente = intervals[Math.min(intervals.length - 1, Math.max(0, i + paso))];
-    if (siguiente && siguiente !== tf) setTf(siguiente);
+    const el = pistaRef.current;
+    if (!el) return;
+    el.scrollBy({ left: paso * Math.max(120, el.clientWidth * 0.8), behavior: 'smooth' });
   };
-
-  const i = intervals.indexOf(tf);
   const activas = intervals.filter((x) => usage[x]?.captura).length;
 
   return (
@@ -112,9 +117,9 @@ export function TimeframeBar({
         type="button"
         className="tfbar-nav"
         onClick={() => mover(-1)}
-        disabled={i <= 0}
-        aria-label="Temporalidad anterior"
-        title="Temporalidad anterior"
+        disabled={!puedeIzq}
+        aria-label="Ver temporalidades anteriores"
+        title="Ver temporalidades anteriores"
       >
         ‹
       </button>
@@ -140,20 +145,22 @@ export function TimeframeBar({
               title={
                 `${tituloDe(it)}\n` +
                 (u
-                  ? `${u.registros} registros · ` +
-                    MARCAS.filter((m) => u[m.id]).map((m) => m.nombre.toLowerCase()).join(' · ')
+                  ? `${u.registros} registros guardados` +
+                    (MARCAS.filter((m) => u[m.id]).length > 0
+                      ? `\n${MARCAS.filter((m) => u[m.id]).map((m) => m.nombre).join(' · ')}`
+                      : '\nEl motor no trabaja en esta temporalidad')
                   : '')
               }
             >
               <span className="tf-label">{it}</span>
               {u && (
-                <span className="tf-marcas" aria-hidden>
-                  {MARCAS.map((m) => (
-                    <span key={m.id} className={`tf-marca ${u[m.id] ? 'on' : ''}`}>
-                      {m.icono}
-                    </span>
-                  ))}
-                </span>
+                // Una sola marca: «el motor trabaja aquí». El detalle va en el tooltip y en la
+                // leyenda del botón «?». Tres glifos distintos no se entendían sin explicación.
+                <span
+                  className={`tf-activa ${u.captura ? 'on' : ''}`}
+                  aria-hidden
+                  title={u.captura ? 'El motor analiza y registra esta temporalidad' : undefined}
+                />
               )}
               <span
                 className={`tf-dot ${alertaEn(it) ? 'on' : ''}`}
@@ -169,9 +176,9 @@ export function TimeframeBar({
         type="button"
         className="tfbar-nav"
         onClick={() => mover(1)}
-        disabled={i >= intervals.length - 1}
-        aria-label="Temporalidad siguiente"
-        title="Temporalidad siguiente"
+        disabled={!puedeDer}
+        aria-label="Ver temporalidades siguientes"
+        title="Ver temporalidades siguientes"
       >
         ›
       </button>
