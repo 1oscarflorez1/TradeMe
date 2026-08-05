@@ -5,6 +5,19 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — Panel de decisión (pestaña «Sustento»)
+
+- **`GET /decision/sustento`**: configuración activa (pesos, multiplicadores de régimen, banda
+  neutra, riesgo) más la **evidencia histórica de cada indicador** calculada sobre las decisiones ya
+  evaluadas: cuántas veces acompañó a la decisión y con qué acierto, cuántas se opuso y con cuál, y
+  la diferencia entre ambas — su aporte real. Mínimo de 10 casos por columna para dar una cifra.
+- **Pestaña Sustento** con tres bloques: tacómetro de la inclinación actual (−1 a +1 con la banda
+  neutra dibujada), tabla de **quién empuja** (voto × peso × multiplicador de régimen = aportación,
+  con barra de empuje) y tabla de **por qué cada peso**, ordenada por aporte real.
+- La pestaña dice explícitamente lo que todavía no puede: los pesos de hoy los fijó Optuna sobre el
+  backtest, no esta evidencia. Fijarlos desde aquí, y distintos por régimen, es el paso siguiente y
+  depende de acumular muestra.
+
 ### Fixed — Integridad de los registros (auditoría del 5 de agosto)
 
 - **Una decisión por vela, no una por reloj.** La captura automática usaba un enfriamiento fijo de
