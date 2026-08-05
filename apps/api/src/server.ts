@@ -16,7 +16,8 @@ import { BacktestsRepo } from './db/backtests-repo.js';
 import { EvidenceRepo } from './db/evidence-repo.js';
 import { AssistantProvider, AssistantQuota } from './assistant/provider.js';
 import { SYSTEM_PROMPT, construirContexto } from './assistant/context.js';
-import { TOOLS, resumirPrecios } from './assistant/tools.js';
+import { TOOLS, TOOL_BUSCAR, resumirPrecios } from './assistant/tools.js';
+import { WebSearch } from './assistant/search.js';
 import { AlertsRepo } from './db/alerts-repo.js';
 import { AccessLogRepo } from './db/access-log-repo.js';
 import { WatchlistRepo } from './db/watchlist-repo.js';
@@ -114,6 +115,12 @@ async function main(): Promise<void> {
     timeoutMs: env.ASSISTANT_TIMEOUT_MS,
   });
   const cupoAsistente = new AssistantQuota();
+  const buscador = new WebSearch({
+    provider: env.ASSISTANT_SEARCH,
+    apiKey: env.ASSISTANT_SEARCH_KEY,
+    maxResultados: 5,
+    timeoutMs: 10_000,
+  });
   const alertsRepo = pool ? new AlertsRepo(pool) : null;
   const accessLogRepo = pool ? new AccessLogRepo(pool) : null;
   const watchlistRepo = pool ? new WatchlistRepo(pool) : null;
@@ -259,7 +266,7 @@ async function main(): Promise<void> {
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
       : undefined,
-    assistantInfo: () => asistente.describe(),
+    assistantInfo: () => ({ ...asistente.describe(), busqueda: buscador.describe() }),
     askAssistant: asistente.enabled
       ? async (pregunta, historial, symbol, interval, usuario) => {
           const cupo = cupoAsistente.intentar(usuario);
@@ -376,6 +383,16 @@ async function main(): Promise<void> {
                   ),
                 };
               }
+              case 'buscar_en_internet': {
+                const q = String(args.consulta ?? '').trim();
+                if (!q) return { error: 'consulta vacía' };
+                try {
+                  const hits = await buscador.buscar(q);
+                  return hits.length > 0 ? { consulta: q, resultados: hits } : { consulta: q, resultados: [], nota: 'sin resultados' };
+                } catch (err) {
+                  return { error: String(err instanceof Error ? err.message : err) };
+                }
+              }
               case 'estado_del_sistema':
                 return { proveedores: providers.info(), metaModo: metaPolicy.mode, motivo: metaPolicy.reason };
               case 'uso_por_temporalidad': {
@@ -400,7 +417,9 @@ async function main(): Promise<void> {
               ...historial,
               { role: 'user', content: pregunta },
             ],
-            TOOLS,
+            // La herramienta de búsqueda solo se ofrece si hay proveedor: prometerle al modelo
+            // una capacidad que no funciona lo lleva a inventarse las fuentes.
+            buscador.enabled ? [...TOOLS, TOOL_BUSCAR] : TOOLS,
             ejecutar,
           );
         }

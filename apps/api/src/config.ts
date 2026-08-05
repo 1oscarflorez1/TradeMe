@@ -53,6 +53,10 @@ const EnvSchema = z.object({
   ASSISTANT_MODEL: z.string().default(''),
   ASSISTANT_MAX_TOKENS: z.coerce.number().int().min(64).max(4096).default(700),
   ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(20000),
+  // Búsqueda en internet para el asistente. Vacío = sin acceso a la red; responde solo con los
+  // datos de la plataforma. Planes gratuitos: tavily (1000/mes) o brave (2000/mes).
+  ASSISTANT_SEARCH: z.enum(['', 'tavily', 'brave']).default(''),
+  ASSISTANT_SEARCH_KEY: z.string().default(''),
   // URL pública (para mostrar la dirección exacta del webhook en la interfaz).
   PUBLIC_API_URL: z.string().optional(),
   ACCOUNT_EQUITY: z.coerce.number().positive().default(10_000),

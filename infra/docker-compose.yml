@@ -51,6 +51,8 @@ services:
       ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-}
       ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
       ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
+      ASSISTANT_SEARCH: ${ASSISTANT_SEARCH:-}
+      ASSISTANT_SEARCH_KEY: ${ASSISTANT_SEARCH_KEY:-}
     volumes:
       - ../artifacts:/repo/artifacts
     ports:

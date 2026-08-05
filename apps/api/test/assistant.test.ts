@@ -132,3 +132,23 @@ describe('resumirPrecios', () => {
     expect(resumirPrecios([], [], [])).toHaveProperty('error');
   });
 });
+
+import { WebSearch } from '../src/assistant/search.js';
+import { TOOL_BUSCAR } from '../src/assistant/tools.js';
+
+describe('búsqueda en internet', () => {
+  it('desactivada sin proveedor o sin clave', () => {
+    expect(new WebSearch({ provider: '', apiKey: 'k', maxResultados: 5, timeoutMs: 1000 }).enabled).toBe(false);
+    expect(new WebSearch({ provider: 'tavily', apiKey: '', maxResultados: 5, timeoutMs: 1000 }).enabled).toBe(false);
+    expect(new WebSearch({ provider: 'tavily', apiKey: 'k', maxResultados: 5, timeoutMs: 1000 }).enabled).toBe(true);
+  });
+
+  it('no llama a nadie si no está configurada', async () => {
+    const w = new WebSearch({ provider: '', apiKey: '', maxResultados: 5, timeoutMs: 1000 });
+    await expect(w.buscar('bitcoin')).rejects.toThrow('no está configurada');
+  });
+
+  it('la herramienta advierte que no sirve para datos de la plataforma', () => {
+    expect(TOOL_BUSCAR.function.description).toContain('NO la uses para datos de TradeMe');
+  });
+});

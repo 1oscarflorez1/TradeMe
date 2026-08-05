@@ -128,7 +128,12 @@ export interface AppDeps {
     interval: string,
     usuario: string,
   ) => Promise<{ texto: string; modelo: string; consultas?: string[] }>;
-  assistantInfo?: () => { enabled: boolean; model: string; host: string };
+  assistantInfo?: () => {
+    enabled: boolean;
+    model: string;
+    host: string;
+    busqueda?: { enabled: boolean; provider: string };
+  };
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
   onExternalVote?: (symbol: string, vote: Vote) => void;

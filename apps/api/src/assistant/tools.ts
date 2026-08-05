@@ -114,6 +114,30 @@ export const TOOLS: ToolSpec[] = [
   },
 ];
 
+/**
+ * Búsqueda en internet. Se declara aparte porque solo se ofrece al modelo si hay proveedor
+ * configurado: prometerle una herramienta que no funciona lo lleva a inventarse las fuentes.
+ */
+export const TOOL_BUSCAR: ToolSpec = {
+  type: 'function',
+  function: {
+    name: 'buscar_en_internet',
+    description:
+      'Busca información actual en internet: noticias de mercado, contexto macroeconómico, qué es ' +
+      'un concepto que no conozcas, o novedades de una tecnología. Devuelve título, fragmento y ' +
+      'enlace de unos pocos resultados. Úsala cuando la pregunta dependa de algo externo a la ' +
+      'plataforma o posterior a tu conocimiento. NO la uses para datos de TradeMe: esos están en ' +
+      'las otras herramientas y son los únicos fiables.',
+    parameters: {
+      type: 'object',
+      properties: {
+        consulta: { type: 'string', description: 'Qué buscar, en lenguaje natural.' },
+      },
+      required: ['consulta'],
+    },
+  },
+};
+
 /** Firma del ejecutor. Devuelve cualquier objeto serializable; el modelo lo lee como JSON. */
 export type ToolExecutor = (nombre: string, args: Record<string, unknown>) => Promise<unknown>;
 
