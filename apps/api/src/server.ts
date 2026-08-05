@@ -30,6 +30,7 @@ import { ExternalMapper } from './signals/external-mapper.js';
 import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
 import { computePlanLevels } from './ensemble/plan.js';
+import { intervalMs } from './domain/candle.js';
 import type { Signal } from './domain/signal.js';
 import { Calibrators } from './calibration/load.js';
 import { MetaModel } from './metamodel/apply.js';
@@ -174,6 +175,7 @@ async function main(): Promise<void> {
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
+    snapshotStats: snapshotsRepo ? (symbol: string) => snapshotsRepo.stats(symbol) : undefined,
     deleteSnapshot: snapshotsRepo ? (id) => snapshotsRepo.delete(id) : undefined,
     createAlert: alertsRepo ? (a) => alertsRepo.create(a) : undefined,
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,
@@ -242,6 +244,10 @@ async function main(): Promise<void> {
     savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
+      : undefined,
+    getBacktestHistory: backtestsRepo
+      ? (symbol: string, interval: string, limit: number) =>
+          backtestsRepo.history(symbol, interval, limit)
       : undefined,
     tvSecret: env.TV_WEBHOOK_SECRET,
     authSecret: env.JWT_SECRET,
@@ -327,10 +333,18 @@ async function main(): Promise<void> {
     if (!captureIntervals.has(iv)) return;
     if (signal.action !== 'BUY' && signal.action !== 'SELL') return;
     if (signal.confidence < env.AUTO_CAPTURE_MIN_CONFIDENCE) return;
+    // Una captura POR VELA, no cada N minutos.
+    //
+    // El enfriamiento fijo de 20 minutos era el mismo para todas las temporalidades: en 4h producía
+    // hasta 12 registros de la misma vela y en 1d hasta 72. Esos duplicados se contaban como
+    // observaciones independientes y sesgaban tanto las estadísticas como el dataset del meta-modelo.
+    // Anclar la captura a la vela alinea además el registro con el backtest, que decide una vez por
+    // vela y no una vez por reloj.
     const key = `${symbol}:${iv}`;
     const now = Date.now();
-    if (now - (lastCapture.get(key) ?? 0) < env.AUTO_CAPTURE_COOLDOWN_MIN * 60_000) return;
-    lastCapture.set(key, now);
+    const velaActual = Math.floor(now / intervalMs(iv)) * intervalMs(iv);
+    if ((lastCapture.get(key) ?? -1) === velaActual) return;
+    lastCapture.set(key, velaActual);
     const levels = computePlanLevels(
       signal.action,
       signal.price,

@@ -1,20 +1,29 @@
 import { Fragment, useEffect, useState } from 'react';
 import { deleteSnapshot, fetchCandlesUntil, fetchSnapshots } from './api';
-import type { Candle, SnapshotRow, SnapshotTracking } from './types';
+import type { Candle, EstadoFinal, SnapshotRow, SnapshotStats } from './types';
 import { CandleChart } from './CandleChart';
 import { DrawingLayer } from './DrawingLayer';
 
-const STATUS_LABEL: Record<SnapshotTracking['status'], string> = {
+const ESTADO_LABEL: Record<EstadoFinal, string> = {
   tp: '✓ TP',
   sl: '✗ SL',
-  en_curso: 'En curso',
+  timeout: '⧖ Por tiempo',
+  abierto: 'Abierta',
   sin_plan: '—',
 };
-const STATUS_CLASS: Record<SnapshotTracking['status'], string> = {
+const ESTADO_CLASS: Record<EstadoFinal, string> = {
   tp: 'wh-long',
   sl: 'wh-short',
-  en_curso: '',
+  timeout: 'muted',
+  abierto: '',
   sin_plan: 'muted',
+};
+const ESTADO_TIP: Record<EstadoFinal, string> = {
+  tp: 'Cerrada: tocó el objetivo antes que el stop. Resultado definitivo.',
+  sl: 'Cerrada: tocó el stop antes que el objetivo. Resultado definitivo.',
+  timeout: 'Cerrada al agotarse el horizonte sin tocar ninguno de los dos niveles.',
+  abierto: 'Aún sin evaluar. La columna «R en vivo» dice por dónde va el precio ahora mismo.',
+  sin_plan: 'La decisión fue MANTENER: no hay operación que puntuar.',
 };
 
 function num(n: number | null | undefined, d = 2): string {
@@ -67,14 +76,67 @@ function Th({ label, tip, onSort }: { label: string; tip: string; onSort?: () =>
 }
 
 const CHIP_TIPS = {
-  precio: 'Precio de mercado actual del activo, con el que se sigue cada registro en vivo.',
-  total: 'Número total de registros (snapshots) guardados para este activo.',
-  enCurso: 'Registros cuya operación sigue abierta: el precio aún no ha tocado ni objetivo ni stop.',
-  tp: 'Registros que alcanzaron su objetivo de ganancia (take-profit).',
-  sl: 'Registros que tocaron su stop de pérdida.',
-  expirados: 'Registros cuya validez temporal ya venció (la entrada caducó sin activarse a tiempo).',
+  precio: 'Precio de mercado actual del activo, con el que se sigue cada registro abierto.',
+  total: 'Registros guardados para este activo. Las cifras se calculan sobre TODOS ellos, no solo sobre los que se listan abajo.',
+  tp: 'Operaciones que tocaron su objetivo antes que su stop. Resultado ya evaluado, no provisional.',
+  sl: 'Operaciones que tocaron su stop antes que su objetivo. Resultado ya evaluado.',
+  timeout: 'Operaciones que se cerraron al agotarse el horizonte de evaluación sin tocar ninguno de los dos niveles. Ni acierto ni fallo: cuentan con el resultado parcial que llevaran.',
+  abiertos: 'Registros que el evaluador aún no ha cerrado. Solo en estos tiene sentido el seguimiento en vivo.',
+  sinPlan: 'Decisiones de MANTENER: no generan una operación con niveles, así que no puntúan.',
   refresh: 'La tabla vuelve a consultar el precio y el estado cada 5 segundos.',
 };
+
+/**
+ * Veredicto del sistema. Es la pregunta que de verdad importa: perder más veces de las que se gana
+ * NO es malo si el objetivo está más lejos que el stop. Con relación 2:1 basta con acertar más de
+ * un tercio de las veces. Aquí se compara el acierto real con ese umbral.
+ */
+function Veredicto({ stats }: { stats: SnapshotStats }) {
+  const { tp, sl, timeout, resueltos, winRate, expectancy } = stats;
+  if (tp + sl < 10) {
+    return (
+      <div className="verdict verdict-wait">
+        <strong>Muestra insuficiente todavía.</strong>{' '}
+        <span className="muted">
+          Llevas {tp + sl} operaciones cerradas en objetivo o stop. Con menos de una decena, cualquier
+          conclusión sería ruido. El piloto sigue acumulando.
+        </span>
+      </div>
+    );
+  }
+  // Umbral de equilibrio para la relación riesgo:beneficio configurada (2:1 → 33.3%).
+  const rrObjetivo = 2;
+  const umbral = 1 / (1 + rrObjetivo);
+  const bueno = (expectancy ?? 0) > 0;
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  return (
+    <div className={`verdict ${bueno ? 'verdict-ok' : 'verdict-bad'}`}>
+      <div className="verdict-main">
+        <span className="verdict-badge">{bueno ? '✓ Con ventaja' : '✗ Sin ventaja'}</span>
+        <span>
+          Aciertas el <strong>{winRate === null ? '—' : pct(winRate)}</strong> de las veces y necesitas
+          más del <strong>{pct(umbral)}</strong> para que salga a cuenta, porque el objetivo está al{' '}
+          <strong>doble</strong> de distancia que el stop.
+        </span>
+      </div>
+      <div className="verdict-detail muted">
+        Ganancia media por operación:{' '}
+        <strong className={bueno ? 'wh-long' : 'wh-short'}>
+          {expectancy === null ? '—' : `${expectancy >= 0 ? '+' : ''}${expectancy.toFixed(3)} R`}
+        </strong>{' '}
+        sobre {resueltos} operaciones cerradas ({tp} en objetivo, {sl} en stop, {timeout} por tiempo).
+        Una R es lo que arriesgas en cada entrada.{' '}
+        {bueno
+          ? 'Perder más veces de las que ganas es el comportamiento esperado de este ajuste: las ganancias son mayores que las pérdidas.'
+          : 'Aquí sí conviene revisar los pesos: ni siquiera el tamaño de las ganancias compensa la frecuencia de los fallos.'}
+      </div>
+      <div className="verdict-note muted">
+        Estas cifras no descuentan comisiones ni deslizamiento. Medirlos es justo el objetivo de la
+        futura cuenta de papel.
+      </div>
+    </div>
+  );
+}
 
 function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -89,6 +151,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const [rows, setRows] = useState<SnapshotRow[]>([]);
   const [price, setPrice] = useState<number>(0);
   const [total, setTotal] = useState<number>(0);
+  const [stats, setStats] = useState<SnapshotStats | null>(null);
   const [fTf, setFTf] = useState('');
   const [fAct, setFAct] = useState('');
   const [fDir, setFDir] = useState('');
@@ -108,6 +171,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
         setRows(r.snapshots);
         setPrice(r.currentPrice);
         setTotal(r.total ?? r.snapshots.length);
+        setStats(r.stats ?? null);
         setLoading(false);
       }
     });
@@ -161,17 +225,8 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
 
   if (loading) return <p className="muted">Cargando registros…</p>;
 
-  const enCurso = rows.filter((r) => r.tracking?.status === 'en_curso').length;
-  const tp = rows.filter((r) => r.tracking?.status === 'tp' || r.outcome_result === 'tp').length;
-  const sl = rows.filter((r) => r.tracking?.status === 'sl' || r.outcome_result === 'sl').length;
-  const expirados = rows.filter((r) => r.tracking?.expired).length;
-  const estadoDe = (r: SnapshotRow): string => {
-    if (r.outcome_result === 'tp' || r.tracking?.status === 'tp') return 'tp';
-    if (r.outcome_result === 'sl' || r.tracking?.status === 'sl') return 'sl';
-    if (r.tracking?.expired) return 'expirado';
-    if (r.tracking?.status === 'en_curso') return 'en_curso';
-    return 'sin_plan';
-  };
+  // El estado lo decide el servidor: manda el resultado evaluado sobre el seguimiento en vivo.
+  const estadoDe = (r: SnapshotRow): string => r.estado;
   const tfs = [...new Set(rows.map((r) => r.interval))];
   const filtered = rows.filter(
     (r) =>
@@ -223,9 +278,9 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
           Precio {symbol} <strong>{price.toFixed(2)}</strong>
         </span>
         <span className="reg-chip" title={CHIP_TIPS.total}>
-          Total <strong>{total}</strong>
+          Total <strong>{stats?.total ?? total}</strong>
           {total > rows.length ? (
-            <span className="muted"> (últimos {rows.length})</span>
+            <span className="muted"> (se listan {rows.length})</span>
           ) : null}
         </span>
         {filtering && (
@@ -233,22 +288,29 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
             Filtradas <strong>{visible.length}</strong>
           </span>
         )}
-        <span className="reg-chip" title={CHIP_TIPS.enCurso}>
-          En curso <strong>{enCurso}</strong>
-        </span>
         <span className="reg-chip reg-chip-ok" title={CHIP_TIPS.tp}>
-          ✓ TP <strong>{tp}</strong>
+          ✓ TP <strong>{stats?.tp ?? 0}</strong>
         </span>
         <span className="reg-chip reg-chip-bad" title={CHIP_TIPS.sl}>
-          ✗ SL <strong>{sl}</strong>
+          ✗ SL <strong>{stats?.sl ?? 0}</strong>
         </span>
-        <span className="reg-chip" title={CHIP_TIPS.expirados}>
-          Expirados <strong>{expirados}</strong>
+        <span className="reg-chip" title={CHIP_TIPS.timeout}>
+          ⧖ Por tiempo <strong>{stats?.timeout ?? 0}</strong>
         </span>
+        <span className="reg-chip" title={CHIP_TIPS.abiertos}>
+          Abiertas <strong>{stats?.abiertos ?? 0}</strong>
+        </span>
+        {(stats?.sinPlan ?? 0) > 0 && (
+          <span className="reg-chip muted" title={CHIP_TIPS.sinPlan}>
+            Sin plan <strong>{stats?.sinPlan}</strong>
+          </span>
+        )}
         <span className="reg-chip muted" title={CHIP_TIPS.refresh}>
           actualiza cada 5s
         </span>
       </div>
+
+      {stats && <Veredicto stats={stats} />}
 
       {rows.length > 0 && (
         <div className="reg-filters">
@@ -285,10 +347,10 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
             <span>Estado</span>
             <select value={fEst} onChange={(e) => setFEst(e.target.value)}>
               <option value="">Todos</option>
-              <option value="en_curso">En curso</option>
+              <option value="abierto">Abiertas</option>
               <option value="tp">✓ TP</option>
               <option value="sl">✗ SL</option>
-              <option value="expirado">Expirados</option>
+              <option value="timeout">⧖ Por tiempo</option>
               <option value="sin_plan">Sin plan</option>
             </select>
           </label>
@@ -356,12 +418,29 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
                       <td>{num(r.plan_entry)}</td>
                       <td className="wh-short">{num(r.plan_stop)}</td>
                       <td className="wh-long">{num(r.plan_take_profit)}</td>
-                      <td className={t ? STATUS_CLASS[t.status] : ''}>
-                        {t ? STATUS_LABEL[t.status] : '—'}
-                        {t?.expired ? ' (exp)' : ''}
+                      <td className={ESTADO_CLASS[r.estado]} title={ESTADO_TIP[r.estado]}>
+                        {ESTADO_LABEL[r.estado]}
+                        {r.estado === 'abierto' && t?.expired ? (
+                          <span className="muted" title="La ventana de entrada ya venció"> (exp)</span>
+                        ) : null}
                       </td>
-                      <td className={(t?.liveR ?? 0) >= 0 ? 'wh-long' : 'wh-short'}>
-                        {num(t?.liveR ?? null)}
+                      <td
+                        className={
+                          r.estado === 'abierto'
+                            ? (t?.liveR ?? 0) >= 0
+                              ? 'wh-long'
+                              : 'wh-short'
+                            : (r.outcome_return_r ?? 0) >= 0
+                              ? 'wh-long'
+                              : 'wh-short'
+                        }
+                        title={
+                          r.estado === 'abierto'
+                            ? 'Recorrido actual, en múltiplos del riesgo. Cambia con el precio.'
+                            : 'Resultado final de la operación, en múltiplos del riesgo.'
+                        }
+                      >
+                        {r.estado === 'abierto' ? num(t?.liveR ?? null) : num(r.outcome_return_r)}
                       </td>
                       <td className="cell-actions">
                         <button
@@ -587,7 +666,7 @@ function buildReport(r: SnapshotRow, price: number) {
           <span className="det-value wh-long">{num(r.plan_take_profit)}</span>
         </div>
         <div>
-          <span className="det-label">R en vivo</span>
+          <span className="det-label">Resultado (R)</span>
           <span className={`det-value ${(t?.liveR ?? 0) >= 0 ? 'wh-long' : 'wh-short'}`}>
             {num(t?.liveR ?? null)}
           </span>

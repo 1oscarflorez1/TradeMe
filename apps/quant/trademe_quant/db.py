@@ -78,7 +78,18 @@ def save_backtest(dsn: str, symbol: str, interval: str, result: dict[str, Any]) 
 
 
 def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
-    """Rellena outcome_* de los snapshots pendientes usando las velas posteriores."""
+    """Rellena outcome_* de los snapshots pendientes usando las velas posteriores.
+
+    Regla de cierre, deliberadamente asimétrica:
+
+    - Un toque de objetivo o de stop es DEFINITIVO aunque ocurra en la primera vela: el precio
+      estuvo ahí y eso ya no cambia. Se cierra siempre.
+    - Un «timeout» solo es válido si de verdad transcurrió el horizonte completo. Cerrar por tiempo
+      con tres velas disponibles no significa que la operación no fuera a ninguna parte, significa
+      que aún no le hemos dado tiempo. Antes se cerraban igual y, como el resultado dejaba de ser
+      nulo, no se volvían a evaluar jamás: en 1d eso convertía el 100 % de los registros en timeouts
+      artificiales.
+    """
     import psycopg
 
     from .backtest import evaluate_trade
@@ -117,6 +128,9 @@ def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
                 [float(r[1]) for r in future],
                 [float(r[2]) for r in future],
             )
+            # Sin el horizonte completo, un «timeout» es prematuro: se deja pendiente.
+            if res["result"] == "timeout" and len(future) < horizon:
+                continue
             with conn.cursor() as cur:
                 cur.execute(
                     """

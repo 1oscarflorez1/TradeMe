@@ -44,8 +44,13 @@ def fetch_rows(dsn: str) -> list[dict[str, Any]]:
     cols = ", ".join(SNAPSHOT_COLUMNS)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
-            f"SELECT {cols} FROM snapshots "  # noqa: S608 - columnas fijas del módulo
-            "WHERE outcome_result IN ('tp','sl') ORDER BY captured_at ASC"
+            # Una decisión por vela: los duplicados de la captura antigua no son observaciones
+            # independientes y, sin deduplicar, el modelo memoriza las situaciones repetidas.
+            # El envoltorio devuelve el orden cronológico, que es el que necesita la división
+            # temporal del entrenamiento (si no, se entrenaría con el futuro).
+            f"SELECT * FROM (SELECT DISTINCT ON (interval, candle_open) {cols} "  # noqa: S608
+            "FROM snapshots WHERE outcome_result IN ('tp','sl') "
+            "ORDER BY interval, candle_open, captured_at ASC) t ORDER BY captured_at ASC"
         )
         return [dict(zip(SNAPSHOT_COLUMNS, r, strict=False)) for r in cur.fetchall()]
 

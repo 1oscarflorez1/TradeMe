@@ -111,7 +111,37 @@ export interface SnapshotRow {
   valid_until: string | null;
   outcome_result: string | null;
   outcome_return_r: number | null;
+  /** Estado autoritativo que calcula el servidor: manda el resultado evaluado sobre el vivo. */
+  estado: EstadoFinal;
   tracking: SnapshotTracking | null;
+}
+
+/** tp/sl/timeout = ya evaluada por quant · abierto = aún sin evaluar · sin_plan = fue MANTENER. */
+export type EstadoFinal = 'tp' | 'sl' | 'timeout' | 'abierto' | 'sin_plan';
+
+export interface SnapshotStatsTf {
+  interval: string;
+  total: number;
+  tp: number;
+  sl: number;
+  timeout: number;
+  abiertos: number;
+  winRate: number | null;
+  expectancy: number | null;
+}
+
+/** Resumen calculado en la base de datos sobre TODOS los registros, no sobre la página cargada. */
+export interface SnapshotStats {
+  total: number;
+  tp: number;
+  sl: number;
+  timeout: number;
+  abiertos: number;
+  sinPlan: number;
+  resueltos: number;
+  winRate: number | null;
+  expectancy: number | null;
+  porTf: SnapshotStatsTf[];
 }
 
 export interface SnapshotsResponse {
@@ -119,6 +149,7 @@ export interface SnapshotsResponse {
   currentPrice: number;
   snapshots: SnapshotRow[];
   total: number;
+  stats: SnapshotStats | null;
 }
 
 export interface BacktestTrade {

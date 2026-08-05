@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { intervalMs, type Interval } from '../domain/candle.js';
 import type { Signal } from '../domain/signal.js';
 import type { PlanLevels } from '../ensemble/plan.js';
 import type { SnapshotRow } from '../snapshots/tracking.js';
@@ -11,6 +12,30 @@ function value(signal: Signal, key: string): number | null {
 }
 
 /** Persiste una instantánea completa del escenario (para análisis y entrenamiento de IA). */
+export interface SnapshotStatsTf {
+  interval: string;
+  total: number;
+  tp: number;
+  sl: number;
+  timeout: number;
+  abiertos: number;
+  winRate: number | null;
+  expectancy: number | null;
+}
+
+export interface SnapshotStats {
+  total: number;
+  tp: number;
+  sl: number;
+  timeout: number;
+  abiertos: number;
+  sinPlan: number;
+  resueltos: number;
+  winRate: number | null;
+  expectancy: number | null;
+  porTf: SnapshotStatsTf[];
+}
+
 export class SnapshotsRepo {
   constructor(private readonly pool: pg.Pool) {}
 
@@ -28,7 +53,7 @@ export class SnapshotsRepo {
         ema_cross_score, macd_score, rsi14_score, rsi14_value, bbands_score,
         stoch14_score, supertrend_score, meta_confidence, adx14_value, atr14_value, reditum_sniper_score, reditum_poc_score,
         plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr, valid_until,
-        model_version, source, note, raw_signal
+        model_version, source, note, raw_signal, candle_open
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
         $7,$8,$9,$10,$11,$12,$13,
@@ -36,7 +61,9 @@ export class SnapshotsRepo {
         $19,$20,$21,$22,$23,
         $24,$25,$26,$27,$28,$29,$30,
         $31,$32,$33,$34,$35,$36,
-        $37,'manual',$38,$39
+        $37,'manual',$38,$39,
+        -- Vela a la que pertenece la decisión: es lo que garantiza una sola por vela.
+        to_timestamp(floor(extract(epoch FROM now()) / $40) * $40)
       ) RETURNING id`,
       [
         signal.symbol,
@@ -78,6 +105,7 @@ export class SnapshotsRepo {
         signal.model_version,
         note ?? null,
         JSON.stringify(signal),
+        Math.round(intervalMs(interval as Interval) / 1000),
       ],
     );
     return res.rows[0]?.id ?? '';
@@ -100,6 +128,90 @@ export class SnapshotsRepo {
       [symbol.toUpperCase()],
     );
     return { rows: res.rows, total: Number(count.rows[0]?.n ?? 0) };
+  }
+
+  /**
+   * Resumen calculado en la base de datos sobre TODOS los registros del símbolo.
+   *
+   * Antes el resumen se calculaba en el navegador sobre la página cargada (500 filas como mucho) y
+   * mezclando resultado histórico con seguimiento en vivo, así que los totales no cuadraban.
+   *
+   * Además se cuenta UNA decisión por vela: la captura antigua, con enfriamiento fijo de 20 minutos,
+   * generaba hasta 12 registros de la misma vela de 4h. Contarlos por separado fingía tener doce
+   * observaciones independientes cuando en realidad era una sola.
+   */
+  async stats(symbol: string): Promise<SnapshotStats> {
+    const sym = symbol.toUpperCase();
+    const res = await this.pool.query<{
+      total: number; tp: number; sl: number; timeout: number;
+      abiertos: number; sin_plan: number; expectancy: string | null;
+    }>(
+      `WITH una_por_vela AS (
+         SELECT DISTINCT ON (interval, candle_open) *
+           FROM snapshots WHERE symbol = $1
+          ORDER BY interval, candle_open, captured_at ASC
+       )
+       SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE outcome_result = 'tp')::int AS tp,
+              COUNT(*) FILTER (WHERE outcome_result = 'sl')::int AS sl,
+              COUNT(*) FILTER (WHERE outcome_result = 'timeout')::int AS timeout,
+              COUNT(*) FILTER (WHERE outcome_result IS NULL
+                               AND direction IN ('LONG','SHORT')
+                               AND plan_entry IS NOT NULL)::int AS abiertos,
+              COUNT(*) FILTER (WHERE direction = 'FLAT' OR plan_entry IS NULL)::int AS sin_plan,
+              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
+         FROM una_por_vela`,
+      [sym],
+    );
+    const porTf = await this.pool.query<{
+      interval: string; total: number; tp: number; sl: number;
+      timeout: number; abiertos: number; expectancy: string | null;
+    }>(
+      `WITH una_por_vela AS (
+         SELECT DISTINCT ON (interval, candle_open) *
+           FROM snapshots WHERE symbol = $1
+          ORDER BY interval, candle_open, captured_at ASC
+       )
+       SELECT interval,
+              COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE outcome_result = 'tp')::int AS tp,
+              COUNT(*) FILTER (WHERE outcome_result = 'sl')::int AS sl,
+              COUNT(*) FILTER (WHERE outcome_result = 'timeout')::int AS timeout,
+              COUNT(*) FILTER (WHERE outcome_result IS NULL
+                               AND direction IN ('LONG','SHORT')
+                               AND plan_entry IS NOT NULL)::int AS abiertos,
+              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
+         FROM una_por_vela GROUP BY interval`,
+      [sym],
+    );
+    const fila = res.rows[0];
+    const num = (v: string | null): number | null => (v === null ? null : Number(v));
+    const base = {
+      total: fila?.total ?? 0,
+      tp: fila?.tp ?? 0,
+      sl: fila?.sl ?? 0,
+      timeout: fila?.timeout ?? 0,
+      abiertos: fila?.abiertos ?? 0,
+      sinPlan: fila?.sin_plan ?? 0,
+      expectancy: num(fila?.expectancy ?? null),
+    };
+    return {
+      ...base,
+      resueltos: base.tp + base.sl + base.timeout,
+      // Tasa de acierto solo entre las que tocaron objetivo o stop: un «timeout» no es ni acierto
+      // ni fallo, se cerró por tiempo con el resultado que llevara.
+      winRate: base.tp + base.sl > 0 ? base.tp / (base.tp + base.sl) : null,
+      porTf: porTf.rows.map((r) => ({
+        interval: r.interval,
+        total: r.total,
+        tp: r.tp,
+        sl: r.sl,
+        timeout: r.timeout,
+        abiertos: r.abiertos,
+        winRate: r.tp + r.sl > 0 ? r.tp / (r.tp + r.sl) : null,
+        expectancy: num(r.expectancy),
+      })),
+    };
   }
 
   async delete(id: string): Promise<boolean> {

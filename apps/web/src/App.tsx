@@ -15,6 +15,7 @@ import { HelpView } from './HelpView';
 import { NewsView } from './NewsView';
 import { StatusView } from './StatusView';
 import { AssetManager } from './AssetManager';
+import { TimeframeBar } from './TimeframeBar';
 import { setTvSymbols } from './tvSymbol';
 import { DrawingLayer } from './DrawingLayer';
 import {
@@ -68,7 +69,6 @@ export function App() {
   const [thresholds, setThresholds] = useState<Record<string, number>>(loadThresholds);
   const [showGear, setShowGear] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
-  const tfRef = useRef<HTMLDivElement>(null);
   const { alerts: alertHistory, unread, create: createAlert, markRead } = useAlerts();
   const [cooldownMin, setCooldownMin] = useState<number>(() =>
     Number(localStorage.getItem('trademe.alertCooldownMin') ?? 5),
@@ -115,14 +115,6 @@ export function App() {
       clearInterval(pid);
     };
   }, [symbol, intervals]);
-
-  // La barra muestra de entrada el rango que realmente usamos (15m–1d); el resto, deslizando.
-  useEffect(() => {
-    const el = tfRef.current;
-    if (!el) return;
-    const btn = el.querySelector<HTMLElement>('[data-tf="15m"]');
-    if (btn) el.scrollLeft = Math.max(0, btn.offsetLeft - el.offsetLeft);
-  }, [intervals]);
 
 
   useEffect(() => {
@@ -484,28 +476,18 @@ export function App() {
           </button>
 
           <div className="tf-alert-wrap">
-            <div className="tf-group" role="group" aria-label="Temporalidad" ref={tfRef}>
-              {intervals.map((it) => (
-                <button
-                  key={it}
-                  type="button"
-                  data-tf={it}
-                  className={it === tf ? 'tf active' : 'tf'}
-                  onClick={() => setTf(it)}
-                  title={
-                    alerts[it]
-                      ? `${ACT_ES[alerts[it]!.action] ?? alerts[it]!.action} · ${(alerts[it]!.conf * 100).toFixed(0)}% (umbral ${thr(it)}%)`
-                      : 'Sin datos de decisión aún'
-                  }
-                >
-                  <span className="tf-label">{it}</span>
-                  <span
-                    className={`tf-dot ${isAlert(it) ? 'on' : ''}`}
-                    aria-label={isAlert(it) ? 'alerta activa' : undefined}
-                  />
-                </button>
-              ))}
-            </div>
+            <TimeframeBar
+              intervals={intervals}
+              tf={tf}
+              setTf={setTf}
+              symbol={symbol}
+              alertaEn={isAlert}
+              tituloDe={(it) =>
+                alerts[it]
+                  ? `${ACT_ES[alerts[it]!.action] ?? alerts[it]!.action} · ${(alerts[it]!.conf * 100).toFixed(0)}% (umbral ${thr(it)}%)`
+                  : 'Sin datos de decisión aún'
+              }
+            />
             <button
               type="button"
               className="gear-btn"

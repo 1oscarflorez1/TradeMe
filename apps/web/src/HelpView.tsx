@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-type Section = 'manual' | 'kb' | 'faq' | 'glosario';
+type Section = 'inicio' | 'manual' | 'kb' | 'faq' | 'glosario';
 
 interface Article {
   title: string;
@@ -336,6 +336,105 @@ const KB: Article[] = [
   },
 ];
 
+const KB_EXTRA: Article[] = [
+  {
+    title: 'Cómo se lee el informe de un backtest',
+    body: (
+      <>
+        <p>
+          El informe responde a una sola pregunta: <strong>¿esta configuración tenía ventaja sobre el
+          pasado?</strong> Se lee de fuera hacia dentro.
+        </p>
+        <ol>
+          <li>
+            <strong>Expectancy primero.</strong> Si es negativa, lo demás da igual. Si es positiva,
+            mide cuánta ventaja hay por operación.
+          </li>
+          <li>
+            <strong>Después el número de trades.</strong> Una expectancy magnífica sobre 12
+            operaciones no significa nada. Por debajo de 30 no saques conclusiones.
+          </li>
+          <li>
+            <strong>Luego el fuera de muestra.</strong> Si el resultado se desploma en el último 30 %
+            de los datos, el ajuste está memorizando el pasado en vez de aprender de él.
+          </li>
+          <li>
+            <strong>Y por último el drawdown.</strong> No mide si ganas, mide si podrías aguantarlo.
+          </li>
+        </ol>
+        <p>
+          La <strong>curva de equity</strong> suma el resultado de cada operación. Lo que buscas no es
+          una línea que suba mucho, sino una que suba <em>de forma sostenida</em>: los escalones
+          bruscos suelen ser una racha afortunada que no se repetirá.
+        </p>
+        <p className="muted">
+          Ninguna de estas cifras descuenta comisiones ni deslizamiento. Medir ese coste real es el
+          motivo de la futura cuenta de papel.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: 'Cómo se lee el Laboratorio',
+    body: (
+      <>
+        <p>
+          El Laboratorio tiene cuatro secciones y cada una responde a una pregunta distinta. No hay
+          que tocarlas: el piloto automático las lanza cuando toca. Lo que muestran es el estado.
+        </p>
+        <ul>
+          <li>
+            <strong>Calibración.</strong> ¿Cuando el sistema dice «70 % de confianza», acierta de
+            verdad el 70 % de las veces? Ajusta la escala de confianza sin tocar la dirección.
+          </li>
+          <li>
+            <strong>Optimización de pesos.</strong> ¿Qué indicador merece pesar más? Optuna prueba
+            miles de combinaciones y solo promociona la candidata si además gana en el tramo que no
+            vio.
+          </li>
+          <li>
+            <strong>Dataset ML.</strong> ¿Hay ya bastantes decisiones evaluadas para entrenar al
+            meta-modelo? Las barras muestran cuánto falta para cada criterio.
+          </li>
+          <li>
+            <strong>Piloto automático.</strong> ¿Cuándo fue la última medición y cuándo toca la
+            siguiente? Es el reloj de todo lo demás.
+          </li>
+        </ul>
+        <p>
+          El orden natural es: se acumulan registros → se miden → si empeoran, se optimiza → tras
+          optimizar, se recalibra → con suficientes datos, se entrena el meta-modelo.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: 'Por qué perder más veces de las que se gana puede ser bueno',
+    body: (
+      <>
+        <p>
+          Es la confusión más común y merece su propio apartado. TradeMe coloca el objetivo al{' '}
+          <strong>doble</strong> de distancia que el stop (relación 2:1). Con esa proporción, el punto
+          de equilibrio está en acertar el <strong>33,3 %</strong> de las veces.
+        </p>
+        <p>
+          Acertar el 44 % con esa relación deja una ganancia media de <strong>+0,32 R</strong> por
+          operación: por cada 100 que arriesgas, ganas 32 a la larga. Ver el doble de stops que de
+          objetivos es, por tanto, el comportamiento <em>esperado</em>, no una señal de alarma.
+        </p>
+        <p>
+          Lo preocupante sería lo contrario: muchos aciertos pequeños y pocas pérdidas grandes. Eso
+          suele acabar mal.
+        </p>
+        <p>
+          La pestaña <strong>Registros</strong> hace esta cuenta sola y te dice si el sistema tiene
+          ventaja o no.
+        </p>
+      </>
+    ),
+  },
+];
+
 const FAQ: Article[] = [
   {
     title: '¿Por qué casi siempre dice MANTENER / FLAT?',
@@ -409,6 +508,51 @@ const FAQ: Article[] = [
 ];
 
 const GLOSARIO: Array<[string, string, string]> = [
+  [
+    'Trades',
+    'básico',
+    'Operaciones que la lógica de decisión habría abierto sobre el histórico. Cuantas más, más fiable la estadística: con menos de 30 cualquier conclusión es ruido.',
+  ],
+  [
+    'Win rate',
+    'básico',
+    'Porcentaje de operaciones ganadoras. Por sí solo NO dice si el sistema gana dinero: con objetivo al doble de distancia que el stop, acertar el 40 % ya es rentable.',
+  ],
+  [
+    'Expectancy',
+    'básico',
+    'La métrica reina: ganancia media por operación medida en R. Una R es lo que arriesgas en cada entrada (la distancia entrada→stop). Positiva significa que el sistema tiene ventaja.',
+  ],
+  [
+    'R (múltiplo de riesgo)',
+    'básico',
+    'La unidad con la que medimos todo. 1 R = lo que pierdes si salta el stop. Ganar 2 R es ganar el doble de lo que arriesgabas. Permite comparar operaciones de tamaños distintos.',
+  ],
+  [
+    'Profit factor',
+    'intermedio',
+    'Ganancias brutas ÷ pérdidas brutas. Por encima de 1 es rentable. 1,10 indica que apenas gana un 10 % más de lo que pierde: ventaja pequeña y frágil.',
+  ],
+  [
+    'Max drawdown',
+    'intermedio',
+    'La peor caída acumulada desde un punto alto. Mide cuánto duele la peor racha y sirve para saber si podrías aguantarla, psicológica y financieramente.',
+  ],
+  [
+    'Sharpe',
+    'intermedio',
+    'Rentabilidad ajustada a la volatilidad: cuánto ganas por unidad de riesgo. Cuanto mayor, más estable y menos dependiente de la suerte.',
+  ],
+  [
+    'Fuera de muestra (OOS)',
+    'intermedio',
+    'Las mismas métricas pero solo sobre el 30 % final de los datos, un tramo que no influyó en el ajuste. Es la prueba de honestidad: si se parece al resto, el sistema no está sobreajustado.',
+  ],
+  [
+    'Timeout',
+    'básico',
+    'Una operación que se cerró al agotarse el horizonte de evaluación sin tocar objetivo ni stop. Ni acierto ni fallo: cuenta con el resultado parcial que llevara.',
+  ],
   ['Vela (candle)', 'Básico', 'Resumen del precio en un intervalo: apertura, máximo, mínimo y cierre.'],
   ['Temporalidad (timeframe)', 'Básico', 'Duración de cada vela: 15m, 1h, 1d… Marca el horizonte de la decisión.'],
   ['LONG / SHORT / FLAT', 'Básico', 'Apostar al alza, a la baja o quedarse fuera.'],
@@ -454,90 +598,302 @@ const GLOSARIO: Array<[string, string, string]> = [
   ['Sesgo macro', 'Fundamental', 'Inclinación de fondo (funding + tendencia semanal). Hoy desactivado a propósito.'],
 ];
 
-export function HelpView() {
-  const [sec, setSec] = useState<Section>('manual');
-  const [q, setQ] = useState('');
+/** Una frase por artículo: es lo que permite decidir si merece la pena abrirlo. */
+const RESUMEN: Record<string, string> = {
+  '1. Leer una decisión en el Panel': 'Qué significa el anillo, las barras y el plan de acción.',
+  '2. Guardar un registro (snapshot) y seguirlo': 'Cómo congelar una decisión para comprobar después si acertó.',
+  '3. Automatizar el guardado de registros': 'Que el motor capture solo, sin tener el portal abierto.',
+  '4. Medir la estrategia (Backtest)': 'Correr la prueba histórica y saber si hay ventaja.',
+  '5. Afinar el modelo (Laboratorio)': 'Calibrar, optimizar y entrenar, sin tocar la terminal.',
+  '6. Alertas y notificaciones': 'Que te avise cuando pasa algo, incluso con la app cerrada.',
+  'Arquitectura general': 'Quién hace qué: Node decide, Python aprende, la web muestra.',
+  'Cómo se construye una decisión': 'El camino completo desde la vela hasta COMPRAR o VENDER.',
+  'Backtesting honesto: sin look-ahead y peor caso': 'Por qué nuestras cifras son más feas y más ciertas.',
+  'Optimización con Optuna y hold-out': 'Cómo se eligen los pesos sin engañarse con el pasado.',
+  'Calibración de probabilidades': 'Que un 70 % signifique de verdad un 70 %.',
+  'Meta-modelo (meta-labeling)': 'Un segundo modelo que decide cuándo NO fiarse del primero.',
+  'El piloto automático': 'Quién mide, optimiza y reentrena mientras no miras.',
+  'Proveedores de datos: de dónde salen las velas': 'Binance, Twelve Data e IBKR: quién da qué y a qué velocidad.',
+  '¿Por qué TradingView no es un proveedor de datos?': 'Dibuja y avisa, pero no entrega velas. La razón importa.',
+  'Señales externas Reditum (TradingView)': 'Cómo entran tus algoritmos privados en la decisión.',
+  'Análisis fundamental (en pausa)': 'Por qué está desactivado a propósito y cuándo volverá.',
+  'Cómo se lee el informe de un backtest': 'En qué orden mirar las métricas para no engañarte.',
+  'Cómo se lee el Laboratorio': 'Qué pregunta responde cada una de las cuatro secciones.',
+  'Por qué perder más veces de las que se gana puede ser bueno': 'La cuenta que explica por qué ves más SL que TP.',
+};
 
-  const list = sec === 'manual' ? MANUAL : sec === 'kb' ? KB : sec === 'faq' ? FAQ : [];
-  const filtered = q
-    ? list.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()))
-    : list;
-  const glos = q
-    ? GLOSARIO.filter(([t, , d]) => (t + d).toLowerCase().includes(q.toLowerCase()))
+/** Entradas por tarea: la mayoría llega con una intención concreta, no a «leerse la ayuda». */
+const RUTAS: Array<{ icono: string; titulo: string; sub: string; sec: Section; art: string }> = [
+  {
+    icono: '🧭',
+    titulo: 'Acabo de entrar y no sé qué miro',
+    sub: 'Empieza por cómo se lee una decisión.',
+    sec: 'manual',
+    art: '1. Leer una decisión en el Panel',
+  },
+  {
+    icono: '📉',
+    titulo: 'Veo muchos stops y me preocupa',
+    sub: 'La cuenta que explica por qué es normal.',
+    sec: 'kb',
+    art: 'Por qué perder más veces de las que se gana puede ser bueno',
+  },
+  {
+    icono: '🔬',
+    titulo: 'Quiero saber si la estrategia funciona',
+    sub: 'Cómo se lee el informe de un backtest.',
+    sec: 'kb',
+    art: 'Cómo se lee el informe de un backtest',
+  },
+  {
+    icono: '🧠',
+    titulo: 'Quiero entender cómo aprende',
+    sub: 'Las tres capas que ajustan el criterio.',
+    sec: 'kb',
+    art: 'Cómo se construye una decisión',
+  },
+];
+
+/** Minutos de lectura estimados a partir del texto real del artículo. */
+function minutos(nodo: React.ReactNode): number {
+  const texto = JSON.stringify(nodo);
+  return Math.max(1, Math.round(texto.split(/\s+/).length / 180));
+}
+
+export function HelpView() {
+  const [sec, setSec] = useState<Section>('inicio');
+  const [q, setQ] = useState('');
+  const [abierto, setAbierto] = useState<string | null>(null);
+
+  const KB_TODO = [...KB, ...KB_EXTRA];
+  const porSeccion: Record<Exclude<Section, 'inicio' | 'glosario'>, Article[]> = {
+    manual: MANUAL,
+    kb: KB_TODO,
+    faq: FAQ,
+  };
+
+  const busca = q.trim().toLowerCase();
+  const coincide = (a: Article) =>
+    (a.title + ' ' + (RESUMEN[a.title] ?? '')).toLowerCase().includes(busca);
+
+  // La búsqueda atraviesa las cuatro secciones: nadie sabe de antemano en cuál está su respuesta.
+  const resultados = busca
+    ? ([
+        ['Manual', MANUAL.filter(coincide)] as const,
+        ['Base de conocimientos', KB_TODO.filter(coincide)] as const,
+        ['Preguntas frecuentes', FAQ.filter(coincide)] as const,
+      ].filter(([, l]) => l.length > 0) as Array<readonly [string, Article[]]>)
+    : [];
+  const glosBusca = busca
+    ? GLOSARIO.filter(([t, , d]) => (t + d).toLowerCase().includes(busca))
     : GLOSARIO;
+
+  const irA = (s: Section, art: string) => {
+    setSec(s);
+    setAbierto(art);
+    setQ('');
+    requestAnimationFrame(() => {
+      document.getElementById(`art-${art}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  const Tarjeta = ({ a, n }: { a: Article; n?: number }) => {
+    const ab = abierto === a.title;
+    return (
+      <article id={`art-${a.title}`} className={`help-card ${ab ? 'open' : ''}`}>
+        <button
+          type="button"
+          className="help-card-head"
+          aria-expanded={ab}
+          onClick={() => setAbierto(ab ? null : a.title)}
+        >
+          {n !== undefined && <span className="help-card-n">{n}</span>}
+          <span className="help-card-txt">
+            <strong>{a.title}</strong>
+            {RESUMEN[a.title] && <span className="help-card-sub">{RESUMEN[a.title]}</span>}
+          </span>
+          <span className="help-card-meta">
+            <span className="help-card-min">{minutos(a.body)} min</span>
+            <span className="help-card-chev" aria-hidden>
+              {ab ? '▴' : '▾'}
+            </span>
+          </span>
+        </button>
+        {ab && <div className="help-body">{a.body}</div>}
+      </article>
+    );
+  };
 
   return (
     <section className="panel registros">
       <div className="reg-head">
         <h2>Centro de ayuda</h2>
         <p className="reg-intro">
-          Todo lo que necesitas saber para usar TradeMe y entender cómo piensa: desde cómo guardar un
-          registro hasta qué significa cada término técnico.
+          No hace falta leerlo entero. Dinos qué necesitas ahora y te llevamos directo, o busca por
+          palabra: la búsqueda mira en todo a la vez.
         </p>
       </div>
 
-      <div className="help-nav">
-        {(
-          [
-            ['manual', '📘 Manual de usuario'],
-            ['kb', '🧩 Base de conocimientos'],
-            ['faq', '❓ Preguntas frecuentes'],
-            ['glosario', '📖 Glosario'],
-          ] as Array<[Section, string]>
-        ).map(([k, label]) => (
-          <button
-            key={k}
-            type="button"
-            className={sec === k ? 'help-tab active' : 'help-tab'}
-            onClick={() => setSec(k)}
-          >
-            {label}
-          </button>
-        ))}
-        <input
-          className="help-search"
-          placeholder="Buscar…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
+      <input
+        className="help-search help-search-big"
+        placeholder="Buscar en toda la ayuda: expectancy, calibración, snapshot, drawdown…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
 
-      {sec === 'glosario' ? (
-        <div className="snap-scroll">
-          <table className="snap-table help-glos">
-            <thead>
-              <tr>
-                <th>Término</th>
-                <th>Nivel</th>
-                <th>Qué es y cómo lo aprovechamos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {glos.map(([term, level, def]) => (
-                <tr key={term}>
-                  <td>
-                    <strong>{term}</strong>
-                  </td>
-                  <td className="muted">{level}</td>
-                  <td className="muted help-def">{def}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="help-articles">
-          {filtered.length === 0 ? (
-            <p className="muted">Nada coincide con «{q}».</p>
+      {busca ? (
+        <div className="help-results">
+          {resultados.length === 0 && glosBusca.length === 0 ? (
+            <p className="muted">
+              Nada coincide con «{q}». Prueba con una palabra más corta, o mira el glosario.
+            </p>
           ) : (
-            filtered.map((a, i) => (
-              <details key={a.title} className="bt-acc" open={sec === 'manual' && i === 0}>
-                <summary>{a.title}</summary>
-                <div className="bt-acc-body help-body">{a.body}</div>
-              </details>
-            ))
+            <>
+              {resultados.map(([grupo, arts]) => (
+                <div key={grupo} className="help-group">
+                  <h3 className="help-group-h">
+                    {grupo} <span className="muted">· {arts.length}</span>
+                  </h3>
+                  {arts.map((a) => (
+                    <Tarjeta key={a.title} a={a} />
+                  ))}
+                </div>
+              ))}
+              {glosBusca.length > 0 && (
+                <div className="help-group">
+                  <h3 className="help-group-h">
+                    Glosario <span className="muted">· {glosBusca.length}</span>
+                  </h3>
+                  {glosBusca.map(([t, nivel, d]) => (
+                    <p key={t} className="help-glos-hit">
+                      <strong>{t}</strong> <span className="help-nivel">{nivel}</span>
+                      <span className="muted"> — {d}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
+      ) : (
+        <>
+          <div className="help-nav">
+            {(
+              [
+                ['inicio', 'Empezar aquí'],
+                ['manual', 'Cómo se hace'],
+                ['kb', 'Cómo funciona'],
+                ['faq', 'Dudas frecuentes'],
+                ['glosario', 'Glosario'],
+              ] as Array<[Section, string]>
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                className={sec === k ? 'help-tab active' : 'help-tab'}
+                onClick={() => setSec(k)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {sec === 'inicio' && (
+            <div className="help-home">
+              <div className="help-rutas">
+                {RUTAS.map((r) => (
+                  <button
+                    key={r.titulo}
+                    type="button"
+                    className="help-ruta"
+                    onClick={() => irA(r.sec, r.art)}
+                  >
+                    <span className="help-ruta-ico" aria-hidden>
+                      {r.icono}
+                    </span>
+                    <strong>{r.titulo}</strong>
+                    <span className="muted">{r.sub}</span>
+                    <span className="help-ruta-go">Ir →</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="help-recorrido">
+                <h3 className="help-group-h">Si es tu primer día, este es el recorrido</h3>
+                <ol className="help-pasos">
+                  <li>
+                    <button type="button" onClick={() => irA('manual', MANUAL[0]!.title)}>
+                      Leer una decisión en el Panel
+                    </button>
+                    <span className="muted">Entender qué te está diciendo la pantalla principal.</span>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => irA('manual', MANUAL[1]!.title)}>
+                      Guardar un registro y seguirlo
+                    </button>
+                    <span className="muted">Congelar una decisión para comprobar después si acertó.</span>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => irA('kb', 'Por qué perder más veces de las que se gana puede ser bueno')}
+                    >
+                      Entender por qué hay más stops que objetivos
+                    </button>
+                    <span className="muted">La cuenta que evita el susto inicial.</span>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => irA('kb', 'Cómo se lee el informe de un backtest')}>
+                      Leer un backtest sin engañarte
+                    </button>
+                    <span className="muted">En qué orden mirar las métricas y cuándo desconfiar.</span>
+                  </li>
+                </ol>
+              </div>
+
+              <p className="muted help-home-foot">
+                ¿Prefieres explorar por tu cuenta? <strong>Cómo se hace</strong> son tareas paso a
+                paso, <strong>Cómo funciona</strong> explica la maquinaria por dentro, y el{' '}
+                <strong>Glosario</strong> traduce cualquier término que te encuentres.
+              </p>
+            </div>
+          )}
+
+          {sec === 'glosario' && (
+            <div className="snap-scroll">
+              <table className="snap-table help-glos">
+                <thead>
+                  <tr>
+                    <th>Término</th>
+                    <th>Nivel</th>
+                    <th>Qué es y cómo lo aprovechamos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {GLOSARIO.map(([term, level, def]) => (
+                    <tr key={term}>
+                      <td>
+                        <strong>{term}</strong>
+                      </td>
+                      <td>
+                        <span className="help-nivel">{level}</span>
+                      </td>
+                      <td className="muted help-def">{def}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {sec !== 'inicio' && sec !== 'glosario' && (
+            <div className="help-articles">
+              {porSeccion[sec].map((a, i) => (
+                <Tarjeta key={a.title} a={a} n={sec === 'manual' ? i + 1 : undefined} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <p className="muted calib-legend">

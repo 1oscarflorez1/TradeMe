@@ -19,6 +19,19 @@ export interface BacktestRow {
 }
 
 /** Lee el último backtest guardado por apps/quant. */
+export interface BacktestHistoryRow {
+  id: string;
+  created_at: string;
+  n_trades: number | null;
+  win_rate: number | null;
+  expectancy: number | null;
+  profit_factor: number | null;
+  max_drawdown: number | null;
+  sharpe: number | null;
+  oos_win_rate: number | null;
+  oos_expectancy: number | null;
+}
+
 export class BacktestsRepo {
   constructor(private readonly pool: pg.Pool) {}
 
@@ -33,5 +46,20 @@ export class BacktestsRepo {
     const cur = res.rows[0];
     if (!cur) return null;
     return { ...cur, previous: res.rows[1] ?? null };
+  }
+
+  /**
+   * Historial de ejecuciones, de la más antigua a la más reciente. Sin las columnas pesadas
+   * (`trades`, `equity_curve`, `metrics`): aquí solo interesa cómo evoluciona el resultado.
+   */
+  async history(symbol: string, interval: string, limit = 30): Promise<BacktestHistoryRow[]> {
+    const res = await this.pool.query<BacktestHistoryRow>(
+      `SELECT id, created_at, n_trades, win_rate, expectancy, profit_factor,
+              max_drawdown, sharpe, oos_win_rate, oos_expectancy
+         FROM backtests WHERE symbol = $1 AND interval = $2
+         ORDER BY created_at DESC LIMIT $3`,
+      [symbol.toUpperCase(), interval, limit],
+    );
+    return res.rows.reverse();
   }
 }

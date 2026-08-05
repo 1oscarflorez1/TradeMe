@@ -16,14 +16,16 @@ import { CompareBars, Donut, Gauge, ProgressBar, StatusPill } from './Viz';
 /** Laboratorio: todo lo que sirve para AFINAR el modelo (calibrar, optimizar, aprender). */
 export function LabView({ symbol, interval }: { symbol: string; interval: Interval }) {
   return (
-    <div className="bt-layout">
-      <div className="bt-main">
-        <CalibrationSection symbol={symbol} interval={interval} />
-        <OptimizationSection symbol={symbol} interval={interval} />
-        <DatasetSection />
-        <AutomationSection />
-      </div>
-      <LabGuide />
+    <div className="bt-layout lab-layout">
+      <p className="lab-intro">
+        Aquí no se decide nada: aquí se <strong>afina</strong> lo que decide. Cada sección responde a
+        una pregunta distinta y las cuatro trabajan solas — el piloto automático las lanza cuando toca.
+        Lo que ves es el estado de cada una y por qué está así.
+      </p>
+      <CalibrationSection symbol={symbol} interval={interval} />
+      <OptimizationSection symbol={symbol} interval={interval} />
+      <DatasetSection />
+      <AutomationSection />
     </div>
   );
 }
@@ -638,129 +640,5 @@ function AutomationSection() {
         avisa por la campana 🔔. Los botones quedan para cuando quieras un resultado inmediato.
       </p>
     </section>
-  );
-}
-
-function LabGuide() {
-  return (
-    <aside className="panel bt-guide">
-      <details className="bt-acc" open>
-        <summary>¿Qué es el Laboratorio?</summary>
-        <div className="bt-acc-body">
-          <p>
-            Aquí se <strong>afina el modelo</strong>. El Panel decide, Registros comprueba en vivo y
-            Backtest mide sobre el histórico; el Laboratorio es donde se ajusta la maquinaria:
-            calibrar las probabilidades, optimizar los parámetros, entrenar el meta-modelo y
-            supervisar al piloto que hace todo eso por ti.
-          </p>
-          <p>
-            Regla de oro: <strong>ningún cambio se aplica si no gana en datos que no vio</strong>
-            (hold-out / validación temporal). Por eso a veces verás «no promovido»: es el sistema
-            protegiéndote del sobreajuste.
-          </p>
-        </div>
-      </details>
-
-      <div className="bt-acc-group">
-        <h4>Meta-modelo (ML) · pulsa para desplegar</h4>
-        <details className="bt-acc">
-          <summary>¿Qué hace?</summary>
-          <div className="bt-acc-body">
-            <p>
-              Aprende de tus decisiones ya evaluadas (las que tocaron objetivo o stop) a estimar qué
-              probabilidad de éxito tiene cada señal nueva. Sirve de <strong>filtro
-              anti-falsos-positivos</strong>: no cambia la dirección, ajusta la confianza.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>AUC y umbral</summary>
-          <div className="bt-acc-body">
-            <p>
-              <strong>AUC</strong> mide su capacidad de distinguir aciertos de fallos: 0,5 es azar,
-              1,0 perfecto; entre 0,6 y 0,7 ya aporta valor real en trading. El{' '}
-              <strong>umbral</strong> es el corte elegido: por debajo de esa probabilidad, la señal
-              se considera poco fiable.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>¿Cuándo entrenar?</summary>
-          <div className="bt-acc-body">
-            <p>
-              No hace falta que lo hagas: el piloto reentrena cada 12 h con los registros nuevos.
-              Pulsa <strong>🧠 Entrenar ahora</strong> solo si acabas de acumular muchos registros y
-              quieres ver el efecto ya, o tras cambiar la estrategia. Publicar solo ocurre si mejora
-              la expectancy en validación.
-            </p>
-          </div>
-        </details>
-      </div>
-
-      <div className="bt-acc-group">
-        <h4>Calibración de probabilidades · pulsa para desplegar</h4>
-        <details className="bt-acc">
-          <summary>¿Qué es calibrar?</summary>
-          <div className="bt-acc-body">
-            <p>
-              Ajusta la confianza del modelo para que refleje la frecuencia real de acierto: que
-              cuando diga «70%», acierte ~70% de las veces. Se hace por régimen (tendencia/rango).
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Diagrama de fiabilidad</summary>
-          <div className="bt-acc-body">
-            <p>
-              Probabilidad prevista (eje X) frente a frecuencia real de acierto (eje Y). La diagonal
-              es la calibración perfecta: cuanto más pegados los puntos a ella, más honestas las
-              probabilidades.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Brier score</summary>
-          <div className="bt-acc-body">
-            <p>
-              Error cuadrático medio entre la probabilidad y el resultado (0/1). Más bajo = mejor
-              calibración. Se elige entre isotónica y Platt el de menor Brier.
-            </p>
-          </div>
-        </details>
-      </div>
-
-      <div className="bt-acc-group">
-        <h4>Optimización de pesos · pulsa para desplegar</h4>
-        <details className="bt-acc">
-          <summary>Optuna</summary>
-          <div className="bt-acc-body">
-            <p>
-              Buscador bayesiano (TPE) que prueba combinaciones de pesos de los indicadores y
-              multiplicadores de régimen para maximizar la ventaja, de forma más eficiente que
-              probar al azar.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Walk-forward (purga/embargo)</summary>
-          <div className="bt-acc-body">
-            <p>
-              Validación temporal por bloques hacia adelante. La «purga» descarta trades cuyo
-              horizonte cruza el borde del bloque y el «embargo» separa bloques, evitando fuga
-              temporal entre entrenamiento y prueba.
-            </p>
-          </div>
-        </details>
-        <details className="bt-acc">
-          <summary>Hold-out y promoción</summary>
-          <div className="bt-acc-body">
-            <p>
-              Se reserva un tramo final (nunca usado en la búsqueda). El candidato optimizado solo
-              se promociona si supera al base en ese hold-out: así se evita el sobreajuste.
-            </p>
-          </div>
-        </details>
-      </div>
-    </aside>
   );
 }
