@@ -430,16 +430,21 @@ export async function askAssistant(
   historial: Array<{ role: 'user' | 'assistant'; content: string }>,
   symbol: string,
   interval: string,
-): Promise<{ texto: string; modelo: string } | { error: string }> {
+): Promise<{ texto: string; modelo: string; consultas?: string[] } | { error: string }> {
   try {
     const res = await apiFetch('/assistant/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pregunta, historial, symbol, interval }),
     });
-    const body = (await res.json().catch(() => ({}))) as { texto?: string; modelo?: string; error?: string };
+    const body = (await res.json().catch(() => ({}))) as {
+      texto?: string;
+      modelo?: string;
+      consultas?: string[];
+      error?: string;
+    };
     if (!res.ok || !body.texto) return { error: body.error ?? `HTTP ${res.status}` };
-    return { texto: body.texto, modelo: body.modelo ?? '' };
+    return { texto: body.texto, modelo: body.modelo ?? '', consultas: body.consultas };
   } catch (e) {
     return { error: String(e) };
   }

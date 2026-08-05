@@ -27,6 +27,8 @@ interface Mensaje {
   texto: string;
   /** De dónde salió la respuesta: el modelo o la base local. */
   fuente?: 'modelo' | 'local';
+  /** Qué consultó el modelo para responder. Se muestra: nada de caja negra. */
+  consultas?: string[];
 }
 
 const pct = (n: number | null | undefined, d = 0) =>
@@ -237,6 +239,7 @@ const SUGERENCIAS = [
   '¿Qué es la expectancy?',
   '¿Cómo aprende el sistema?',
   '¿De dónde salen las velas?',
+  'Compara 15m con 30m y dime cuál va mejor',
   '¿TradeMe opera por mí?',
 ];
 
@@ -361,7 +364,7 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
     const r = await askAssistant(pregunta, historial, symbol, interval);
     setPensando(false);
     if ('texto' in r) {
-      setMensajes((m) => [...m, { de: 'bot', texto: r.texto, fuente: 'modelo' }]);
+      setMensajes((m) => [...m, { de: 'bot', texto: r.texto, fuente: 'modelo', consultas: r.consultas }]);
     } else {
       setMensajes((m) => [
         ...m,
@@ -402,11 +405,16 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
             {mensajes.map((m, i) => (
               <div key={i} className={`bot-msg ${m.de}`}>
                 <Formato texto={m.texto} />
+                {m.consultas && m.consultas.length > 0 && (
+                  <p className="bot-consultas" title="Datos que el asistente consultó para responder">
+                    consultó: {[...new Set(m.consultas)].map((c) => c.replace(/_/g, ' ')).join(' · ')}
+                  </p>
+                )}
               </div>
             ))}
             {pensando && (
               <div className="bot-msg bot bot-pensando">
-                <p>Pensando…</p>
+                <p>Consultando la plataforma…</p>
               </div>
             )}
             <div ref={finRef} />

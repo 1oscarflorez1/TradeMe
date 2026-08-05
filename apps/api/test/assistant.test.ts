@@ -77,3 +77,58 @@ describe('contexto que se envía al modelo', () => {
     expect(c).not.toContain('HABILITADA');
   });
 });
+
+import { TOOLS, resumirPrecios } from '../src/assistant/tools.js';
+import { SYSTEM_PROMPT } from '../src/assistant/context.js';
+
+describe('herramientas del asistente', () => {
+  it('todas son de solo lectura: ninguna escribe, borra ni lanza procesos', () => {
+    const prohibido = /crear|borrar|elimina|guardar|ejecutar_sql|actualizar|lanzar|optimiz|entrenar|orden/i;
+    for (const t of TOOLS) {
+      expect(t.function.name).not.toMatch(prohibido);
+    }
+    // Y no existe una herramienta genérica de consulta libre.
+    expect(TOOLS.map((t) => t.function.name)).not.toContain('sql');
+  });
+
+  it('cada herramienta declara su esquema de parámetros', () => {
+    for (const t of TOOLS) {
+      expect(t.type).toBe('function');
+      expect(t.function.description.length).toBeGreaterThan(40);
+      expect(t.function.parameters).toHaveProperty('type', 'object');
+    }
+  });
+
+  it('las temporalidades están acotadas por lista cerrada, no por texto libre', () => {
+    const conIv = TOOLS.filter((t) =>
+      Object.keys((t.function.parameters as { properties: object }).properties).includes('interval'),
+    );
+    expect(conIv.length).toBeGreaterThan(0);
+    for (const t of conIv) {
+      const props = (t.function.parameters as { properties: Record<string, { enum?: string[] }> }).properties;
+      expect(props.interval?.enum).toContain('30m');
+    }
+  });
+
+  it('el prompt le prohíbe inventar datos y actuar sobre la plataforma', () => {
+    expect(SYSTEM_PROMPT).toContain('Nunca inventas números');
+    expect(SYSTEM_PROMPT).toContain('No das asesoría financiera');
+    expect(SYSTEM_PROMPT).toContain('SOLO LECTURA');
+  });
+});
+
+describe('resumirPrecios', () => {
+  it('resume en cifras en vez de volcar las velas', () => {
+    const r = resumirPrecios([100, 102, 101, 105], [101, 103, 102, 106], [99, 101, 100, 104]) as Record<string, number>;
+    expect(r.velas).toBe(4);
+    expect(r.variacionPct).toBe(5);
+    expect(r.maximo).toBe(106);
+    expect(r.minimo).toBe(99);
+    expect(r.velasAlcistas).toBe(2);
+    expect(r.velasBajistas).toBe(1);
+  });
+
+  it('no revienta sin datos', () => {
+    expect(resumirPrecios([], [], [])).toHaveProperty('error');
+  });
+});

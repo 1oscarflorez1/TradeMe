@@ -16,6 +16,7 @@ import { BacktestsRepo } from './db/backtests-repo.js';
 import { EvidenceRepo } from './db/evidence-repo.js';
 import { AssistantProvider, AssistantQuota } from './assistant/provider.js';
 import { SYSTEM_PROMPT, construirContexto } from './assistant/context.js';
+import { TOOLS, resumirPrecios } from './assistant/tools.js';
 import { AlertsRepo } from './db/alerts-repo.js';
 import { AccessLogRepo } from './db/access-log-repo.js';
 import { WatchlistRepo } from './db/watchlist-repo.js';
@@ -305,12 +306,103 @@ async function main(): Promise<void> {
             version: pkgVersion,
             liveTrading: env.ENABLE_LIVE_TRADING === 'true',
           });
-          return asistente.ask([
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'system', content: contexto },
-            ...historial,
-            { role: 'user', content: pregunta },
-          ]);
+          /** Ejecuta lo que el modelo pida. Todo es de solo lectura y con salidas acotadas. */
+          const ejecutar = async (
+            nombre: string,
+            args: Record<string, unknown>,
+          ): Promise<unknown> => {
+            const pedido = String(args.interval ?? '');
+            const ivArg = (parseIntervals(env).includes(pedido as Interval)
+              ? pedido
+              : iv) as Interval;
+
+            switch (nombre) {
+              case 'decision_de_temporalidad': {
+                const w = buffer.get(symbol, ivArg);
+                if (w.length < MIN_CANDLES_FOR_VOTES) {
+                  return { error: `todavía no hay velas suficientes de ${ivArg}` };
+                }
+                const sg = buildSignal({
+                  symbol,
+                  price: w[w.length - 1]!.close,
+                  votes: [...registry.computeVotes(w), ...externalStore.active(symbol)],
+                  config: getEnsembleFor(symbol, ivArg),
+                  equity: env.ACCOUNT_EQUITY,
+                  interval: ivArg,
+                  macro: macroEnabled ? macroStore.get(symbol) : undefined,
+                  calibrators,
+                  metaModel,
+                  metaMode: metaPolicy.mode,
+                  metaVetoThreshold: env.META_VETO_THRESHOLD,
+                  metaModulateWeight: env.META_MODULATE_WEIGHT,
+                });
+                return {
+                  interval: ivArg,
+                  accion: sg.action,
+                  direccion: sg.direction,
+                  confianza: sg.confidence,
+                  net: sg.net,
+                  regimen: sg.regime.label,
+                  adx: sg.regime.adx,
+                  precio: sg.price,
+                  votos: sg.votes.map((v) => ({ indicador: v.label, voto: v.value })),
+                };
+              }
+              case 'resumen_registros': {
+                const st = await snapshotsRepo?.stats(symbol);
+                if (!st) return { error: 'sin persistencia disponible' };
+                if (args.interval) {
+                  return st.porTf.find((t) => t.interval === ivArg) ?? { error: `sin registros de ${ivArg}` };
+                }
+                return st;
+              }
+              case 'historial_backtests': {
+                const h = await backtestsRepo?.history(symbol, ivArg, 20);
+                return h && h.length > 0 ? { interval: ivArg, corridas: h } : { error: `sin backtests de ${ivArg}` };
+              }
+              case 'evidencia_indicadores': {
+                const e = await evidenceRepo?.porIndicador(symbol, ivArg);
+                return e ?? { error: 'sin persistencia disponible' };
+              }
+              case 'resumen_de_precios': {
+                const n = Math.max(10, Math.min(300, Number(args.velas ?? 100)));
+                const w = buffer.get(symbol, ivArg).slice(-n);
+                return {
+                  interval: ivArg,
+                  ...resumirPrecios(
+                    w.map((c) => c.close),
+                    w.map((c) => c.high),
+                    w.map((c) => c.low),
+                  ),
+                };
+              }
+              case 'estado_del_sistema':
+                return { proveedores: providers.info(), metaModo: metaPolicy.mode, motivo: metaPolicy.reason };
+              case 'uso_por_temporalidad': {
+                const st = await snapshotsRepo?.stats(symbol).catch(() => null);
+                const porTf = new Map((st?.porTf ?? []).map((t) => [t.interval, t.total]));
+                return parseIntervals(env).map((x: Interval) => ({
+                  interval: x,
+                  captura: env.AUTO_CAPTURE === 'true' && captureIntervals.has(x),
+                  optimizado: ensembleMeta(symbol, x).optimized,
+                  registros: porTf.get(x) ?? 0,
+                }));
+              }
+              default:
+                return { error: `herramienta desconocida: ${nombre}` };
+            }
+          };
+
+          return asistente.askWithTools(
+            [
+              { role: 'system', content: SYSTEM_PROMPT },
+              { role: 'system', content: contexto },
+              ...historial,
+              { role: 'user', content: pregunta },
+            ],
+            TOOLS,
+            ejecutar,
+          );
         }
       : undefined,
     getEvidencia: evidenceRepo

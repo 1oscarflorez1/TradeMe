@@ -127,7 +127,7 @@ export interface AppDeps {
     symbol: string,
     interval: string,
     usuario: string,
-  ) => Promise<{ texto: string; modelo: string }>;
+  ) => Promise<{ texto: string; modelo: string; consultas?: string[] }>;
   assistantInfo?: () => { enabled: boolean; model: string; host: string };
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */

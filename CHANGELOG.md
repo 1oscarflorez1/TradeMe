@@ -5,6 +5,19 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — El asistente puede consultar la plataforma (herramientas)
+
+- Siete **herramientas de solo lectura** que el modelo puede invocar cuando la pregunta necesita
+  datos que no tiene: decisión de otra temporalidad, resumen de registros, historial de backtests,
+  evidencia por indicador, resumen de precios, estado del sistema y uso por temporalidad.
+- Deja de ser «te explico la foto que me dieron» y pasa a «déjame mirar y te digo»: ya puede
+  responder a *«compara 15m con 30m y dime cuál va mejor»*.
+- **Sin superficie de escritura**: ninguna herramienta modifica nada, no hay consulta SQL libre y
+  los parámetros van por listas cerradas. Una prueba falla si se añade una herramienta cuyo nombre
+  sugiera acción.
+- Tope de **tres vueltas** por pregunta, con la última sin herramientas para forzar respuesta.
+- Bajo cada respuesta se muestra **qué consultó** el asistente.
+
 ### Added — El asistente puede usar un modelo de lenguaje gratuito
 
 - **`POST /assistant/ask`**: la llamada al proveedor ocurre en el servidor, nunca en el navegador,

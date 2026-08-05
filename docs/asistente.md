@@ -94,6 +94,42 @@ docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod exec 
 otros 2–3 GB de margen. Tu equipo ya sostiene Postgres, Redis, la API, quant y la web — y el plan
 contempla añadir el gateway de IBKR, que pide otro giga. Mídelo antes de dejarlo fijo.
 
+## Herramientas: el asistente puede consultar, no solo leer una foto
+
+Sin herramientas, el modelo solo veía el estado que la API le entregaba de entrada: siempre el
+activo y la temporalidad en pantalla. Si preguntabas por otra, no la tenía.
+
+Ahora puede pedir lo que le falte. Todas son de **solo lectura**:
+
+| Herramienta | Para qué |
+|---|---|
+| `decision_de_temporalidad` | La decisión en vivo de OTRA temporalidad, con sus votos |
+| `resumen_registros` | Estadísticas de decisiones evaluadas, en total o por temporalidad |
+| `historial_backtests` | Las corridas guardadas: ¿mejora o se degrada? |
+| `evidencia_indicadores` | Aporte real medido de cada indicador |
+| `resumen_de_precios` | Recorrido reciente: variación, máximo, mínimo, velas alcistas |
+| `estado_del_sistema` | Salud de componentes y proveedores |
+| `uso_por_temporalidad` | Dónde trabaja el motor y con qué configuración |
+
+Con esto puedes pedirle *«compara 15m con 30m y dime cuál va mejor»* y lo hará de verdad: consulta
+las dos, mira sus registros y sus backtests, y responde. Debajo de cada respuesta se lista **qué
+consultó** — nada de caja negra.
+
+### Tres decisiones de diseño, todas por seguridad
+
+1. **Solo lectura, sin excepciones.** Ninguna herramienta escribe, borra, lanza procesos ni cambia
+   configuración. Actuar se hace desde los botones de la interfaz. Hay una prueba que falla si
+   alguien añade una herramienta cuyo nombre sugiera lo contrario.
+2. **Superficie cerrada.** No existe un `ejecutar_sql` ni nada parecido. Cada herramienta tiene un
+   propósito concreto y sus parámetros están acotados por listas cerradas: la temporalidad se elige
+   de un enumerado, no se acepta texto libre.
+3. **Respuestas pequeñas.** Se devuelven resúmenes, no volcados. Una serie de precios se resume en
+   ocho cifras en vez de mandar trescientas velas que además llenarían la ventana de contexto.
+
+Y un tope de **tres vueltas** por pregunta: en la última se le retiran las herramientas para forzar
+una respuesta en texto. Sin ese límite, un modelo confundido podría encadenar llamadas hasta agotar
+el cupo.
+
 ## Salvaguardas
 
 - **Cupo por usuario**: 6 preguntas por minuto y 120 al día. Evita que una pestaña abierta agote el

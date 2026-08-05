@@ -2816,3 +2816,7 @@ html, body { overflow-x: hidden; }
   .bot-fab { right: 14px; bottom: 14px; }
 }
 .bot-pensando p { color: var(--muted); font-style: italic; }
+.bot-consultas {
+  margin-top: 8px !important; padding-top: 6px; border-top: 1px dashed var(--border);
+  font-size: 10.5px; color: var(--muted); font-style: italic;
+}
