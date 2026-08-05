@@ -942,6 +942,9 @@ pre.hint {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  /* Debe poder encogerse: si no, la barra de temporalidades empuja la cabecera fuera de la vista. */
+  min-width: 0;
+  flex: 1 1 240px;
 }
 
 .tf-group .tf {
@@ -2507,7 +2510,7 @@ pre.hint {
 }
 
 /* --- Barra de temporalidades: navegación por botones + estado de uso --- */
-.tfbar { position: relative; display: flex; align-items: stretch; gap: 4px; min-width: 0; }
+.tfbar { position: relative; display: flex; align-items: stretch; gap: 4px; min-width: 0; max-width: 100%; }
 .tfbar-nav {
   flex: 0 0 auto; width: 26px; border: 1px solid var(--border); background: var(--bg-elev);
   color: var(--text); border-radius: 8px; font-size: 17px; line-height: 1; cursor: pointer;
@@ -2516,7 +2519,11 @@ pre.hint {
 .tfbar-nav:disabled { opacity: .3; cursor: default; }
 .tfbar-track {
   position: relative; display: flex; gap: 4px; overflow-x: auto; scroll-behavior: smooth;
-  scrollbar-width: none; min-width: 0;
+  scrollbar-width: none;
+  /* Sin esto, la tira crece hasta su contenido en vez de encogerse, empuja la cabecera y hace
+     que la página entera se desplace en horizontal. */
+  min-width: 0; flex: 1 1 auto;
+  overscroll-behavior-x: contain;
 }
 .tfbar-track::-webkit-scrollbar { display: none; }
 .tfbar-fade {
@@ -2529,9 +2536,15 @@ pre.hint {
   gap: 5px; padding: 5px 9px; border-radius: 8px;
 }
 .tfbar .tf.tf-viva { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
-.tf-marcas { display: inline-flex; gap: 2px; line-height: 1; }
-.tf-marca { font-size: 7px; color: var(--border); transition: color .15s; }
+.tf-marcas { display: inline-flex; gap: 3px; line-height: 1; }
+.tf-marca { font-size: 8px; color: var(--border); transition: color .15s; }
 .tf-marca.on { color: var(--accent); }
+/* Marca única en el botón: encendida = el motor analiza y registra esa temporalidad. */
+.tf-activa {
+  width: 5px; height: 5px; border-radius: 50%;
+  border: 1px solid var(--border); background: transparent;
+}
+.tf-activa.on { background: var(--accent); border-color: var(--accent); }
 .tfbar-info {
   flex: 0 0 auto; width: 24px; border: 1px solid var(--border); background: var(--bg-elev);
   color: var(--muted); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
@@ -2739,3 +2752,71 @@ pre.hint {
 .aporte-barra.pos { background: var(--buy); }
 .aporte-barra.neg { background: var(--sell); }
 @media (max-width: 900px) { .sus-cabecera { grid-template-columns: 1fr; } }
+
+
+/* La cabecera nunca debe provocar desplazamiento horizontal de la página. */
+.topbar, .tf-alert-wrap { min-width: 0; max-width: 100%; }
+.topbar { flex-wrap: wrap; }
+.tf-alert-wrap { overflow: visible; }
+html, body { overflow-x: hidden; }
+
+/* --- Asistente flotante --- */
+.bot-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 90;
+  width: 52px; height: 52px; border-radius: 50%; cursor: pointer;
+  font-size: 22px; line-height: 1;
+  background: var(--bg-elev); color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgb(0 0 0 / .45);
+  transition: transform .15s, border-color .15s;
+}
+.bot-fab:hover { transform: translateY(-2px); border-color: var(--accent); }
+.bot-fab.on { border-color: var(--accent); font-size: 17px; }
+.bot-panel {
+  position: fixed; right: 20px; bottom: 84px; z-index: 90;
+  width: min(420px, calc(100vw - 40px)); max-height: min(620px, calc(100vh - 130px));
+  display: flex; flex-direction: column;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 16px 44px rgb(0 0 0 / .55); overflow: hidden;
+}
+.bot-head { padding: 12px 14px; border-bottom: 1px solid var(--border); display: grid; gap: 2px; }
+.bot-head strong { font-size: 13.5px; }
+.bot-head span { font-size: 11px; }
+.bot-hilo { flex: 1; overflow-y: auto; padding: 12px 14px; display: grid; gap: 10px; align-content: start; }
+.bot-msg { font-size: 12.5px; line-height: 1.6; border-radius: 10px; padding: 9px 11px; max-width: 92%; }
+.bot-msg.bot { background: var(--bg); border: 1px solid var(--border); justify-self: start; }
+.bot-msg.yo {
+  justify-self: end; background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.bot-msg p { margin: 0 0 6px; }
+.bot-msg p:last-child { margin-bottom: 0; }
+.bot-msg p.bot-sep { height: 4px; margin: 0; }
+.bot-msg code { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--accent); }
+.bot-sugerencias { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
+.bot-sugerencias button {
+  font-size: 11.5px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  background: none; color: var(--muted); border: 1px solid var(--border);
+}
+.bot-sugerencias button:hover { border-color: var(--accent); color: var(--accent); }
+.bot-entrada { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+.bot-entrada input {
+  flex: 1; min-width: 0; padding: 8px 11px; border-radius: 8px; font-size: 12.5px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+}
+.bot-entrada input:focus { outline: none; border-color: var(--accent); }
+.bot-entrada button {
+  padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  background: var(--accent); color: #06101c; border: none;
+}
+.bot-entrada button:disabled { opacity: .4; cursor: default; }
+.bot-pie { padding: 0 14px 10px; font-size: 10.5px; line-height: 1.45; margin: 0; }
+@media (max-width: 720px) {
+  .bot-panel { right: 10px; left: 10px; width: auto; bottom: 78px; }
+  .bot-fab { right: 14px; bottom: 14px; }
+}
+.bot-pensando p { color: var(--muted); font-style: italic; }
+.bot-consultas {
+  margin-top: 8px !important; padding-top: 6px; border-top: 1px dashed var(--border);
+  font-size: 10.5px; color: var(--muted); font-style: italic;
+}

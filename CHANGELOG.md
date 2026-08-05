@@ -5,6 +5,55 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Added — El asistente puede consultar la plataforma (herramientas)
+
+- Siete **herramientas de solo lectura** que el modelo puede invocar cuando la pregunta necesita
+  datos que no tiene: decisión de otra temporalidad, resumen de registros, historial de backtests,
+  evidencia por indicador, resumen de precios, estado del sistema y uso por temporalidad.
+- Deja de ser «te explico la foto que me dieron» y pasa a «déjame mirar y te digo»: ya puede
+  responder a *«compara 15m con 30m y dime cuál va mejor»*.
+- **Sin superficie de escritura**: ninguna herramienta modifica nada, no hay consulta SQL libre y
+  los parámetros van por listas cerradas. Una prueba falla si se añade una herramienta cuyo nombre
+  sugiera acción.
+- Tope de **tres vueltas** por pregunta, con la última sin herramientas para forzar respuesta.
+- Bajo cada respuesta se muestra **qué consultó** el asistente.
+
+### Added — El asistente puede usar un modelo de lenguaje gratuito
+
+- **`POST /assistant/ask`**: la llamada al proveedor ocurre en el servidor, nunca en el navegador,
+  para que la clave no viaje al cliente. Un solo adaptador compatible con el formato de OpenAI cubre
+  **Groq, Cerebras, Mistral, OpenRouter y Ollama**: cambiar de proveedor son dos variables.
+- El contexto lo construye la API (`assistant/context.ts`): decisión en vivo con sus votos, régimen,
+  estadísticas de registros, configuración activa y aporte medido de cada indicador. **No se envían
+  claves, correos ni datos personales**, solo cifras agregadas.
+- **Instrucciones que el modelo no puede saltarse**: no da asesoría financiera, no recomienda operar,
+  no promete rentabilidad y no puede inventar datos que no estén en el contexto.
+- **Cupo por usuario** (6/min, 120/día) para que una pestaña abierta no agote el plan gratuito.
+- **Reserva automática**: si no hay proveedor, o si falla, responde la base de conocimiento local.
+  El asistente nunca se queda mudo.
+- `docs/asistente.md` con la comparativa de proveedores gratuitos, qué se envía exactamente y cómo
+  montar Ollama si se prefiere que nada salga de la red.
+
+### Added — Asistente de la plataforma
+
+- **Botón flotante 🤖** abajo a la derecha con un asistente que responde sobre TradeMe: por qué
+  decide lo que decide ahora mismo, qué significan las métricas, cómo aprende, de dónde salen los
+  datos, cómo está montado por dentro y qué estado tiene cada componente.
+- No es un buscador de documentación: **lee el estado en vivo** (decisión actual y sus votos,
+  estadísticas de registros, configuración activa, salud de los servicios, uso por temporalidad) y
+  responde con las cifras reales del sistema. Todo se resuelve en el navegador; no sale nada de la
+  red y no hay coste por consulta.
+
+### Fixed — Barra de temporalidades
+
+- **Las flechas ya no arrastran la página.** Faltaba `min-width: 0` en la tira y en su contenedor,
+  así que la barra crecía hasta su contenido, empujaba la cabecera y desplazaba la vista entera en
+  horizontal. Además las flechas ahora **recorren la tira** en lugar de cambiar de temporalidad:
+  navegar y elegir son cosas distintas.
+- **Una sola marca en vez de tres glifos.** Los símbolos `● ◆ ▮` no se entendían sin consultar la
+  leyenda. Queda un punto que se enciende cuando el motor analiza y registra esa temporalidad; el
+  detalle vive en el tooltip y en el botón «?».
+
 ### Added — Panel de decisión (pestaña «Sustento»)
 
 - **`GET /decision/sustento`**: configuración activa (pesos, multiplicadores de régimen, banda

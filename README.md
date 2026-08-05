@@ -134,6 +134,7 @@ un PR por hito; Conventional Commits; nunca commits directos a `main`.
 - [`docs/contrato.md`](docs/contrato.md) — contrato Node↔Python
 - [`docs/indicadores.md`](docs/indicadores.md) — motor de indicadores (plugin)
 - [`docs/multiactivo.md`](docs/multiactivo.md) — lista de activos seguidos y suscripción en caliente
+- [`docs/asistente.md`](docs/asistente.md) — asistente 🤖: base local y modelo de lenguaje opcional
 - [`docs/proveedores.md`](docs/proveedores.md) — proveedores de datos, modos de entrega y por qué
   TradingView no puede ser fuente de velas
 - [`docs/riesgo.md`](docs/riesgo.md) — seguridad, riesgo y cumplimiento

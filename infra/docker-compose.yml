@@ -47,6 +47,10 @@ services:
       QUANT_URL: http://quant:8000
       # Acciones, divisas e índices (opcional). Vacío = solo cripto vía Binance.
       TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
+      # Asistente con modelo de lenguaje (opcional). Ver docs/asistente.md.
+      ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-}
+      ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
     volumes:
       - ../artifacts:/repo/artifacts
     ports:
