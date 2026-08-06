@@ -2524,6 +2524,9 @@ pre.hint {
 .tfbar-track {
   position: relative; display: flex; gap: 4px; overflow-x: auto; scroll-behavior: smooth;
   scrollbar-width: none;
+  /* A la vista, solo las temporalidades que de verdad se usan; el resto se alcanza deslizando.
+     Nueve botones a la vez comían la cabecera y ninguno destacaba. */
+  max-width: 320px;
   /* Sin esto, la tira crece hasta su contenido en vez de encogerse, empuja la cabecera y hace
      que la página entera se desplace en horizontal. */
   min-width: 0; flex: 1 1 auto;
@@ -2583,8 +2586,15 @@ pre.hint {
 @media (max-width: 860px) { .bt-evo { grid-template-columns: 1fr; } }
 
 /* --- Laboratorio: a lo ancho y con respiración uniforme --- */
-.lab-layout > .panel,
-.lab-layout > .calib-panel { margin: 0; width: 100%; max-width: none; }
+/* Selector amplio a propósito: .panel, .calib-panel y .opt-panel llevan cada uno su propio
+   max-width de 720px, pensado para vistas estrechas. En las de ancho completo hay que anularlos
+   todos, y por descendencia (no por hijo directo) para que valga aunque cambie el envoltorio. */
+.lab-layout .panel,
+.lab-layout .calib-panel,
+.lab-layout .opt-panel,
+.bt-layout .panel,
+.bt-layout .calib-panel,
+.bt-layout .opt-panel { margin: 0; width: 100%; max-width: none; }
 .lab-intro {
   margin: 0 0 2px;
   padding: 12px 14px;
@@ -2773,6 +2783,10 @@ pre.hint {
 .sym-select { max-width: 130px; }
 @media (max-width: 1100px) {
   .topbar .nav { padding: .3rem .38rem; font-size: 12px; }
+  .tfbar-track { max-width: 240px; }
+}
+@media (max-width: 820px) {
+  .tfbar-track { max-width: 180px; }
 }
 .tf-alert-wrap { overflow: visible; }
 html, body { overflow-x: hidden; }

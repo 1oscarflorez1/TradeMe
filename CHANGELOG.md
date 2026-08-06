@@ -5,6 +5,15 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Fixed — Laboratorio a lo ancho (de verdad) y barra más recogida
+
+- El arreglo anterior anulaba el `max-width` de `.panel`, pero `.calib-panel` y `.opt-panel` llevan
+  **su propio** `max-width: 720px`. Se anulan los tres, y por descendencia en vez de por hijo
+  directo para que siga valiendo aunque cambie el envoltorio.
+- **Barra de temporalidades recogida**: la tira se limita en ancho para que a simple vista se vean
+  solo las que de verdad se usan; el resto se alcanza deslizando con las flechas. Al cargar, se
+  centra en la primera temporalidad en la que trabaja el motor, no en la primera de la lista.
+
 ### Changed — El sustento vive dentro del Panel
 
 - **Se retira la pestaña «Sustento»**: su contenido pasa a ser una sección debajo del Panel, que es

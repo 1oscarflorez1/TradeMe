@@ -85,17 +85,20 @@ export function TimeframeBar({
     return () => obs.disconnect();
   }, [intervals]);
 
-  // Traer la seleccionada a la vista moviendo SOLO la tira. Nunca scrollIntoView: eso desplaza
-  // también la página y saca la cabecera de la pantalla.
+  // Traer a la vista la seleccionada —o, si aún no hay ninguna, la primera en la que trabaja el
+  // motor— moviendo SOLO la tira. Nunca scrollIntoView: eso desplaza también la página.
   useEffect(() => {
     const el = pistaRef.current;
-    const btn = el?.querySelector<HTMLElement>(`[data-tf="${tf}"]`);
+    const foco = usage[tf]?.captura
+      ? tf
+      : (intervals.find((x) => usage[x]?.captura) ?? tf);
+    const btn = el?.querySelector<HTMLElement>(`[data-tf="${foco}"]`);
     if (el && btn) {
       const centro = btn.offsetLeft - el.offsetLeft - el.clientWidth / 2 + btn.clientWidth / 2;
       el.scrollTo({ left: Math.max(0, centro), behavior: 'smooth' });
     }
     revisarBordes();
-  }, [tf, intervals]);
+  }, [tf, intervals, usage]);
 
   /**
    * Desplaza la tira, no la selección.
