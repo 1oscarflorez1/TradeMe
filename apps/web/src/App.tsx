@@ -51,7 +51,7 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
   reconnecting: 'Reconectando…',
 };
 
-type View = 'panel' | 'sustento' | 'registros' | 'backtest' | 'lab' | 'ayuda' | 'novedades' | 'estado';
+type View = 'panel' | 'registros' | 'backtest' | 'lab' | 'ayuda' | 'novedades' | 'estado';
 
 export function App() {
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -402,14 +402,6 @@ export function App() {
             </button>
             <button
               type="button"
-              className={view === 'sustento' ? 'nav active' : 'nav'}
-              onClick={() => setView('sustento')}
-              title="Por qué el motor decide lo que decide"
-            >
-              Sustento
-            </button>
-            <button
-              type="button"
               className={view === 'registros' ? 'nav active' : 'nav'}
               onClick={() => setView('registros')}
             >
@@ -593,9 +585,7 @@ export function App() {
       </header>
 
       <main className="content">
-        {view === 'sustento' ? (
-          <SustentoView symbol={symbol} interval={tf} />
-        ) : view === 'registros' ? (
+        {view === 'registros' ? (
           <SnapshotsView symbol={symbol} />
         ) : view === 'backtest' ? (
           <BacktestView symbol={symbol} interval={tf} />
@@ -613,6 +603,7 @@ export function App() {
             <p className="hint">¿Está la API en marcha? (`pnpm --filter @trademe/api dev`)</p>
           </div>
         ) : (
+          <>
           <div className="panel-view">
             <div className="panel-left">
               <section className="panel chart-panel">
@@ -714,7 +705,12 @@ export function App() {
                   <WebhookStatus votes={votes} now={now} />
                 </section>
               </div>
-          </div>
+            </div>
+
+            {/* El sustento vive aquí, debajo del Panel: es la continuación natural de la
+                decisión, no una pestaña aparte. */}
+            <SustentoView symbol={symbol} interval={tf} />
+          </>
         )}
       </main>
 

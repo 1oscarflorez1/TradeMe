@@ -651,6 +651,9 @@ pre.hint {
 .bt-layout > .panel {
   margin: 0;
   width: 100%;
+  /* .panel lleva max-width: 720px para las vistas estrechas; en las de ancho completo estorba
+     y dejaba media pantalla vacía. */
+  max-width: none;
 }
 
 .bt-guide {
@@ -1185,7 +1188,8 @@ pre.hint {
 
 /* ---- Fase presentación: Panel en una sola vista ---- */
 .panel-view {
-  height: 100%;
+  /* Antes era height:100% para caber sin scroll; ahora el sustento va debajo y la vista crece. */
+  min-height: 78vh;
   display: grid;
   grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -2580,7 +2584,7 @@ pre.hint {
 
 /* --- Laboratorio: a lo ancho y con respiración uniforme --- */
 .lab-layout > .panel,
-.lab-layout > .calib-panel { margin: 0; width: 100%; }
+.lab-layout > .calib-panel { margin: 0; width: 100%; max-width: none; }
 .lab-intro {
   margin: 0 0 2px;
   padding: 12px 14px;
@@ -2756,7 +2760,20 @@ pre.hint {
 
 /* La cabecera nunca debe provocar desplazamiento horizontal de la página. */
 .topbar, .tf-alert-wrap { min-width: 0; max-width: 100%; }
-.topbar { flex-wrap: wrap; }
+/* Una sola fila: en vez de envolver, cada bloque se encoge y la tira de temporalidades desliza. */
+.topbar { flex-wrap: nowrap; gap: .6rem; padding: .5rem .9rem; }
+.topbar .nav { padding: .3rem .5rem; font-size: 12.5px; white-space: nowrap; }
+.topbar .brand { flex: 0 0 auto; }
+.topbar .brand small, .topbar .brand .tagline { display: none; }
+.nav-group { display: flex; gap: .1rem; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.tfbar .tf { padding: 4px 7px; gap: 4px; }
+.tfbar .tf .tf-label { font-size: 12px; }
+.tfbar-nav, .tfbar-info { width: 22px; }
+.gear-btn, .asset-btn { padding: .25rem .45rem; }
+.sym-select { max-width: 130px; }
+@media (max-width: 1100px) {
+  .topbar .nav { padding: .3rem .38rem; font-size: 12px; }
+}
 .tf-alert-wrap { overflow: visible; }
 html, body { overflow-x: hidden; }
 
@@ -2820,3 +2837,12 @@ html, body { overflow-x: hidden; }
   margin-top: 8px !important; padding-top: 6px; border-top: 1px dashed var(--border);
   font-size: 10.5px; color: var(--muted); font-style: italic;
 }
+
+/* El sustento va debajo del Panel: separación clara, sin heredar su restricción de altura. */
+.sus-bloque { margin-top: 1rem; }
+.panel-view + .sus-bloque { border-top: 1px solid var(--border); padding-top: 1rem; }
+
+/* Con el sustento debajo, el Panel deja de recortar su contenido para caber en una pantalla. */
+.panel-view .side { overflow: visible; }
+.panel-view .webhooks-panel { overflow: visible; flex: 0 0 auto; min-height: 120px; }
+.panel-view .panel-left { overflow: visible; }

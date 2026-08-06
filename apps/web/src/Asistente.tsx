@@ -240,6 +240,7 @@ const SUGERENCIAS = [
   '¿Cómo aprende el sistema?',
   '¿De dónde salen las velas?',
   'Compara 15m con 30m y dime cuál va mejor',
+  '¿Qué está moviendo el mercado hoy?',
   '¿TradeMe opera por mí?',
 ];
 
@@ -397,6 +398,7 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
             <span className="muted">
               {symbol} · {interval} ·{' '}
               {info.enabled ? `modelo ${info.model}` : 'base de conocimiento local'}
+              {info.busqueda?.enabled ? ' · con internet' : ''}
               {ctx ? ' · con datos en vivo' : ' · cargando estado…'}
             </span>
           </div>
@@ -450,7 +452,7 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
 
           <p className="bot-pie muted">
             {info.enabled
-              ? `Responde un modelo alojado en ${info.host}, al que se le envía el estado del sistema (cifras, no credenciales). Si falla, contesta la base local.`
+              ? `Responde un modelo alojado en ${info.host}, al que se le envía el estado del sistema (cifras, no credenciales)${info.busqueda?.enabled ? ' y que puede buscar en internet' : ''}. Si falla, contesta la base local.`
               : 'Responde la base de conocimiento local con el estado en vivo. No sale nada de tu red.'}{' '}
             No es asesoría financiera.
           </p>

@@ -115,6 +115,30 @@ Con esto puedes pedirle *«compara 15m con 30m y dime cuál va mejor»* y lo har
 las dos, mira sus registros y sus backtests, y responde. Debajo de cada respuesta se lista **qué
 consultó** — nada de caja negra.
 
+### Búsqueda en internet (opcional)
+
+Con un proveedor configurado, el asistente gana una octava herramienta: `buscar_en_internet`. Sirve
+para lo que depende de información externa o actual — noticias, contexto macroeconómico, qué está
+pasando con un activo — y cita la fuente.
+
+| Proveedor | `ASSISTANT_SEARCH` | Plan gratuito |
+|---|---|---|
+| **Tavily** | `tavily` | ~1 000 búsquedas/mes |
+| **Brave Search** | `brave` | ~2 000 búsquedas/mes |
+
+```env
+ASSISTANT_SEARCH=tavily
+ASSISTANT_SEARCH_KEY=tu_clave
+```
+
+Dos detalles deliberados:
+
+- **La herramienta solo se le ofrece al modelo si hay proveedor.** Prometerle una capacidad que no
+  funciona lo empuja a inventarse las fuentes, que es peor que no tenerla.
+- **Prohibido usarla para datos de TradeMe.** Si internet y tu plataforma se contradicen sobre tus
+  propias cifras, gana la plataforma, y el asistente debe decirlo. Internet aporta contexto; los
+  números de tu sistema solo los tiene tu sistema.
+
 ### Tres decisiones de diseño, todas por seguridad
 
 1. **Solo lectura, sin excepciones.** Ninguna herramienta escribe, borra, lanza procesos ni cambia

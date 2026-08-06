@@ -412,6 +412,7 @@ export interface AssistantInfo {
   enabled: boolean;
   model: string;
   host: string;
+  busqueda?: { enabled: boolean; provider: string };
 }
 
 export async function fetchAssistantInfo(): Promise<AssistantInfo> {

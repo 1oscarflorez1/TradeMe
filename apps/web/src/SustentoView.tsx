@@ -129,11 +129,11 @@ export function SustentoView({ symbol, interval }: { symbol: string; interval: I
   const pct = (n: number | null) => (n === null ? '—' : `${(n * 100).toFixed(0)}%`);
 
   return (
-    <div className="bt-layout lab-layout">
+    <div className="bt-layout lab-layout sus-bloque">
       <p className="lab-intro">
-        Esta pestaña responde a una sola pregunta: <strong>¿por qué el motor dice lo que dice?</strong>{' '}
-        Arriba, la decisión actual. En medio, quién la empuja y con cuánta fuerza. Abajo, la evidencia
-        que justifica el peso de cada indicador — porque un peso sin evidencia es una opinión.
+        <strong>El sustento de la decisión de arriba.</strong> Quién la empuja y con cuánta fuerza, y
+        qué evidencia justifica el peso de cada indicador — porque un peso sin evidencia es una
+        opinión.
       </p>
 
       <section className="panel sus-cabecera">

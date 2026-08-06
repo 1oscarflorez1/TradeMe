@@ -5,6 +5,25 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Changed — El sustento vive dentro del Panel
+
+- **Se retira la pestaña «Sustento»**: su contenido pasa a ser una sección debajo del Panel, que es
+  la continuación natural de la decisión y no un sitio aparte al que había que ir.
+- **Espacios vacíos corregidos**: `.panel` llevaba `max-width: 720px`, pensado para las vistas
+  estrechas, y en Backtest, Laboratorio y Sustento dejaba media pantalla en blanco.
+- **Cabecera en una sola fila**: pestañas y temporalidades compactadas; en vez de envolver a dos
+  filas, cada bloque se encoge y la tira de temporalidades desliza con sus flechas.
+
+### Added — El asistente puede buscar en internet
+
+- Octava herramienta `buscar_en_internet` con **Tavily** o **Brave Search** (ambos con plan
+  gratuito), configurable por `ASSISTANT_SEARCH`. Para noticias, contexto macro y todo lo que
+  dependa de información externa o posterior al conocimiento del modelo.
+- **Solo se le ofrece si hay proveedor configurado**: prometerle una capacidad que no funciona lo
+  empuja a inventarse las fuentes.
+- **Prohibida para datos de TradeMe**: si internet y la plataforma se contradicen sobre las cifras
+  propias, gana la plataforma y el asistente debe decirlo.
+
 ### Added — El asistente puede consultar la plataforma (herramientas)
 
 - Siete **herramientas de solo lectura** que el modelo puede invocar cuando la pregunta necesita
