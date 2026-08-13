@@ -101,7 +101,12 @@ def correlation_matrix(rows: list[dict[str, Any]]) -> np.ndarray | None:
         datos = datos.copy()
         datos[constantes, :] = np.linspace(0.0, 1.0, datos.shape[1])
     corr = np.corrcoef(datos)
-    return np.nan_to_num(np.asarray(corr, dtype=float), nan=1.0)
+    # Variable anotada en vez de `cast`: en numpy 1.x `nan_to_num` no está tipado y devuelve Any,
+    # que mypy en modo estricto rechaza al salir de una función con tipo declarado; en numpy 2.x sí
+    # lo está, y ahí un `cast` sería redundante —y `warn_redundant_casts` forma parte de `strict`—.
+    # La anotación es correcta con ambas: absorbe el Any y no sobra cuando el tipo ya es bueno.
+    limpia: np.ndarray = np.nan_to_num(np.asarray(corr, dtype=float), nan=1.0)
+    return limpia
 
 
 def analyze(rows: list[dict[str, Any]], floor: float = DEFAULT_FLOOR) -> dict[str, Any] | None:
