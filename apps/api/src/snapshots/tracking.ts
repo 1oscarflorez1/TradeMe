@@ -18,6 +18,8 @@ export interface SnapshotRow {
   plan_take_profit: number | null;
   plan_rr: number | null;
   valid_until: string | null;
+  hold_reason?: string | null;
+  independence_factor?: number | null;
   outcome_result: string | null;
   outcome_return_r: number | null;
 }

@@ -2,7 +2,7 @@ import json
 import pathlib
 
 from trademe_quant.calibration import apply_calibrator
-from trademe_quant.decision import decide
+from trademe_quant.decision import decide, horizon_for, is_quarantined, valid_candles_for
 from trademe_quant.ensemble import load_ensemble
 from trademe_quant.indicators import compute_readings
 from trademe_quant.inference import infer_probs, pick_action
@@ -71,11 +71,33 @@ def test_parity_inference() -> None:
     for v in MACRO["inference"]:
         inp = v["input"]
         probs = infer_probs(
-            inp["net"], inp["temperature"], inp["holdBand"], inp["bias"], inp["wMacro"]
+            inp["net"],
+            inp["temperature"],
+            inp["holdBand"],
+            inp["bias"],
+            inp["wMacro"],
+            inp.get("independence", 1.0),
         )
         assert abs(probs["BUY"] - v["expected"]["BUY"]) < 1e-4, (probs, v["expected"])
         assert abs(probs["SELL"] - v["expected"]["SELL"]) < 1e-4
         assert pick_action(probs) == v["expected"]["action"]
+
+
+def test_desinflado_no_cambia_la_direccion() -> None:
+    """Invariante del ajuste por dependencia: baja la confianza, nunca la decisión.
+
+    Escalar los tres logits por una constante positiva no altera cuál es el mayor. Si esto se
+    rompiera, el ajuste habría dejado de ser una corrección de calibración para convertirse en un
+    cambio de criterio, y habría que volver a validar toda la estrategia.
+    """
+    for net in (-0.9, -0.35, -0.05, 0.0, 0.05, 0.35, 0.9):
+        for bias in (-0.8, 0.0, 0.8):
+            base = infer_probs(net, 0.5, 0.06, bias, 1.0, 1.0)
+            for k in (0.9, 0.66, 0.485, 0.35):
+                bajado = infer_probs(net, 0.5, 0.06, bias, 1.0, k)
+                assert pick_action(bajado) == pick_action(base), (net, bias, k)
+                # Y la confianza declarada nunca sube al desinflar.
+                assert bajado[pick_action(bajado)] <= base[pick_action(base)] + 1e-12
 
 
 def test_parity_decision() -> None:
@@ -85,16 +107,40 @@ def test_parity_decision() -> None:
     close = [c["c"] for c in candles]
     config = load_ensemble(pathlib.Path(__file__).parents[3] / "artifacts/ensemble.yaml")
     for v in MACRO["decision"]:
-        got = decide(high, low, close, config, v["macroBias"])
+        got = decide(
+            high,
+            low,
+            close,
+            config,
+            v["macroBias"],
+            independence=v.get("independence", 1.0),
+            quarantined=v.get("quarantined", False),
+        )
         exp = v["expected"]
         assert got["action"] == exp["action"], (got["action"], exp)
         assert got["direction"] == exp["direction"]
+        assert got["hold_reason"] == exp["hold_reason"], (got["hold_reason"], exp["hold_reason"])
         assert abs(got["net"] - exp["net"]) < 1e-4, (got["net"], exp["net"])
         if exp["levels"] is not None:
             assert got["levels"] is not None
             assert abs(got["levels"]["entry"] - exp["levels"]["entry"]) < 0.05
             assert abs(got["levels"]["stop"] - exp["levels"]["stop"]) < 0.05
             assert abs(got["levels"]["take_profit"] - exp["levels"]["take_profit"]) < 0.05
+
+
+def test_parity_por_temporalidad() -> None:
+    """Frescura de la entrada, horizonte de evaluación y cuarentena, idénticos Node<->Python.
+
+    No están en el camino de la decisión, pero deciden cuándo cierra una operación el backtest de
+    Python y cuánto vive el plan en Node. Si divergieran, el backtest dejaría de medir lo que la
+    plataforma hace de verdad, que es el fallo más caro de detectar de todos.
+    """
+    config = load_ensemble(pathlib.Path(__file__).parents[3] / "artifacts/ensemble.yaml")
+    for v in MACRO["timeframes"]:
+        iv, exp = v["interval"], v["expected"]
+        assert valid_candles_for(config, iv) == exp["valid_candles"], iv
+        assert horizon_for(config, iv) == exp["horizon"], iv
+        assert is_quarantined(config, iv) == exp["quarantined"], iv
 
 
 def test_parity_calibration() -> None:

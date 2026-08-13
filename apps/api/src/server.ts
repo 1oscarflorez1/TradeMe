@@ -32,7 +32,13 @@ import { CandleBuffer } from './indicators/buffer.js';
 import type { Vote } from './indicators/types.js';
 import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
-import { DEFAULT_ENSEMBLE, loadEnsemble, type EnsembleConfig } from './ensemble/config.js';
+import {
+  DEFAULT_ENSEMBLE,
+  forInterval,
+  loadEnsemble,
+  type EnsembleConfig,
+} from './ensemble/config.js';
+import { Independence } from './ensemble/independence.js';
 import { buildSignal } from './ensemble/signal.js';
 import { computePlanLevels } from './ensemble/plan.js';
 import { intervalMs } from './domain/candle.js';
@@ -81,13 +87,17 @@ async function main(): Promise<void> {
   const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
   const artifactsDir = dirname(env.ENSEMBLE_CONFIG);
   const ensembleCache = new Map<string, EnsembleConfig>();
+  const independence = Independence.load(env.INDEPENDENCE_PATH);
   // Config ACTIVA por símbolo+TF: la optimizada de esa temporalidad si existe; si no, la base.
   function getEnsembleFor(symbol: string, interval: string): EnsembleConfig {
     const key = `${symbol.toUpperCase()}:${interval}`;
     const hit = ensembleCache.get(key);
     if (hit) return hit;
     const p = join(artifactsDir, 'optimized', `ensemble.${symbol.toUpperCase()}.${interval}.yaml`);
-    const cfg = existsSync(p) ? loadEnsembleSafe(p, (m) => console.warn(m)) : ensemble;
+    const base = existsSync(p) ? loadEnsembleSafe(p, (m) => console.warn(m)) : ensemble;
+    // Se especializa aquí, una sola vez por símbolo+TF: validez del plan, cuarentena y factor de
+    // independencia quedan resueltos y ningún punto de llamada tiene que acordarse de aplicarlos.
+    const cfg = forInterval(base, interval, independence.factorFor(symbol, interval));
     ensembleCache.set(key, cfg);
     return cfg;
   }
@@ -144,6 +154,7 @@ async function main(): Promise<void> {
     calibrators.reload();
     metaModel.reload();
     metaPolicy.reload();
+    independence.reload();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
@@ -509,12 +520,30 @@ async function main(): Promise<void> {
     }
   }
 
-  /** Guarda un snapshot cuando hay una decisión operable con confianza suficiente. */
+  /**
+   * ¿Merece registrarse esta decisión de MANTENER?
+   *
+   * Guardar los 1 440 «no operar» diarios de 1m ahogaría el dataset en indecisión sin información.
+   * Lo que sí informa son dos casos: los MANTENER **provocados por un filtro** (cuarentena, conflicto
+   * macro, veto del meta-modelo), que son decisiones que el sistema iba a tomar y algo detuvo, y los
+   * que se quedaron **a las puertas** del umbral. Esos son los negativos que el meta-modelo necesita
+   * para dejar de aprender solo de la mitad operable del mundo.
+   */
+  function holdValeLaPena(signal: Signal): boolean {
+    if (signal.hold_reason && signal.hold_reason !== 'banda_neutra') return true;
+    const direccional = Math.max(signal.probs.BUY, signal.probs.SELL);
+    return direccional >= env.AUTO_CAPTURE_MIN_CONFIDENCE - env.AUTO_CAPTURE_HOLD_MARGIN;
+  }
+
+  /** Guarda un snapshot de la decisión: operable con confianza suficiente, o NO TRADE informativo. */
   async function maybeCapture(symbol: string, iv: Interval, signal: Signal): Promise<void> {
     if (env.AUTO_CAPTURE !== 'true' || !snapshotsRepo) return;
     if (!captureIntervals.has(iv)) return;
-    if (signal.action !== 'BUY' && signal.action !== 'SELL') return;
-    if (signal.confidence < env.AUTO_CAPTURE_MIN_CONFIDENCE) return;
+    if (signal.action === 'HOLD') {
+      if (!holdValeLaPena(signal)) return;
+    } else if (signal.confidence < env.AUTO_CAPTURE_MIN_CONFIDENCE) {
+      return;
+    }
     // Una captura POR VELA, no cada N minutos.
     //
     // El enfriamiento fijo de 20 minutos era el mismo para todas las temporalidades: en 4h producía

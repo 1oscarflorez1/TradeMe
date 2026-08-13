@@ -14,7 +14,40 @@ export interface RiskConfig {
 }
 
 export interface PlanConfig {
+  /** Validez por defecto, en velas, cuando la temporalidad no tiene entrada propia. */
   validCandles: number;
+  /**
+   * Frescura de la ENTRADA por temporalidad (M10.5).
+   *
+   * Cuánto tiempo sigue teniendo sentido entrar al precio propuesto. Las 3 velas fijas anteriores
+   * eran 3 minutos en 1m y 12 horas en 4h: el mismo número para horizontes que se diferencian en
+   * tres órdenes de magnitud. En las cortas se descartaba una entrada todavía buena; en las largas
+   * se mantenía viva mucho después de que el contexto hubiera cambiado.
+   *
+   * No confundir con `EvaluationConfig.horizonByTf`: esto decide hasta cuándo se puede entrar, no
+   * cuánto tiempo se le da a la operación una vez abierta.
+   */
+  validCandlesByTf: Record<string, number>;
+}
+
+export interface EvaluationConfig {
+  /** Horizonte por defecto, en velas, cuando la temporalidad no tiene entrada propia. */
+  horizon: number;
+  /**
+   * Velas que se le dan a una operación antes de cerrarla por tiempo (M10.5).
+   *
+   * **Este es el parámetro que produce los «timeout»**, no la frescura de la entrada. Estaba fijo en
+   * 20 velas para todas las temporalidades, escrito como valor por defecto de una función y sin
+   * forma de configurarlo: el 31 % de las decisiones acababa expirando sin resolverse y 1d/1w/1M no
+   * llegaban a evaluarse nunca, porque 20 velas de 1d son 20 días y el histórico no llegaba.
+   *
+   * Con stop a 1,5·ATR y objetivo a 2R el precio tiene que recorrer 3·ATR. Bajo un paseo aleatorio
+   * de pasos del tamaño del ATR eso pide del orden de 9 velas: por debajo de ahí un «timeout» no
+   * mide que la operación no fuera a ninguna parte, mide que no le dimos tiempo. Por arriba, en las
+   * temporalidades largas, cada vela ya es tanto tiempo de reloj que esperar 20 significa no cerrar
+   * nunca. De ahí que baje al alargarse la temporalidad.
+   */
+  horizonByTf: Record<string, number>;
 }
 
 export interface MacroConfig {
@@ -46,6 +79,20 @@ export interface EnsembleConfig {
   risk: RiskConfig;
   macro: MacroConfig;
   plan: PlanConfig;
+  evaluation: EvaluationConfig;
+  /**
+   * Temporalidades en cuarentena: se calculan y se registran, pero no emiten señal operable.
+   *
+   * 4h acumulaba −0,485 R en 89 decisiones (69 cortos con el 85,6 % al stop, contra una tendencia
+   * alcista de fondo). Una temporalidad que pierde de forma sistemática no debería seguir
+   * proponiendo entradas mientras se le busca el contexto direccional que le falta. Sigue
+   * midiéndose: lo que se retira es el permiso para operar, no la observación.
+   */
+  quarantineIntervals: string[];
+  /** Resuelto por temporalidad en `forInterval`. */
+  quarantined?: boolean;
+  /** Resuelto por símbolo+temporalidad en `forInterval` (1 = sin desinflar). */
+  independenceFactor?: number;
 }
 
 export const DEFAULT_ENSEMBLE: EnsembleConfig = {
@@ -74,8 +121,68 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
     enableScaling: false,
     tfScale: { '1m': 0.2, '5m': 0.3, '15m': 0.4, '30m': 0.5, '1h': 0.6, '4h': 0.8, '1d': 1, '1w': 1, '1M': 1 },
   },
-  plan: { validCandles: 3 },
+  plan: {
+    validCandles: 3,
+    validCandlesByTf: {
+      '1m': 5,
+      '5m': 5,
+      '15m': 4,
+      '30m': 4,
+      '1h': 3,
+      '4h': 3,
+      '1d': 2,
+      '1w': 2,
+      '1M': 1,
+    },
+  },
+  evaluation: {
+    horizon: 20,
+    horizonByTf: {
+      '1m': 30,
+      '5m': 25,
+      '15m': 20,
+      '30m': 20,
+      '1h': 18,
+      '4h': 15,
+      '1d': 10,
+      '1w': 6,
+      '1M': 4,
+    },
+  },
+  quarantineIntervals: ['4h'],
 };
+
+/** Frescura de la entrada, en velas, para una temporalidad. */
+export function validCandlesFor(cfg: EnsembleConfig, interval: string): number {
+  const v = cfg.plan.validCandlesByTf?.[interval];
+  return typeof v === 'number' && v > 0 ? v : cfg.plan.validCandles;
+}
+
+/** Velas que se le dan a la operación antes de cerrarla por tiempo. */
+export function horizonFor(cfg: EnsembleConfig, interval: string): number {
+  const v = cfg.evaluation?.horizonByTf?.[interval];
+  return typeof v === 'number' && v > 0 ? v : (cfg.evaluation?.horizon ?? 20);
+}
+
+/**
+ * Especializa la configuración para un símbolo y temporalidad concretos.
+ *
+ * Deja resueltos los tres ajustes que dependen de la temporalidad —validez del plan, cuarentena y
+ * factor de independencia— para que `buildSignal` siga leyendo un único objeto de configuración y
+ * ningún punto de llamada tenga que acordarse de aplicarlos.
+ */
+export function forInterval(
+  cfg: EnsembleConfig,
+  interval: string,
+  independenceFactor = 1,
+): EnsembleConfig {
+  return {
+    ...cfg,
+    plan: { ...cfg.plan, validCandles: validCandlesFor(cfg, interval) },
+    quarantined: (cfg.quarantineIntervals ?? []).includes(interval),
+    independenceFactor,
+  };
+}
 
 interface RawRegimeMult {
   trend?: number;
@@ -96,7 +203,9 @@ interface RawConfig {
     range?: RawRegimeMult;
   };
   risk?: { atr_stop_mult?: number; tp_r_multiple?: number; risk_pct?: number };
-  plan?: { valid_candles?: number };
+  plan?: { valid_candles?: number; valid_candles_by_tf?: Record<string, number> };
+  evaluation?: { horizon?: number; horizon_by_tf?: Record<string, number> };
+  quarantine_intervals?: string[];
   macro?: {
     enabled?: boolean;
     w_macro?: number;
@@ -151,7 +260,15 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
       enableScaling: raw.macro?.enable_scaling ?? d.macro.enableScaling,
       tfScale: raw.macro?.tf_scale ?? d.macro.tfScale,
     },
-    plan: { validCandles: raw.plan?.valid_candles ?? d.plan.validCandles },
+    plan: {
+      validCandles: raw.plan?.valid_candles ?? d.plan.validCandles,
+      validCandlesByTf: raw.plan?.valid_candles_by_tf ?? d.plan.validCandlesByTf,
+    },
+    evaluation: {
+      horizon: raw.evaluation?.horizon ?? d.evaluation.horizon,
+      horizonByTf: raw.evaluation?.horizon_by_tf ?? d.evaluation.horizonByTf,
+    },
+    quarantineIntervals: raw.quarantine_intervals ?? d.quarantineIntervals,
   };
 }
 

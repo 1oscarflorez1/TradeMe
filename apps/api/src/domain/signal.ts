@@ -3,6 +3,20 @@ import type { Vote } from '../indicators/types.js';
 export type Action = 'BUY' | 'HOLD' | 'SELL';
 export type Direction = 'LONG' | 'SHORT' | 'FLAT';
 
+/**
+ * Por qué la decisión NO es operable (M10.5).
+ *
+ * «No operar» tiene que ser un veredicto con motivo, no el residuo de que ninguna otra opción ganase.
+ * Sin este campo, las decisiones descartadas no se podían registrar de forma útil y el dataset solo
+ * contenía COMPRAR y VENDER: el meta-modelo aprendía de la mitad del mundo y la trataba como si
+ * fuera entera.
+ */
+export type HoldReason =
+  | 'cuarentena' // la temporalidad está retirada de la operativa
+  | 'conflicto_macro' // técnica y macro se contradicen con fuerza
+  | 'veto_meta' // el meta-modelo descarta la señal
+  | 'banda_neutra'; // sin ventaja suficiente para salir de la banda
+
 export interface Macro {
   bias: number;
   funding: number;
@@ -42,6 +56,12 @@ export interface Signal {
   action: Action;
   direction: Direction;
   confidence: number;
+  /** Presente solo cuando `action` es HOLD: por qué no se opera. */
+  hold_reason?: HoldReason;
+  /** Factor de desinflado aplicado a los logits por dependencia de los votos (1 = ninguno). */
+  independence_factor?: number;
+  /** La temporalidad está en cuarentena: se registra pero no emite señal operable. */
+  quarantined?: boolean;
   calibrated_confidence?: number;
   calibration_version?: string;
   meta_confidence?: number;

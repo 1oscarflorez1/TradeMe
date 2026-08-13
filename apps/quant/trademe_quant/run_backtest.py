@@ -12,7 +12,9 @@ from typing import Any
 
 from .backtest import run_backtest
 from .db import evaluate_snapshot_outcomes, save_backtest
-from .ensemble import load_active_ensemble
+from .decision import horizon_for
+from .ensemble import artifacts_dir, load_active_ensemble
+from .independence import load_factor
 from .market.binance import fetch_klines
 from .market.normalize import normalize_rest_kline
 
@@ -29,11 +31,19 @@ def run_and_save(symbol: str, interval: str) -> dict[str, Any]:
     low = [c.low for c in candles]
     close = [c.close for c in candles]
     config = load_active_ensemble(symbol, interval)
-    result = run_backtest(high, low, close, config)
+    # Mismo horizonte y mismo desinflado que en vivo: si el backtest midiera con otras reglas,
+    # dejaría de ser comparable con lo que la plataforma decide de verdad.
+    horizonte = horizon_for(config, interval)
+    factor = load_factor(artifacts_dir(), symbol, interval)
+    result = run_backtest(high, low, close, config, horizon=horizonte, independence=factor)
     save_backtest(_dsn(), symbol, interval, result)
     evaluated = 0
     try:
-        evaluated = evaluate_snapshot_outcomes(_dsn())
+        horizontes = {
+            iv: horizon_for(config, iv)
+            for iv in config.get("evaluation", {}).get("horizon_by_tf", {})
+        }
+        evaluated = evaluate_snapshot_outcomes(_dsn(), horizonte, horizontes or None)
     except Exception:  # noqa: BLE001 - paso secundario
         evaluated = 0
     return {

@@ -39,9 +39,26 @@ risk:
   tp_r_multiple: 2.0 # take-profit a 2R (riesgo:beneficio 1:2)
   risk_pct: 0.01 # se arriesga 1% del capital por operación
 
-# Validez temporal del plan de acción (M5.6): velas de la temporalidad antes de descartar la entrada.
+# Frescura de la ENTRADA (M5.6, por temporalidad desde M10.5): cuántas velas sigue teniendo sentido
+# entrar al precio propuesto. No confundir con `evaluation.horizon_by_tf`, que es el tiempo que se le
+# da a la operación una vez abierta.
 plan:
   valid_candles: 3
+  valid_candles_by_tf: { '1m': 5, '5m': 5, '15m': 4, '30m': 4, '1h': 3, '4h': 3, '1d': 2, '1w': 2, '1M': 1 }
+
+# Horizonte de evaluación (M10.5): velas que se le dan a una operación antes de cerrarla por tiempo.
+# ESTE es el parámetro que produce los «timeout». Estaba fijo en 20 para todas las temporalidades,
+# escrito como valor por defecto de una función: en 1m cerraba antes de tiempo (31 % de expirados) y
+# en 1d exigía 20 días de histórico, así que esos registros no se evaluaban nunca.
+evaluation:
+  horizon: 20
+  horizon_by_tf: { '1m': 30, '5m': 25, '15m': 20, '30m': 20, '1h': 18, '4h': 15, '1d': 10, '1w': 6, '1M': 4 }
+
+# Temporalidades en cuarentena (M10.5): se calculan y se registran, pero NO emiten señal operable.
+# 4h acumulaba −0,485 R en 89 decisiones (69 cortos, el 85,6 % al stop, contra tendencia alcista).
+# Se retira el permiso para operar, no la observación: el backtest sigue simulándola para saber
+# cuándo puede levantarse.
+quarantine_intervals: ['4h']
 
 # Sesgo fundamental macro (1w+): funding rate + tendencia semanal (EMA 1w).
 # Se inyecta en los logits del softmax; si el conflicto es fuerte, degrada a FLAT.

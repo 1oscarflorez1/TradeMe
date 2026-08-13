@@ -30,6 +30,8 @@ export interface SnapshotStats {
   timeout: number;
   abiertos: number;
   sinPlan: number;
+  /** Decisiones de NO TRADE registradas con su motivo (subconjunto de `sinPlan`). */
+  noTrade: number;
   resueltos: number;
   winRate: number | null;
   expectancy: number | null;
@@ -53,7 +55,7 @@ export class SnapshotsRepo {
         ema_cross_score, macd_score, rsi14_score, rsi14_value, bbands_score,
         stoch14_score, supertrend_score, meta_confidence, adx14_value, atr14_value, reditum_sniper_score, reditum_poc_score,
         plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr, valid_until,
-        model_version, source, note, raw_signal, candle_open
+        model_version, source, note, raw_signal, hold_reason, independence_factor, candle_open
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
         $7,$8,$9,$10,$11,$12,$13,
@@ -61,9 +63,9 @@ export class SnapshotsRepo {
         $19,$20,$21,$22,$23,
         $24,$25,$26,$27,$28,$29,$30,
         $31,$32,$33,$34,$35,$36,
-        $37,'manual',$38,$39,
+        $37,'manual',$38,$39,$40,$41,
         -- Vela a la que pertenece la decisión: es lo que garantiza una sola por vela.
-        to_timestamp(floor(extract(epoch FROM now()) / $40) * $40)
+        to_timestamp(floor(extract(epoch FROM now()) / $42) * $42)
       ) RETURNING id`,
       [
         signal.symbol,
@@ -105,6 +107,8 @@ export class SnapshotsRepo {
         signal.model_version,
         note ?? null,
         JSON.stringify(signal),
+        signal.hold_reason ?? null,
+        signal.independence_factor ?? null,
         Math.round(intervalMs(interval as Interval) / 1000),
       ],
     );
@@ -119,6 +123,7 @@ export class SnapshotsRepo {
       `SELECT id, captured_at, symbol, interval, action, direction, price, confidence,
               regime_label, net, prob_buy, prob_hold, prob_sell,
               macro_bias, plan_entry, plan_stop, plan_take_profit, plan_rr, valid_until,
+              hold_reason, independence_factor,
               outcome_result, outcome_return_r
        FROM snapshots WHERE symbol = $1 ORDER BY captured_at DESC LIMIT $2`,
       [symbol.toUpperCase(), limit],
@@ -144,7 +149,7 @@ export class SnapshotsRepo {
     const sym = symbol.toUpperCase();
     const res = await this.pool.query<{
       total: number; tp: number; sl: number; timeout: number;
-      abiertos: number; sin_plan: number; expectancy: string | null;
+      abiertos: number; sin_plan: number; no_trade: number; expectancy: string | null;
     }>(
       `WITH una_por_vela AS (
          SELECT DISTINCT ON (interval, candle_open) *
@@ -159,6 +164,10 @@ export class SnapshotsRepo {
                                AND direction IN ('LONG','SHORT')
                                AND plan_entry IS NOT NULL)::int AS abiertos,
               COUNT(*) FILTER (WHERE direction = 'FLAT' OR plan_entry IS NULL)::int AS sin_plan,
+              COUNT(*) FILTER (WHERE hold_reason IS NOT NULL)::int AS no_trade,
+              -- La expectancy solo mira lo que tuvo desenlace. Un NO TRADE nunca lo tiene (no hay
+              -- plan que evaluar), así que registrar los descartes no mueve ni un decimal de estas
+              -- cifras: solo llena el hueco que tenía el dataset.
               AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
          FROM una_por_vela`,
       [sym],
@@ -193,6 +202,7 @@ export class SnapshotsRepo {
       timeout: fila?.timeout ?? 0,
       abiertos: fila?.abiertos ?? 0,
       sinPlan: fila?.sin_plan ?? 0,
+      noTrade: fila?.no_trade ?? 0,
       expectancy: num(fila?.expectancy ?? null),
     };
     return {

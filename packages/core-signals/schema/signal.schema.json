@@ -78,6 +78,21 @@
       "minimum": 0,
       "maximum": 1
     },
+    "hold_reason": {
+      "type": "string",
+      "enum": ["cuarentena", "conflicto_macro", "veto_meta", "banda_neutra"],
+      "description": "Por qu\u00e9 la decisi\u00f3n NO es operable (M10.5). Presente solo cuando action es HOLD: \u00abno operar\u00bb es un veredicto con motivo, no el residuo de que ninguna otra opci\u00f3n ganase."
+    },
+    "independence_factor": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1,
+      "description": "Factor de desinflado aplicado a los logits por dependencia de los votos (M10.5). 1 = sin desinflar. Los seis votos internos no son seis evidencias independientes; este factor corrige la confianza sin alterar la direcci\u00f3n."
+    },
+    "quarantined": {
+      "type": "boolean",
+      "description": "La temporalidad est\u00e1 en cuarentena (M10.5): se calcula y se registra, pero no emite se\u00f1al operable."
+    },
     "calibrated_confidence": {
       "type": "number",
       "minimum": 0,

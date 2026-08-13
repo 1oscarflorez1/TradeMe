@@ -1,5 +1,5 @@
 import type { Vote } from '../indicators/types.js';
-import type { Action, Direction, Macro, Signal } from '../domain/signal.js';
+import type { Action, Direction, HoldReason, Macro, Signal } from '../domain/signal.js';
 import { intervalMs, type Interval } from '../domain/candle.js';
 import type { EnsembleConfig } from './config.js';
 import { aggregate } from './aggregate.js';
@@ -43,8 +43,17 @@ export function buildSignal(params: BuildSignalParams): Signal {
     params.macro && macroCfg.enabled
       ? { bias: params.macro.bias, wMacro: macroCfg.wMacro }
       : undefined;
-  const probs = inferProbs(net, params.config.temperature, params.config.holdBand, macroInput);
+  // Desinflado por dependencia: los seis votos no son seis evidencias (ver ensemble/independence.ts).
+  const independence = params.config.independenceFactor ?? 1;
+  const probs = inferProbs(
+    net,
+    params.config.temperature,
+    params.config.holdBand,
+    macroInput,
+    independence,
+  );
   let { action, confidence } = pickAction(probs);
+  let holdReason: HoldReason | undefined = action === 'HOLD' ? 'banda_neutra' : undefined;
 
   let macroOut: Macro | undefined;
   if (params.macro && macroCfg.enabled) {
@@ -57,6 +66,7 @@ export function buildSignal(params: BuildSignalParams): Signal {
     ) {
       action = 'HOLD';
       confidence = probs.HOLD;
+      holdReason = 'conflicto_macro';
     }
     macroOut = { ...params.macro, confluence: conf };
   }
@@ -98,11 +108,24 @@ export function buildSignal(params: BuildSignalParams): Signal {
         confidence = probs.HOLD;
         direction = 'FLAT';
         metaVetoed = true;
+        holdReason = 'veto_meta';
       } else if (action !== 'HOLD' && metaMode === 'veto') {
         metaVetoed = false;
       }
     }
   }
+
+  // ---- Cuarentena de temporalidad (M10.5) ----
+  // Va la última y por encima de todo lo demás: es una retirada del permiso para operar, no una
+  // opinión que se pueda compensar con confianza alta. La decisión se sigue calculando entera —los
+  // votos, el net y las probabilidades quedan registrados— pero no sale de aquí como operable.
+  if (params.config.quarantined && action !== 'HOLD') {
+    action = 'HOLD';
+    confidence = probs.HOLD;
+    direction = 'FLAT';
+    holdReason = 'cuarentena';
+  }
+
   const plan = buildPlan({
     action,
     price: params.price,
@@ -126,6 +149,9 @@ export function buildSignal(params: BuildSignalParams): Signal {
     action,
     direction,
     confidence,
+    hold_reason: action === 'HOLD' ? (holdReason ?? 'banda_neutra') : undefined,
+    independence_factor: independence,
+    quarantined: params.config.quarantined ? true : undefined,
     calibrated_confidence: calibratedConfidence,
     calibration_version: params.calibrators?.version ?? undefined,
     meta_confidence: metaConfidence,

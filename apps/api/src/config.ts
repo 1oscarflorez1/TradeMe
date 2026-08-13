@@ -24,12 +24,16 @@ const EnvSchema = z.object({
   CALIBRATORS_PATH: z.string().default('artifacts/calibrators.json'),
   METAMODEL_PATH: z.string().default('artifacts/metamodel.json'),
   META_POLICY_PATH: z.string().default('artifacts/meta_policy.json'),
+  INDEPENDENCE_PATH: z.string().default('artifacts/independence.json'),
   // Captura automática de decisiones en el servidor (alimenta el dataset sin depender de que
   // alguien tenga el portal abierto).
   AUTO_CAPTURE: z.enum(['true', 'false']).default('true'),
   AUTO_CAPTURE_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.4),
   AUTO_CAPTURE_COOLDOWN_MIN: z.coerce.number().min(1).default(20),
   AUTO_CAPTURE_INTERVALS: z.string().default('15m,30m,1h,4h,1d'),
+  // Margen por debajo del umbral de captura a partir del cual una decisión de MANTENER se considera
+  // informativa y también se registra. Sin esto el dataset solo contenía COMPRAR y VENDER.
+  AUTO_CAPTURE_HOLD_MARGIN: z.coerce.number().min(0).max(1).default(0.1),
   // TOPE de seguridad: el piloto asciende el modo automáticamente, pero nunca por encima de esto.
   // off = desactivado · shadow = solo observar · modulate = ajusta confianza · veto = filtra.
   META_MODE: z.enum(['off', 'shadow', 'modulate', 'veto']).default('veto'),

@@ -37,6 +37,33 @@ import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 const TF_ALERT_KEY = 'trademe.tfAlertThresholds';
 type TfAlert = { action: string; conf: number };
 const ACT_ES: Record<string, string> = { BUY: 'Compra', SELL: 'Venta', HOLD: 'Mantener' };
+
+/**
+ * Por qué no se opera. «Mantener» dejaba al usuario sin saber si el sistema no ve nada o si algo lo
+ * ha frenado, que son dos situaciones muy distintas: una es indiferencia y la otra es una decisión.
+ */
+const MOTIVO_NO_OPERAR: Record<string, { etiqueta: string; detalle: string }> = {
+  cuarentena: {
+    etiqueta: 'temporalidad en cuarentena',
+    detalle:
+      'Esta temporalidad está retirada de la operativa por rendimiento negativo sostenido. Se sigue calculando y registrando para poder medir cuándo levantarla, pero no propone entradas.',
+  },
+  conflicto_macro: {
+    etiqueta: 'conflicto con el macro',
+    detalle:
+      'La lectura técnica y el contexto macro apuntan a lados opuestos, y el macro es lo bastante fuerte como para no operar en su contra.',
+  },
+  veto_meta: {
+    etiqueta: 'vetada por el filtro ML',
+    detalle:
+      'El meta-modelo, entrenado con tus registros evaluados, considera esta señal poco fiable y la descarta.',
+  },
+  banda_neutra: {
+    etiqueta: 'sin ventaja suficiente',
+    detalle:
+      'Los indicadores no se inclinan lo bastante como para salir de la banda neutra. No es un fallo: concluir que no hay ventaja también es una decisión.',
+  },
+};
 function loadThresholds(): Record<string, number> {
   try {
     return JSON.parse(localStorage.getItem(TF_ALERT_KEY) ?? '{}') as Record<string, number>;
@@ -665,6 +692,27 @@ export function App() {
                             {signal.meta_vetoed ? ' · vetada' : ''}
                           </span>
                         )}
+                        {signal.action === 'HOLD' && signal.hold_reason && (
+                          <span
+                            className={`meta-chip ${signal.hold_reason === 'cuarentena' ? 'meta-veto' : ''}`}
+                            title={MOTIVO_NO_OPERAR[signal.hold_reason].detalle}
+                          >
+                            ⛔ {MOTIVO_NO_OPERAR[signal.hold_reason].etiqueta}
+                          </span>
+                        )}
+                        {signal.independence_factor !== undefined &&
+                          signal.independence_factor < 0.999 && (
+                            <span
+                              className="meta-chip"
+                              title={
+                                'Los seis indicadores no son seis evidencias independientes: derivan de la misma serie de precio. ' +
+                                'La confianza se desinfla en esa proporción, medida sobre tus propios registros. ' +
+                                'No cambia la dirección de la decisión, solo la seguridad con que se declara.'
+                              }
+                            >
+                              ⚖ {(signal.independence_factor * 100).toFixed(0)}%
+                            </span>
+                          )}
                       </span>
                     )}
                     <SnapshotButton symbol={symbol} interval={tf} />

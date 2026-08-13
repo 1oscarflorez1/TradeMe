@@ -3,6 +3,73 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.34.0] — M10.5 · Sanear lo que ya decide
+
+> Antes de añadir el análisis fundamental o cualquier agente nuevo, se corrige la base matemática
+> sobre la que se apoyarían. Cinco arreglos, ninguno estructural, todos sobre defectos medidos en
+> los registros reales de la plataforma.
+
+### Fixed — Un modelo peor que una moneda estaba modulando las decisiones
+
+- **Gobierno simétrico del meta-modelo** (`meta_policy.py::decide_mode`). Para ascender se exigía
+  AUC ≥ 0,55; para **permanecer**, nada. El AUC no se volvía a comprobar jamás. Resultado: un
+  meta-modelo degradado hasta **AUC 0,43** —anti-predictivo— seguía en modo `modulate` sobre las
+  decisiones en vivo, porque su lift de −0,005 R no llegaba al umbral de retroceso.
+- Ahora la condición de permanencia **repite la de ascenso**. Si un componente deja de cumplir lo
+  que se le exigió para darle poder, lo pierde. Es la regla que gobernará al consejo de agentes.
+
+### Added — Ajuste por dependencia de los votos
+
+- Los seis indicadores internos no son seis evidencias: medido sobre 636 registros, en 4h equivalen
+  a **1,41 votos independientes** (el 83 % de su información cabe en un solo factor). La confianza
+  del softmax, calculada como si fueran seis, estaba sistemáticamente inflada.
+- Nuevo `apps/quant/trademe_quant/independence.py`: mide la dimensionalidad efectiva por
+  símbolo+temporalidad y publica `artifacts/independence.json`. La API solo lo evalúa, con recarga
+  en caliente — mismo patrón que `calibrators.json`.
+- El factor multiplica **los tres logits por igual**, así que **no cambia la dirección de ninguna
+  decisión**: solo baja la confianza declarada. Hay un test en Node y otro en Python que fallan si
+  esa invariante se rompe. Es una corrección de calibración, no de criterio.
+- Chip **⚖** en el Panel cuando hay desinflado. `docs/independencia.md` con la medición completa.
+
+### Added — «No operar» pasa a ser un veredicto con motivo
+
+- 324 COMPRAR, 309 VENDER y **cero MANTENER** en 633 registros: el dataset solo contenía decisiones
+  operables y el meta-modelo aprendía de la mitad del mundo tratándola como si fuera entera.
+- Nuevo campo `hold_reason` (`cuarentena`, `conflicto_macro`, `veto_meta`, `banda_neutra`) y
+  migración **016**. Se registran los MANTENER **informativos**: los provocados por un filtro y los
+  que se quedaron a las puertas del umbral (`AUTO_CAPTURE_HOLD_MARGIN`). Los 1 440 «no operar»
+  diarios de 1m no se guardan: sería ahogar el dataset en indecisión.
+- No contaminan ninguna estadística: sin plan no hay desenlace que evaluar, y el resumen ya los
+  separa. Se añade el contador `noTrade`.
+- En el Panel, un chip **⛔** explica por qué no se opera. «Mantener» a secas no distinguía entre
+  «no veo nada» y «algo me ha frenado», que son cosas muy distintas.
+
+### Changed — Cuarentena de temporalidades
+
+- `quarantine_intervals` en `ensemble.yaml`, con **4h dentro**: −0,485 R en 89 decisiones, 69 cortos
+  con el 85,6 % al stop contra una tendencia alcista de fondo.
+- Una temporalidad en cuarentena **se calcula y se registra, pero no emite señal operable**. Se
+  retira el permiso para operar, no la observación: el backtest la sigue simulando a propósito,
+  porque si dejara de hacerlo no habría forma de saber cuándo levantarla.
+
+### Changed — Horizonte de evaluación y frescura de la entrada, por temporalidad
+
+- **El 31 % de las decisiones expiraba sin resolverse y 1d/1w/1M no se evaluaban nunca.** La causa
+  no era la validez del plan sino `horizon`, fijo en 20 velas para todas las temporalidades y
+  escrito como valor por defecto de una función: 20 minutos en 1m y 20 días en 1d, cuando el
+  histórico no llega a tanto.
+- Se separan los dos conceptos, que estaban confundidos: `plan.valid_candles_by_tf` (hasta cuándo
+  tiene sentido **entrar**) y `evaluation.horizon_by_tf` (cuánto tiempo se le da a la operación
+  **ya abierta**). Ambos por temporalidad, ambos en `ensemble.yaml`, ambos con paridad.
+
+### Notas de despliegue
+
+- Migración **016** automática al arrancar la API.
+- Tras el primer ciclo del piloto aparecerá `artifacts/independence.json` y las confianzas bajarán
+  en las temporalidades con votos redundantes. **Es el comportamiento correcto, no una regresión**:
+  la cifra anterior afirmaba más seguridad de la que los datos respaldaban.
+- 4h dejará de proponer entradas. Se sigue viendo y midiendo.
+
 ## [No publicado]
 
 ### Changed — El sustento vive dentro del Panel

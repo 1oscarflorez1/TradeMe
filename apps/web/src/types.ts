@@ -76,6 +76,9 @@ export interface Signal {
   meta_version?: string;
   meta_mode?: 'shadow' | 'modulate' | 'veto';
   meta_vetoed?: boolean;
+  hold_reason?: 'cuarentena' | 'conflicto_macro' | 'veto_meta' | 'banda_neutra';
+  independence_factor?: number;
+  quarantined?: boolean;
   macro?: Macro;
   plan: PlanStep[];
   valid_until: string;
