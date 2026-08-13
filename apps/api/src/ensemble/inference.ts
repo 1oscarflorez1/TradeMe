@@ -6,15 +6,30 @@ export interface MacroModulation {
   wMacro: number;
 }
 
+/**
+ * Softmax con modulación macro y desinflado por dependencia de los votos.
+ *
+ * `independence` (ver `ensemble/independence.ts`) escala los TRES logits por igual. Como escalar
+ * todos los logits por una constante positiva no altera cuál es el mayor, el ajuste **no cambia la
+ * dirección de la decisión**: solo aplana la distribución y baja la confianza declarada. Es una
+ * corrección de calibración, no de criterio — el sistema no cree otra cosa, declara con menos
+ * seguridad lo que ya creía.
+ */
 export function inferProbs(
   net: number,
   temperature: number,
   holdBand: number,
   macro?: MacroModulation,
+  independence = 1,
 ): Probs {
   const t = temperature > 0 ? temperature : 0.5;
   const macroTerm = macro ? macro.wMacro * macro.bias : 0;
-  const logits = { BUY: net / t + macroTerm, SELL: -net / t - macroTerm, HOLD: holdBand / t };
+  const k = independence > 0 ? independence : 1;
+  const logits = {
+    BUY: k * (net / t + macroTerm),
+    SELL: k * (-net / t - macroTerm),
+    HOLD: k * (holdBand / t),
+  };
   const max = Math.max(logits.BUY, logits.SELL, logits.HOLD);
   const e = {
     BUY: Math.exp(logits.BUY - max),

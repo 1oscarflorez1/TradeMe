@@ -8,7 +8,7 @@ import { inferProbs, pickAction } from '../src/ensemble/inference.js';
 import { IndicatorRegistry } from '../src/indicators/registry.js';
 import { buildSignal } from '../src/ensemble/signal.js';
 import type { Macro } from '../src/domain/signal.js';
-import { DEFAULT_ENSEMBLE } from '../src/ensemble/config.js';
+import { DEFAULT_ENSEMBLE, horizonFor, validCandlesFor } from '../src/ensemble/config.js';
 import type { Candle } from '../src/domain/candle.js';
 
 interface Vectors {
@@ -62,17 +62,31 @@ interface MacroVectors {
     expected: { bias: number; weekly_trend: number; label: string };
   }>;
   inference: Array<{
-    input: { net: number; bias: number; wMacro: number; temperature: number; holdBand: number };
+    input: {
+      net: number;
+      bias: number;
+      wMacro: number;
+      temperature: number;
+      holdBand: number;
+      independence?: number;
+    };
     expected: { BUY: number; HOLD: number; SELL: number; action: string };
   }>;
   decision: Array<{
     macroBias: number | null;
+    independence?: number;
+    quarantined?: boolean;
     expected: {
       net: number;
       action: string;
       direction: string;
+      hold_reason: string | null;
       levels: { entry: number; stop: number; take_profit: number } | null;
     };
+  }>;
+  timeframes: Array<{
+    interval: string;
+    expected: { valid_candles: number; horizon: number; quarantined: boolean };
   }>;
 }
 
@@ -93,13 +107,34 @@ describe('paridad macro — Node ≡ vectores dorados', () => {
 
   it('inferencia modulada coincide', () => {
     for (const v of macroVectors.inference) {
-      const probs = inferProbs(v.input.net, v.input.temperature, v.input.holdBand, {
-        bias: v.input.bias,
-        wMacro: v.input.wMacro,
-      });
+      const probs = inferProbs(
+        v.input.net,
+        v.input.temperature,
+        v.input.holdBand,
+        { bias: v.input.bias, wMacro: v.input.wMacro },
+        v.input.independence ?? 1,
+      );
       expect(Math.abs(probs.BUY - v.expected.BUY)).toBeLessThan(1e-4);
       expect(Math.abs(probs.SELL - v.expected.SELL)).toBeLessThan(1e-4);
       expect(pickAction(probs).action).toBe(v.expected.action);
+    }
+  });
+
+  it('el desinflado por dependencia baja la confianza sin cambiar la dirección', () => {
+    // Invariante del ajuste: escalar los tres logits por una constante positiva no altera el
+    // argmax. Si esto se rompiera, habría dejado de ser una corrección de calibración para
+    // convertirse en un cambio de criterio, y habría que revalidar toda la estrategia.
+    for (const net of [-0.9, -0.35, -0.05, 0, 0.05, 0.35, 0.9]) {
+      for (const bias of [-0.8, 0, 0.8]) {
+        const base = inferProbs(net, 0.5, 0.06, { bias, wMacro: 1 }, 1);
+        for (const k of [0.9, 0.66, 0.485, 0.35]) {
+          const bajado = inferProbs(net, 0.5, 0.06, { bias, wMacro: 1 }, k);
+          expect(pickAction(bajado).action).toBe(pickAction(base).action);
+          expect(pickAction(bajado).confidence).toBeLessThanOrEqual(
+            pickAction(base).confidence + 1e-12,
+          );
+        }
+      }
     }
   });
 });
@@ -126,14 +161,31 @@ describe('paridad decisión — Node ≡ vectores dorados', () => {
         symbol: 'BTCUSDT',
         price,
         votes,
-        config: DEFAULT_ENSEMBLE,
+        config: {
+          ...DEFAULT_ENSEMBLE,
+          independenceFactor: v.independence ?? 1,
+          quarantined: v.quarantined ?? false,
+        },
         equity: 10_000,
         interval: '1m',
         macro,
       });
       expect(sig.action).toBe(v.expected.action);
       expect(sig.direction).toBe(v.expected.direction);
+      expect(sig.hold_reason ?? null).toBe(v.expected.hold_reason ?? null);
       expect(Math.abs(sig.net - v.expected.net)).toBeLessThan(1e-4);
+    }
+  });
+});
+
+describe('paridad por temporalidad — Node ≡ vectores dorados', () => {
+  it('frescura de la entrada, horizonte de evaluación y cuarentena', () => {
+    for (const v of macroVectors.timeframes) {
+      expect(validCandlesFor(DEFAULT_ENSEMBLE, v.interval)).toBe(v.expected.valid_candles);
+      expect(horizonFor(DEFAULT_ENSEMBLE, v.interval)).toBe(v.expected.horizon);
+      expect(DEFAULT_ENSEMBLE.quarantineIntervals.includes(v.interval)).toBe(
+        v.expected.quarantined,
+      );
     }
   });
 });

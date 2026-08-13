@@ -64,7 +64,8 @@
         "bias": 0.8,
         "wMacro": 1,
         "temperature": 0.5,
-        "holdBand": 0.06
+        "holdBand": 0.06,
+        "independence": 1
       },
       "expected": {
         "BUY": 0.585304,
@@ -79,7 +80,8 @@
         "bias": 0.5,
         "wMacro": 1,
         "temperature": 0.5,
-        "holdBand": 0.06
+        "holdBand": 0.06,
+        "independence": 1
       },
       "expected": {
         "BUY": 0.768424,
@@ -94,7 +96,8 @@
         "bias": -0.8,
         "wMacro": 1,
         "temperature": 0.5,
-        "holdBand": 0.06
+        "holdBand": 0.06,
+        "independence": 1
       },
       "expected": {
         "BUY": 0.385589,
@@ -109,7 +112,8 @@
         "bias": 0.2,
         "wMacro": 1,
         "temperature": 0.5,
-        "holdBand": 0.06
+        "holdBand": 0.06,
+        "independence": 1
       },
       "expected": {
         "BUY": 0.087306,
@@ -124,7 +128,8 @@
         "bias": 0,
         "wMacro": 1,
         "temperature": 0.5,
-        "holdBand": 0.06
+        "holdBand": 0.06,
+        "independence": 1
       },
       "expected": {
         "BUY": 0.319745,
@@ -132,15 +137,66 @@
         "SELL": 0.319745,
         "action": "HOLD"
       }
+    },
+    {
+      "input": {
+        "net": 0.5,
+        "bias": 0.5,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.06,
+        "independence": 0.485
+      },
+      "expected": {
+        "BUY": 0.572912,
+        "HOLD": 0.29337,
+        "SELL": 0.133718,
+        "action": "BUY"
+      }
+    },
+    {
+      "input": {
+        "net": -0.6,
+        "bias": 0.2,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.06,
+        "independence": 0.66
+      },
+      "expected": {
+        "BUY": 0.146248,
+        "HOLD": 0.306282,
+        "SELL": 0.547469,
+        "action": "SELL"
+      }
+    },
+    {
+      "input": {
+        "net": 0.9,
+        "bias": -0.4,
+        "wMacro": 1,
+        "temperature": 0.5,
+        "holdBand": 0.06,
+        "independence": 0.35
+      },
+      "expected": {
+        "BUY": 0.496471,
+        "HOLD": 0.317198,
+        "SELL": 0.186331,
+        "action": "BUY"
+      }
     }
   ],
   "decision": [
     {
       "macroBias": null,
+      "independence": 1,
+      "quarantined": false,
       "expected": {
         "net": -0.316575,
         "action": "SELL",
         "direction": "SHORT",
+        "hold_reason": null,
         "levels": {
           "entry": 110.876694,
           "stop": 112.911332,
@@ -150,10 +206,13 @@
     },
     {
       "macroBias": -0.5,
+      "independence": 1,
+      "quarantined": false,
       "expected": {
         "net": -0.316575,
         "action": "SELL",
         "direction": "SHORT",
+        "hold_reason": null,
         "levels": {
           "entry": 110.876694,
           "stop": 112.911332,
@@ -163,11 +222,148 @@
     },
     {
       "macroBias": 0.6,
+      "independence": 1,
+      "quarantined": false,
       "expected": {
         "net": -0.316575,
         "action": "HOLD",
         "direction": "FLAT",
+        "hold_reason": "conflicto_macro",
         "levels": null
+      }
+    },
+    {
+      "macroBias": null,
+      "independence": 0.485,
+      "quarantined": false,
+      "expected": {
+        "net": -0.316575,
+        "action": "SELL",
+        "direction": "SHORT",
+        "hold_reason": null,
+        "levels": {
+          "entry": 110.876694,
+          "stop": 112.911332,
+          "take_profit": 106.807418
+        }
+      }
+    },
+    {
+      "macroBias": 0.6,
+      "independence": 0.485,
+      "quarantined": false,
+      "expected": {
+        "net": -0.316575,
+        "action": "HOLD",
+        "direction": "FLAT",
+        "hold_reason": "conflicto_macro",
+        "levels": null
+      }
+    },
+    {
+      "macroBias": null,
+      "independence": 1,
+      "quarantined": true,
+      "expected": {
+        "net": -0.316575,
+        "action": "HOLD",
+        "direction": "FLAT",
+        "hold_reason": "cuarentena",
+        "levels": null
+      }
+    },
+    {
+      "macroBias": -0.5,
+      "independence": 0.485,
+      "quarantined": true,
+      "expected": {
+        "net": -0.316575,
+        "action": "HOLD",
+        "direction": "FLAT",
+        "hold_reason": "cuarentena",
+        "levels": null
+      }
+    }
+  ],
+  "timeframes": [
+    {
+      "interval": "1m",
+      "expected": {
+        "valid_candles": 5,
+        "horizon": 30,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "5m",
+      "expected": {
+        "valid_candles": 5,
+        "horizon": 25,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "15m",
+      "expected": {
+        "valid_candles": 4,
+        "horizon": 20,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "30m",
+      "expected": {
+        "valid_candles": 4,
+        "horizon": 20,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "1h",
+      "expected": {
+        "valid_candles": 3,
+        "horizon": 18,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "4h",
+      "expected": {
+        "valid_candles": 3,
+        "horizon": 15,
+        "quarantined": true
+      }
+    },
+    {
+      "interval": "1d",
+      "expected": {
+        "valid_candles": 2,
+        "horizon": 10,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "1w",
+      "expected": {
+        "valid_candles": 2,
+        "horizon": 6,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "1M",
+      "expected": {
+        "valid_candles": 1,
+        "horizon": 4,
+        "quarantined": false
+      }
+    },
+    {
+      "interval": "3m",
+      "expected": {
+        "valid_candles": 3,
+        "horizon": 20,
+        "quarantined": false
       }
     }
   ],

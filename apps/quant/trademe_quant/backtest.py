@@ -95,13 +95,30 @@ def run_backtest(
     horizon: int = 20,
     macro_bias: float | None = None,
     oos_split: float = 0.7,
+    independence: float = 1.0,
 ) -> dict[str, Any]:
-    """Ejecuta el backtest y devuelve trades, métricas globales y out-of-sample."""
+    """Ejecuta el backtest y devuelve trades, métricas globales y out-of-sample.
+
+    `independence` desinfla la confianza igual que en vivo, para que la cifra que registra el
+    backtest sea la misma que declarará el motor. No afecta a qué operaciones se abren: escalar
+    todos los logits no cambia el argmax.
+
+    La **cuarentena no se aplica aquí a propósito**. Retirar una temporalidad de la operativa es una
+    decisión sobre lo que se emite, no sobre lo que se mide: si el backtest dejara de simular 4h no
+    habría forma de saber cuándo puede levantarse su cuarentena.
+    """
     trades: list[dict[str, Any]] = []
     n = len(close)
     t = MIN_CANDLES
     while t < n - 1:
-        d = decide(high[: t + 1], low[: t + 1], close[: t + 1], config, macro_bias)
+        d = decide(
+            high[: t + 1],
+            low[: t + 1],
+            close[: t + 1],
+            config,
+            macro_bias,
+            independence=independence,
+        )
         levels = d["levels"]
         if d["action"] in ("BUY", "SELL") and levels is not None:
             end = min(n, t + 1 + horizon)

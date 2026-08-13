@@ -4,7 +4,12 @@ import { writeFileSync } from 'node:fs';
 import { BUILTIN_INDICATORS } from '../src/indicators/builtin.js';
 import { computeMacroBias } from '../src/macro/bias.js';
 import { inferProbs, pickAction } from '../src/ensemble/inference.js';
-import { DEFAULT_ENSEMBLE } from '../src/ensemble/config.js';
+import {
+  DEFAULT_ENSEMBLE,
+  horizonFor,
+  validCandlesFor,
+  type EnsembleConfig,
+} from '../src/ensemble/config.js';
 import { IndicatorRegistry } from '../src/indicators/registry.js';
 import { buildSignal } from '../src/ensemble/signal.js';
 import { computePlanLevels } from '../src/ensemble/plan.js';
@@ -103,32 +108,45 @@ const macroBiasVectors = macroInputs.map((input) => {
     expected: { bias: round(m.bias), weekly_trend: round(m.weekly_trend), label: m.label },
   };
 });
+// `independence` = factor de desinflado por dependencia de los votos (M10.5). Los casos con 1
+// reproducen el comportamiento anterior; los demás comprueban que Node y Python aplanan igual.
 const inferInputs = [
-  { net: 0, bias: 0.8 },
-  { net: 0.5, bias: 0.5 },
-  { net: 0.5, bias: -0.8 },
-  { net: -0.6, bias: 0.2 },
-  { net: 0, bias: 0 },
+  { net: 0, bias: 0.8, independence: 1 },
+  { net: 0.5, bias: 0.5, independence: 1 },
+  { net: 0.5, bias: -0.8, independence: 1 },
+  { net: -0.6, bias: 0.2, independence: 1 },
+  { net: 0, bias: 0, independence: 1 },
+  { net: 0.5, bias: 0.5, independence: 0.485 }, // 4h medido: 1,41 de 6 votos efectivos
+  { net: -0.6, bias: 0.2, independence: 0.66 }, // 15m medido: 2,61 de 6
+  { net: 0.9, bias: -0.4, independence: 0.35 }, // desinflado extremo
 ];
 const T = DEFAULT_ENSEMBLE.temperature;
 const HB = DEFAULT_ENSEMBLE.holdBand;
 const inferenceVectors = inferInputs.map((c) => {
-  const probs = inferProbs(c.net, T, HB, { bias: c.bias, wMacro: mc.wMacro });
+  const probs = inferProbs(c.net, T, HB, { bias: c.bias, wMacro: mc.wMacro }, c.independence);
   const { action } = pickAction(probs);
   return {
-    input: { net: c.net, bias: c.bias, wMacro: mc.wMacro, temperature: T, holdBand: HB },
+    input: {
+      net: c.net,
+      bias: c.bias,
+      wMacro: mc.wMacro,
+      temperature: T,
+      holdBand: HB,
+      independence: c.independence,
+    },
     expected: { BUY: round(probs.BUY), HOLD: round(probs.HOLD), SELL: round(probs.SELL), action },
   };
 });
 const registry = new IndicatorRegistry();
 const decVotes = registry.computeVotes(candles);
 const decPrice = candles[candles.length - 1]!.close;
-function decisionVector(macro?: Macro) {
+function decisionVector(macro?: Macro, independence = 1, quarantined = false) {
+  const cfg: EnsembleConfig = { ...DEFAULT_ENSEMBLE, independenceFactor: independence, quarantined };
   const sig = buildSignal({
     symbol: 'BTCUSDT',
     price: decPrice,
     votes: decVotes,
-    config: DEFAULT_ENSEMBLE,
+    config: cfg,
     equity: 10_000,
     interval: '1m',
     macro,
@@ -136,10 +154,13 @@ function decisionVector(macro?: Macro) {
   const lv = computePlanLevels(sig.action, sig.price, sig.atr, DEFAULT_ENSEMBLE.risk, 10_000);
   return {
     macroBias: macro ? macro.bias : null,
+    independence,
+    quarantined,
     expected: {
       net: round(sig.net),
       action: sig.action,
       direction: sig.direction,
+      hold_reason: sig.hold_reason ?? null,
       levels: lv
         ? { entry: round(lv.entry), stop: round(lv.stop), take_profit: round(lv.takeProfit) }
         : null,
@@ -160,7 +181,25 @@ const decisionVectors = [
   decisionVector(undefined),
   decisionVector(mkMacro(-0.5)),
   decisionVector(mkMacro(0.6)),
+  // M10.5: desinflado por dependencia y cuarentena de la temporalidad.
+  decisionVector(undefined, 0.485),
+  decisionVector(mkMacro(0.6), 0.485),
+  decisionVector(undefined, 1, true),
+  decisionVector(mkMacro(-0.5), 0.485, true),
 ];
+
+// ---- Vectores del horizonte y la frescura por temporalidad (M10.5) ----
+// No entran en el camino de la decisión, pero sí deciden cuándo se cierra una operación en el
+// backtest de Python y cuánto vive el plan en Node: si divergieran, el backtest dejaría de medir lo
+// que la plataforma hace.
+const tfVectors = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M', '3m'].map((iv) => ({
+  interval: iv,
+  expected: {
+    valid_candles: validCandlesFor(DEFAULT_ENSEMBLE, iv),
+    horizon: horizonFor(DEFAULT_ENSEMBLE, iv),
+    quarantined: DEFAULT_ENSEMBLE.quarantineIntervals.includes(iv),
+  },
+}));
 
 // ---- Vectores de paridad del calibrador (applier idéntico Node<->Python) ----
 const calibrators: Record<string, Calibrator> = {
@@ -222,6 +261,7 @@ writeFileSync(
       macro_bias: macroBiasVectors,
       inference: inferenceVectors,
       decision: decisionVectors,
+      timeframes: tfVectors,
       calibration: calibrationVectors,
       metamodel: { forest, vectors: metamodelVectors },
     },

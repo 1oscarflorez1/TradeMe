@@ -50,6 +50,38 @@ def compute_plan_levels(
     }
 
 
+def valid_candles_for(config: dict[str, Any], interval: str) -> int:
+    """Frescura de la entrada, en velas (mirror de config.ts::validCandlesFor)."""
+    plan = config.get("plan", {})
+    por_tf = plan.get("valid_candles_by_tf", {})
+    if isinstance(por_tf, dict):
+        v = por_tf.get(interval)
+        if isinstance(v, int | float) and v > 0:
+            return int(v)
+    return int(plan.get("valid_candles", 3))
+
+
+def horizon_for(config: dict[str, Any], interval: str) -> int:
+    """Velas que se le dan a la operación antes de cerrarla por tiempo.
+
+    Mirror de config.ts::horizonFor. Es el parámetro que produce los «timeout»: estaba fijo en 20
+    para todas las temporalidades, escrito como valor por defecto de una función.
+    """
+    ev = config.get("evaluation", {})
+    por_tf = ev.get("horizon_by_tf", {}) if isinstance(ev, dict) else {}
+    if isinstance(por_tf, dict):
+        v = por_tf.get(interval)
+        if isinstance(v, int | float) and v > 0:
+            return int(v)
+    return int(ev.get("horizon", 20)) if isinstance(ev, dict) else 20
+
+
+def is_quarantined(config: dict[str, Any], interval: str) -> bool:
+    """La temporalidad está retirada de la operativa (mirror de config.ts::forInterval)."""
+    lista = config.get("quarantine_intervals", [])
+    return isinstance(lista, list) and interval in lista
+
+
 def decide(
     high: Sequence[float],
     low: Sequence[float],
@@ -57,6 +89,8 @@ def decide(
     config: dict[str, Any],
     macro_bias: float | None = None,
     external_votes: Sequence[dict[str, Any]] | None = None,
+    independence: float = 1.0,
+    quarantined: bool = False,
 ) -> dict[str, Any]:
     readings = compute_readings(high, low, close)
     adx = readings["adx14"]["value"]
@@ -100,8 +134,10 @@ def decide(
         float(config["hold_band"]),
         macro_bias if use_macro else None,
         float(macro_cfg["w_macro"]) if use_macro else 0.0,
+        independence,
     )
     action = pick_action(probs)
+    hold_reason = "banda_neutra" if action == "HOLD" else None
 
     confluence = "neutral"
     if use_macro and macro_bias is not None:
@@ -113,6 +149,12 @@ def decide(
             and abs(macro_bias) > float(macro_cfg["conflict_threshold"])
         ):
             action = "HOLD"
+            hold_reason = "conflicto_macro"
+
+    # Cuarentena: la última palabra y la más fuerte (mirror de ensemble/signal.ts).
+    if quarantined and action != "HOLD":
+        action = "HOLD"
+        hold_reason = "cuarentena"
 
     direction = "LONG" if action == "BUY" else "SHORT" if action == "SELL" else "FLAT"
     price = float(close[-1])
@@ -125,6 +167,9 @@ def decide(
         "probs": probs,
         "action": action,
         "direction": direction,
+        "hold_reason": hold_reason,
+        "independence": independence,
+        "quarantined": quarantined,
         "confluence": confluence,
         "price": price,
         "levels": levels,

@@ -11,10 +11,23 @@ def infer_probs(
     hold_band: float,
     macro_bias: float | None = None,
     w_macro: float = 0.0,
+    independence: float = 1.0,
 ) -> dict[str, float]:
+    """Softmax con modulación macro y desinflado por dependencia de los votos.
+
+    `independence` escala los TRES logits por igual (ver trademe_quant.independence). Como escalar
+    todos los logits por una constante positiva no altera cuál es el mayor, el ajuste **no cambia la
+    dirección de la decisión**: solo aplana la distribución y baja la confianza declarada. Es una
+    corrección de calibración, no de criterio.
+    """
     t = temperature if temperature > 0 else 0.5
     macro_term = w_macro * macro_bias if macro_bias is not None else 0.0
-    logits = {"BUY": net / t + macro_term, "SELL": -net / t - macro_term, "HOLD": hold_band / t}
+    k = independence if independence > 0 else 1.0
+    logits = {
+        "BUY": k * (net / t + macro_term),
+        "SELL": k * (-net / t - macro_term),
+        "HOLD": k * (hold_band / t),
+    }
     peak = max(logits.values())
     exp = {k: math.exp(v - peak) for k, v in logits.items()}
     total = sum(exp.values())

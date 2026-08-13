@@ -240,6 +240,25 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
             except Exception as err:  # noqa: BLE001 - el piloto no debe morir por un TF
                 log.append(f"error {symbol} {iv}: {err}")
 
+    # Independencia de los votos: se remide en cada ciclo porque es barato (una matriz 6x6 por
+    # símbolo y temporalidad) y porque su valor cambia con el régimen de mercado. Si no hay muestra
+    # suficiente para una clave, simplemente no se publica y la API no desinfla nada.
+    try:
+        from .independence import publish as publish_independence
+
+        datos = publish_independence(artifacts_dir(), dsn)
+        n_claves = len(datos["entries"])
+        if n_claves:
+            peor = min(datos["entries"].items(), key=lambda kv: float(kv[1]["effective"]))
+            log.append(
+                f"independencia medida en {n_claves} claves "
+                f"(la más colapsada: {peor[0]} con {peor[1]['effective']:.2f} votos efectivos)"
+            )
+        else:
+            log.append("independencia: sin muestra suficiente todavía")
+    except Exception as err:  # noqa: BLE001 - sin independencia se decide sin desinflar
+        log.append(f"error independencia: {err}")
+
     # Calibración de mantenimiento (independiente de que haya habido optimización).
     try:
         cal_ok, cal_reason = should_calibrate(

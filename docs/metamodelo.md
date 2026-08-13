@@ -54,7 +54,22 @@ evidencia:
 |---|---|
 | `shadow` → `modulate` | ≥40 decisiones evaluadas con predicción, mejora ≥ 0,05 R, AUC ≥ 0,55 y que el filtro conserve ≥25 % de las señales |
 | `modulate` → `veto` | Lo anterior sostenido con ≥100 decisiones |
-| Retroceso | Con muestra suficiente, si el filtro **empeora** el resultado (−0,05 R), baja un escalón |
+| **Permanencia** | Con muestra suficiente, quien ya tiene poder debe **seguir cumpliendo** lo mismo que se le exigió para tenerlo (mejora ≥ 0,05 R **y** AUC ≥ 0,55). Si deja de cumplirlo, baja un escalón. |
+
+### El fallo que corrigió M10.5
+
+Hasta la versión 0.34.0 el guardián de salida era más laxo que el de entrada: para **ascender** se
+exigía AUC ≥ 0,55, pero para **permanecer** solo se miraba que el lift no cayera por debajo de
+−0,05 R. El AUC no se volvía a comprobar nunca.
+
+El 11 de agosto de 2026 eso tenía al meta-modelo en modo `modulate` —modulando la confianza de las
+decisiones en vivo— con **AUC 0,43**, es decir, ordenando ganadores y perdedores *peor que una
+moneda*. Su propio artefacto lo decía («aún no demuestra ventaja»), y aun así conservaba el poder,
+porque su lift era −0,005 R y no llegaba al umbral de retroceso.
+
+Un umbral que solo se comprueba al ascender no es un umbral: es un peaje de entrada. Ahora la
+condición de permanencia repite la de ascenso. **Si un componente deja de cumplir lo que se le exigió
+para darle poder, lo pierde.** Es la regla que gobernará también a los agentes del consejo (M13).
 
 La decisión se publica en `artifacts/meta_policy.json` y se avisa por la campana. La variable
 `META_MODE` pasa a ser un **tope de seguridad**: la automatización nunca sube por encima de él

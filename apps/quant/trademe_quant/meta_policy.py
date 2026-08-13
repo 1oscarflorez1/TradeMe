@@ -67,11 +67,22 @@ def decide_mode(current: str, ev: dict[str, Any], max_mode: str = "veto") -> tup
     cur = MODES.index(current) if current in MODES else 1
     n, lift, auc, kept = ev["n"], ev["lift"], ev["auc"], ev["kept"]
 
-    # Retroceso: con muestra suficiente, si el filtro empeora el resultado.
-    if cur >= 2 and n >= MIN_SAMPLES_MODULATE and lift < -MIN_LIFT_R:
-        return MODES[max(1, cur - 1)], (
-            f"el filtro empeora el resultado ({lift:+.3f} R en {n} decisiones): se retrocede"
-        )
+    # Permanencia simétrica: quien ya tiene poder debe seguir cumpliendo lo que se le exigió para
+    # tenerlo. Antes el guardián de salida era más laxo que el de entrada —solo miraba el lift— y un
+    # modelo degradado hasta AUC 0,43 (peor que una moneda) conservaba el modo `modulate` porque su
+    # lift, aun siendo malo, no llegaba a −0,05 R. Un umbral que solo se comprueba al ascender no es
+    # un umbral: es un peaje de entrada.
+    if cur >= 2 and n >= MIN_SAMPLES_MODULATE:
+        if lift < -MIN_LIFT_R:
+            return MODES[max(1, cur - 1)], (
+                f"el filtro empeora el resultado ({lift:+.3f} R en {n} decisiones): se retrocede"
+            )
+        if lift < MIN_LIFT_R or auc < MIN_AUC:
+            return MODES[max(1, cur - 1)], (
+                f"deja de cumplir lo exigido para tener poder "
+                f"(mejora {lift:+.3f} R, AUC {auc:.2f}; se exige ≥{MIN_LIFT_R} R "
+                f"y AUC ≥{MIN_AUC} en {n} decisiones): se retrocede"
+            )
 
     if n < MIN_SAMPLES_MODULATE:
         return current, f"evidencia insuficiente ({n}/{MIN_SAMPLES_MODULATE} decisiones evaluadas)"

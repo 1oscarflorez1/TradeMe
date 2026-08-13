@@ -77,7 +77,9 @@ def save_backtest(dsn: str, symbol: str, interval: str, result: dict[str, Any]) 
         conn.commit()
 
 
-def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
+def evaluate_snapshot_outcomes(
+    dsn: str, horizon: int = 20, horizons: dict[str, int] | None = None
+) -> int:
     """Rellena outcome_* de los snapshots pendientes usando las velas posteriores.
 
     Regla de cierre, deliberadamente asimétrica:
@@ -89,6 +91,12 @@ def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
       que aún no le hemos dado tiempo. Antes se cerraban igual y, como el resultado dejaba de ser
       nulo, no se volvían a evaluar jamás: en 1d eso convertía el 100 % de los registros en timeouts
       artificiales.
+
+    El horizonte es **por temporalidad** desde M10.5 (`horizons`). Las 20 velas fijas anteriores
+    eran 20 minutos en 1m y 20 días en 1d: en las cortas cerraban por tiempo operaciones que aún
+    tenían recorrido —el 31 % del total—, y en 1d, 1w y 1M exigían más histórico del que existe, de
+    modo que esos registros no llegaban a evaluarse nunca. `horizon` queda como reserva para las
+    temporalidades que no aparezcan en el mapa.
     """
     import psycopg
 
@@ -107,6 +115,7 @@ def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
             pending = cur.fetchall()
         for row in pending:
             sid, symbol, interval, captured_at, direction, entry, stop, tp = row
+            h = (horizons or {}).get(str(interval), horizon)
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -114,7 +123,7 @@ def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
                     WHERE symbol=%s AND interval=%s AND ts > %s
                     ORDER BY ts LIMIT %s
                     """,
-                    (symbol, interval, captured_at, horizon),
+                    (symbol, interval, captured_at, h),
                 )
                 future = cur.fetchall()
             if not future:
@@ -129,7 +138,7 @@ def evaluate_snapshot_outcomes(dsn: str, horizon: int = 20) -> int:
                 [float(r[2]) for r in future],
             )
             # Sin el horizonte completo, un «timeout» es prematuro: se deja pendiente.
-            if res["result"] == "timeout" and len(future) < horizon:
+            if res["result"] == "timeout" and len(future) < h:
                 continue
             with conn.cursor() as cur:
                 cur.execute(
