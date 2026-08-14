@@ -25,6 +25,7 @@ const EnvSchema = z.object({
   METAMODEL_PATH: z.string().default('artifacts/metamodel.json'),
   META_POLICY_PATH: z.string().default('artifacts/meta_policy.json'),
   INDEPENDENCE_PATH: z.string().default('artifacts/independence.json'),
+  QUARANTINE_PATH: z.string().default('artifacts/quarantine.json'),
   // Historial y documentación: el Dockerfile copia el repositorio entero, así que ambos viajan
   // dentro de la imagen y no hay nada que montar.
   CHANGELOG_PATH: z.string().default('CHANGELOG.md'),

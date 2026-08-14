@@ -11,7 +11,7 @@ import sys
 from typing import Any
 
 from .backtest import run_backtest
-from .db import evaluate_snapshot_outcomes, save_backtest
+from .db import evaluate_shadow_outcomes, evaluate_snapshot_outcomes, save_backtest
 from .decision import horizon_for
 from .ensemble import artifacts_dir, load_active_ensemble
 from .independence import load_factor
@@ -44,6 +44,9 @@ def run_and_save(symbol: str, interval: str) -> dict[str, Any]:
             for iv in config.get("evaluation", {}).get("horizon_by_tf", {})
         }
         evaluated = evaluate_snapshot_outcomes(_dsn(), horizonte, horizontes or None)
+        # Y las sombra: es lo que permite que una temporalidad en cuarentena acumule expediente
+        # y pueda salir de ella. Van a sus propias columnas, nunca al rendimiento real.
+        evaluate_shadow_outcomes(_dsn(), horizonte, horizontes or None)
     except Exception:  # noqa: BLE001 - paso secundario
         evaluated = 0
     return {

@@ -77,6 +77,75 @@ def save_backtest(dsn: str, symbol: str, interval: str, result: dict[str, Any]) 
         conn.commit()
 
 
+def evaluate_shadow_outcomes(
+    dsn: str, horizon: int = 20, horizons: dict[str, int] | None = None
+) -> int:
+    """Puntúa las decisiones **sombra**: las que la cuarentena impidió emitir (M10.7).
+
+    Una temporalidad en cuarentena no opera, así que no genera ninguna operación real que evaluar.
+    Sin esto no podría acumular expediente y la cuarentena sería irreversible por construcción: la
+    temporalidad quedaría vetada para siempre por no poder demostrar lo contrario.
+
+    Mismas reglas de cierre que el desenlace real —primer toque, horizonte completo para declarar
+    timeout— pero en `shadow_outcome_*`. **Estas cifras no son rendimiento**: nadie operó. Sirven
+    para decidir si la cuarentena se levanta, y para nada más.
+    """
+    import psycopg
+
+    from .backtest import evaluate_trade
+
+    updated = 0
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, symbol, interval, captured_at, shadow_direction,
+                       shadow_entry, shadow_stop, shadow_take_profit
+                FROM snapshots
+                WHERE shadow_outcome_result IS NULL AND shadow_entry IS NOT NULL
+                      AND shadow_direction IN ('LONG','SHORT')
+                """)
+            pending = cur.fetchall()
+        for row in pending:
+            sid, symbol, interval, captured_at, direction, entry, stop, tp = row
+            h = (horizons or {}).get(str(interval), horizon)
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT high, low, close FROM candles
+                    WHERE symbol=%s AND interval=%s AND ts > %s
+                    ORDER BY ts LIMIT %s
+                    """,
+                    (symbol, interval, captured_at, h),
+                )
+                future = cur.fetchall()
+            if not future:
+                continue
+            res = evaluate_trade(
+                direction,
+                float(entry),
+                float(stop),
+                float(tp),
+                [float(r[0]) for r in future],
+                [float(r[1]) for r in future],
+                [float(r[2]) for r in future],
+            )
+            if res["result"] == "timeout" and len(future) < h:
+                continue
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE snapshots
+                    SET shadow_outcome_result=%s, shadow_outcome_return_r=%s,
+                        shadow_evaluated_at=now()
+                    WHERE id=%s
+                    """,
+                    (res["result"], res["r"], sid),
+                )
+            updated += 1
+        conn.commit()
+    return updated
+
+
 def evaluate_snapshot_outcomes(
     dsn: str, horizon: int = 20, horizons: dict[str, int] | None = None
 ) -> int:

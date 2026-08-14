@@ -119,7 +119,14 @@ export function buildSignal(params: BuildSignalParams): Signal {
   // Va la última y por encima de todo lo demás: es una retirada del permiso para operar, no una
   // opinión que se pueda compensar con confianza alta. La decisión se sigue calculando entera —los
   // votos, el net y las probabilidades quedan registrados— pero no sale de aquí como operable.
+  let shadowAction: Action | undefined;
+  let shadowDirection: Direction | undefined;
   if (params.config.quarantined && action !== 'HOLD') {
+    // Se guarda lo que se iba a emitir ANTES de degradarlo: es el expediente con el que la
+    // temporalidad podrá demostrar que merece salir. Sin esta línea la cuarentena no tendría
+    // salida posible, porque una temporalidad que no opera no genera nada que evaluar.
+    shadowAction = action;
+    shadowDirection = direction;
     action = 'HOLD';
     confidence = probs.HOLD;
     direction = 'FLAT';
@@ -150,6 +157,8 @@ export function buildSignal(params: BuildSignalParams): Signal {
     direction,
     confidence,
     hold_reason: action === 'HOLD' ? (holdReason ?? 'banda_neutra') : undefined,
+    shadow_action: shadowAction,
+    shadow_direction: shadowDirection,
     independence_factor: independence,
     quarantined: params.config.quarantined ? true : undefined,
     calibrated_confidence: calibratedConfidence,

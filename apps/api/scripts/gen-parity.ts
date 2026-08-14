@@ -161,6 +161,8 @@ function decisionVector(macro?: Macro, independence = 1, quarantined = false) {
       action: sig.action,
       direction: sig.direction,
       hold_reason: sig.hold_reason ?? null,
+      shadow_action: sig.shadow_action ?? null,
+      shadow_direction: sig.shadow_direction ?? null,
       levels: lv
         ? { entry: round(lv.entry), stop: round(lv.stop), take_profit: round(lv.takeProfit) }
         : null,

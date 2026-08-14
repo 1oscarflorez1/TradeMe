@@ -58,6 +58,19 @@ export interface Signal {
   confidence: number;
   /** Presente solo cuando `action` es HOLD: por qué no se opera. */
   hold_reason?: HoldReason;
+  /**
+   * Lo que se habría decidido si la temporalidad no estuviera en cuarentena.
+   *
+   * Sin esto, una temporalidad vetada no genera ninguna operación evaluable y por tanto no puede
+   * demostrar nunca que merece volver: la cuarentena sería irreversible por construcción. La sombra
+   * es lo que le permite acumular expediente sin operar — el mismo principio que el modo sombra del
+   * meta-modelo.
+   *
+   * **Nunca cuenta como rendimiento**: no se operó. Alimenta el expediente de la temporalidad y
+   * nada más.
+   */
+  shadow_action?: Action;
+  shadow_direction?: Direction;
   /** Factor de desinflado aplicado a los logits por dependencia de los votos (1 = ninguno). */
   independence_factor?: number;
   /** La temporalidad está en cuarentena: se registra pero no emite señal operable. */

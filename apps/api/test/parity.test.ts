@@ -81,6 +81,8 @@ interface MacroVectors {
       action: string;
       direction: string;
       hold_reason: string | null;
+      shadow_action: string | null;
+      shadow_direction: string | null;
       levels: { entry: number; stop: number; take_profit: number } | null;
     };
   }>;
@@ -173,6 +175,8 @@ describe('paridad decisión — Node ≡ vectores dorados', () => {
       expect(sig.action).toBe(v.expected.action);
       expect(sig.direction).toBe(v.expected.direction);
       expect(sig.hold_reason ?? null).toBe(v.expected.hold_reason ?? null);
+      expect(sig.shadow_action ?? null).toBe(v.expected.shadow_action ?? null);
+      expect(sig.shadow_direction ?? null).toBe(v.expected.shadow_direction ?? null);
       expect(Math.abs(sig.net - v.expected.net)).toBeLessThan(1e-4);
     }
   });
@@ -187,5 +191,44 @@ describe('paridad por temporalidad — Node ≡ vectores dorados', () => {
         v.expected.quarantined,
       );
     }
+  });
+});
+
+describe('cuarentena con salida (M10.7)', () => {
+  const registry = new IndicatorRegistry();
+  const votes = registry.computeVotes(candles);
+  const price = candles[candles.length - 1]!.close;
+
+  const construye = (quarantined: boolean) =>
+    buildSignal({
+      symbol: 'BTCUSDT',
+      price,
+      votes,
+      config: { ...DEFAULT_ENSEMBLE, quarantined },
+      equity: 10_000,
+      interval: '1m',
+    });
+
+  it('una temporalidad vetada no emite señal operable', () => {
+    const sig = construye(true);
+    expect(sig.action).toBe('HOLD');
+    expect(sig.direction).toBe('FLAT');
+    expect(sig.hold_reason).toBe('cuarentena');
+  });
+
+  it('pero conserva lo que habría hecho, o no podría salir nunca', () => {
+    // Sin sombra, una temporalidad en cuarentena no genera nada evaluable y la medida sería
+    // irreversible por construcción. Esta es la prueba que protege esa propiedad.
+    const vetada = construye(true);
+    const libre = construye(false);
+    expect(libre.action).not.toBe('HOLD');
+    expect(vetada.shadow_action).toBe(libre.action);
+    expect(vetada.shadow_direction).toBe(libre.direction);
+  });
+
+  it('sin cuarentena no se registra sombra alguna', () => {
+    const sig = construye(false);
+    expect(sig.shadow_action).toBeUndefined();
+    expect(sig.shadow_direction).toBeUndefined();
   });
 });

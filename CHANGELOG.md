@@ -7,6 +7,55 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.36.0] — 2026-08-14
+
+> M10.7. La cuarentena que se entregó en M10.5 era irreversible por construcción: una temporalidad
+> vetada no generaba nada evaluable, así que no podía demostrar nunca que merecía volver. Se arregla
+> el fallo y se le pone gobierno automático, con el mismo principio que rige al meta-modelo.
+
+### Fixed — La cuarentena era una trampa sin salida
+
+- Al degradar 4h a MANTENER, la decisión se guardaba con dirección `FLAT` y sin plan. El evaluador
+  solo puntúa filas con `plan_entry IS NOT NULL` y dirección operable, de modo que **ninguna decisión
+  en cuarentena llegaba a evaluarse**. Comprobado en producción: 1 de 1 filas en cuarentena sin plan,
+  sin dirección y sin desenlace.
+- Se escribió que la cuarentena «retira el permiso para operar, no la observación». Retiraba las dos.
+
+### Added — Modo sombra de la cuarentena (migración 017)
+
+- Una temporalidad vetada sigue registrando **qué habría hecho**: acción, dirección y plan, en
+  columnas `shadow_*` propias. El evaluador las puntúa con las mismas reglas —primer toque, horizonte
+  por temporalidad— en `shadow_outcome_*`.
+- **El aislamiento es estructural, no de disciplina.** Las sombra tienen su propio juego de columnas:
+  aunque alguien olvide filtrar, es imposible que una operación que nadie abrió cuente como
+  rendimiento. `expectancy` y `winRate` no las ven; el resumen las expone aparte.
+
+### Added — Gobierno automático de la cuarentena
+
+- `quarantine_policy.py`: una temporalidad vetada **sale sola** cuando su expediente sombra acumule
+  ≥40 decisiones evaluadas y ≥ +0,05 R; una que opera **entra sola** con ≥30 decisiones y ≤ −0,15 R.
+- Deliberadamente **asimétrico**: dejar de operar es barato y volver a operar no. Con la misma
+  muestra, una expectancy que no basta para entrar tampoco basta para salir.
+- Los umbrales están escritos **antes** de que exista muestra suficiente, a propósito: fijarlos
+  después sería elegirlos mirando el resultado.
+- `artifacts/quarantine.json` manda sobre `ensemble.yaml`, que pasa a ser el estado inicial. Sin
+  medición para una clave, manda la configuración: nunca se levanta una cuarentena por falta de datos.
+- Cada decisión lleva su motivo en texto: una decisión automática que no se puede explicar no es
+  auditable. Se avisa por la campana cuando una temporalidad entra o sale.
+
+### Added — Primeras pruebas del portal
+
+- `apps/web` no tenía ninguna. Se extrae la lógica pura de Novedades a `news.ts` y se cubre con
+  **16 pruebas**: fechas, titulares, recuentos y buscador, incluidos los casos que rompen (fecha
+  inválida, versión sin secciones, categoría desconocida).
+- Sin stack de renderizado: lo que se puede probar sin montar un navegador se prueba así.
+
+### Fixed — Cifra equivocada en el registro de cambios
+
+- La entrada de 0.35.0 decía «35 versiones» reconstruidas. Son **37** (38 con la propia 0.35.0). Al
+  leer la salida del reconstructor se cortaron las dos primeras líneas y la cifra se arrastró al
+  CHANGELOG, al commit y al PR. El fichero siempre estuvo bien; la cifra sobre él, no.
+
 ## [0.35.0] — 2026-08-13
 
 > M10.6. La plataforma pasa a contar su propia historia sin que nadie tenga que acordarse. El
@@ -28,7 +77,7 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - Tenía **dos** cabeceras: `[0.34.0]` y `[No publicado]`, con **48 secciones** colgando de la
   segunda. Todo el historial anterior estaba sin atribuir, y no había ni un solo tag de git.
 - Reconstruido desde la propia historia del repositorio: para cada commit que tocó el CHANGELOG se
-  mira qué versión declaraba `apps/api/package.json` en ese momento. **35 versiones desde la 0.0.0**
+  mira qué versión declaraba `apps/api/package.json` en ese momento. **37 versiones desde la 0.0.0**
   con sus fechas reales, sin inventar ninguna. Cero secciones perdidas y una recuperada
   («Multi-activo + visualizaciones del motor») que se había borrado por el camino.
 - Tags `v0.0.0`…`v0.34.0` creados sobre los commits que ya existían.
