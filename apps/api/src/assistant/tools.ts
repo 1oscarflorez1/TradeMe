@@ -34,6 +34,48 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'cambios_de_version',
+      description:
+        'Qué cambió en una versión de TradeMe y por qué, leído del registro de cambios oficial. ' +
+        'Sin argumentos devuelve las últimas versiones. Úsala siempre que pregunten qué hay de ' +
+        'nuevo, qué trajo la última actualización, cuándo se añadió algo o por qué se hizo un ' +
+        'cambio. Es la única fuente fiable: no respondas de memoria sobre el historial.',
+      parameters: {
+        type: 'object',
+        properties: {
+          version: {
+            type: 'string',
+            description: 'Versión concreta, por ejemplo "0.34.0". Omítela para las más recientes.',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'consultar_documentacion',
+      description:
+        'Documentación técnica de la plataforma: cómo funciona la calibración, el meta-modelo, el ' +
+        'régimen, los proveedores de datos, el backtesting, la independencia de los votos… ' +
+        'Úsala para preguntas conceptuales sobre CÓMO está hecho TradeMe, cuando quieras responder ' +
+        'con el texto vigente en vez de con lo que recuerdes. Sin argumentos lista lo disponible.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tema: {
+            type: 'string',
+            description:
+              'Término a buscar (por ejemplo "calibración", "cuarentena") o el identificador de un ' +
+              'documento para leerlo entero. Omítelo para ver el índice.',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'decision_de_temporalidad',
       description:
         'Decisión en vivo del activo en OTRA temporalidad: acción, dirección, confianza, ' +

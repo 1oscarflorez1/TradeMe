@@ -3,7 +3,72 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y [Versionado Semántico](https://semver.org/lang/es/).
 
-## [0.34.0] — M10.5 · Sanear lo que ya decide
+> Este fichero es la **única fuente** del historial de versiones: la pestaña Novedades y el
+> asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
+> los `package.json` coincide con la primera entrada de abajo.
+
+## [0.35.0] — 2026-08-13
+
+> M10.6. La plataforma pasa a contar su propia historia sin que nadie tenga que acordarse. El
+> problema no era que se olvidara actualizar Novedades: era que Novedades no leía el registro de
+> cambios, sino que **era una segunda copia** escrita a mano.
+
+### Fixed — Novedades mostraba la 0.28.0 con la 0.34.0 desplegada
+
+- `NewsView.tsx` guardaba un array de **27 entradas redactadas a mano**, la última de la 0.28.0.
+  Seis versiones invisibles para el equipo. Comprobado en el propio paquete servido en producción:
+  contenía la cadena `0.28.0` y no `0.34.0`, con el resto del código de M10.5 ya desplegado.
+- Ahora los datos vienen de `GET /releases`, que interpreta `CHANGELOG.md`. La vista pierde sus 532
+  líneas y se queda en 258: **no puede desviarse porque ya no tiene nada propio que desviar**.
+- Un chip nuevo avisa si la versión en ejecución no es la primera del registro, que es justo la
+  situación que nadie detectaba.
+
+### Fixed — El CHANGELOG no estaba versionado
+
+- Tenía **dos** cabeceras: `[0.34.0]` y `[No publicado]`, con **48 secciones** colgando de la
+  segunda. Todo el historial anterior estaba sin atribuir, y no había ni un solo tag de git.
+- Reconstruido desde la propia historia del repositorio: para cada commit que tocó el CHANGELOG se
+  mira qué versión declaraba `apps/api/package.json` en ese momento. **35 versiones desde la 0.0.0**
+  con sus fechas reales, sin inventar ninguna. Cero secciones perdidas y una recuperada
+  («Multi-activo + visualizaciones del motor») que se había borrado por el camino.
+- Tags `v0.0.0`…`v0.34.0` creados sobre los commits que ya existían.
+
+### Fixed — El asistente decía no saber en qué versión corría
+
+- `pkgVersion` salía de `npm_package_version`, que solo existe si el proceso se lanza con un script
+  de npm. En el contenedor se arranca el binario directamente, así que valía «desconocida».
+
+### Added — El asistente conoce la historia y la documentación
+
+- **`cambios_de_version`**: qué cambió en cada versión y por qué, leído del mismo registro que ve el
+  portal. «¿Qué trajo la última actualización?» pasa a tener respuesta con fuente en vez de un «no
+  lo sé», que era lo único honesto que podía decir antes.
+- **`consultar_documentacion`**: busca y lee `docs/`, que ya viaja dentro de la imagen. Explica con
+  el texto vigente en vez de con lo que recuerde.
+- Su contexto incluye ahora la versión activa y las tres últimas entregas.
+- Se retira de la base local del portal la explicación duplicada de la calibración y se sustituye
+  por una remisión. **El Centro de ayuda no se toca**: es documentación conceptual pensada para
+  leerse en pantalla, no un registro de cambios, y derivarlo del CHANGELOG habría sido un error.
+
+### Added — Puerta de versión en CI
+
+- `scripts/check-version.mjs` falla si `apps/api` y `apps/web` no coinciden entre sí o con la
+  primera entrada del CHANGELOG, y si hay versiones repetidas en el registro. Corre antes que el
+  lint, y el mensaje de error dice exactamente qué hacer.
+- Detecta el caso real que ocurrió: **dos ramas distintas usaron el número 0.34.0**, una fusionada y
+  otra no. Sin esta puerta, la anterior corrección se degradaría sola en unas semanas.
+
+### Added — Primeras pruebas del historial
+
+- 17 pruebas del intérprete del CHANGELOG, incluidas las que validan el **registro real**: todas las
+  versiones con semver y fecha, sin repetidos, ordenadas y ninguna sin contenido.
+
+### Added — `CLAUDE.md` en el repositorio
+
+- Las instrucciones del proyecto vivían fuera del repositorio, así que no viajaban con el clon ni
+  llegaban al equipo. Ahora están versionadas junto al código.
+
+## [0.34.0] — 2026-08-12
 
 > Antes de añadir el análisis fundamental o cualquier agente nuevo, se corrige la base matemática
 > sobre la que se apoyarían. Cinco arreglos, ninguno estructural, todos sobre defectos medidos en
@@ -70,7 +135,7 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   la cifra anterior afirmaba más seguridad de la que los datos respaldaban.
 - 4h dejará de proponer entradas. Se sigue viendo y midiendo.
 
-## [No publicado]
+## [0.33.0] — 2026-08-05
 
 ### Changed — El sustento vive dentro del Panel
 
@@ -91,6 +156,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **Prohibida para datos de TradeMe**: si internet y la plataforma se contradicen sobre las cifras
   propias, gana la plataforma y el asistente debe decirlo.
 
+## [0.32.0] — 2026-08-05
+
 ### Added — El asistente puede consultar la plataforma (herramientas)
 
 - Siete **herramientas de solo lectura** que el modelo puede invocar cuando la pregunta necesita
@@ -103,6 +170,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   sugiera acción.
 - Tope de **tres vueltas** por pregunta, con la última sin herramientas para forzar respuesta.
 - Bajo cada respuesta se muestra **qué consultó** el asistente.
+
+## [0.31.0] — 2026-08-05
 
 ### Added — El asistente puede usar un modelo de lenguaje gratuito
 
@@ -119,6 +188,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   El asistente nunca se queda mudo.
 - `docs/asistente.md` con la comparativa de proveedores gratuitos, qué se envía exactamente y cómo
   montar Ollama si se prefiere que nada salga de la red.
+
+## [0.30.0] — 2026-08-05
 
 ### Added — Asistente de la plataforma
 
@@ -140,6 +211,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   leyenda. Queda un punto que se enciende cuando el motor analiza y registra esa temporalidad; el
   detalle vive en el tooltip y en el botón «?».
 
+## [0.29.0] — 2026-08-05
+
 ### Added — Panel de decisión (pestaña «Sustento»)
 
 - **`GET /decision/sustento`**: configuración activa (pesos, multiplicadores de régimen, banda
@@ -153,23 +226,7 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   backtest, no esta evidencia. Fijarlos desde aquí, y distintos por régimen, es el paso siguiente y
   depende de acumular muestra.
 
-### Fixed — Integridad de los registros (auditoría del 5 de agosto)
-
-- **Una decisión por vela, no una por reloj.** La captura automática usaba un enfriamiento fijo de
-  20 minutos para todas las temporalidades: en 4h producía hasta 12 registros de la misma vela y en
-  1d hasta 72. Esos duplicados se contaban como observaciones independientes —si la decisión acababa
-  en stop se anotaban doce stops en vez de uno— y sesgaban tanto las estadísticas como el dataset
-  del meta-modelo. Ahora la captura se ancla a la vela, que es además como decide el backtest.
-- **El evaluador cerraba antes de tiempo.** Pedía 20 velas futuras pero evaluaba con las que
-  hubiera; al no tocar ningún nivel marcaba `timeout` y, como el resultado dejaba de ser nulo, no
-  volvía a mirarse nunca. En 1d eso convertía el 100 % de los registros en timeouts artificiales.
-  Regla nueva y asimétrica: un toque de objetivo o stop es definitivo aunque ocurra en la primera
-  vela; un timeout solo vale si transcurrió el horizonte completo.
-- **Migración 015:** columna `candle_open` (retroactiva) para poder quedarse con una decisión por
-  vela sin borrar nada, y reapertura de los timeouts cerrados prematuramente para que el piloto los
-  vuelva a medir bien. No se elimina ningún registro.
-- Las estadísticas de Registros y el entrenamiento del meta-modelo deduplican por vela, preservando
-  el orden cronológico que necesita la división temporal.
+## [0.28.0] — 2026-08-05
 
 ### Fixed — El resumen de Registros contaba mal
 
@@ -207,6 +264,26 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   opcionalmente, por qué se hizo así.
 - Laboratorio: introducción que sitúa las cuatro secciones y márgenes uniformes.
 
+### Fixed — Integridad de los registros (auditoría del 5 de agosto)
+
+- **Una decisión por vela, no una por reloj.** La captura automática usaba un enfriamiento fijo de
+  20 minutos para todas las temporalidades: en 4h producía hasta 12 registros de la misma vela y en
+  1d hasta 72. Esos duplicados se contaban como observaciones independientes —si la decisión acababa
+  en stop se anotaban doce stops en vez de uno— y sesgaban tanto las estadísticas como el dataset
+  del meta-modelo. Ahora la captura se ancla a la vela, que es además como decide el backtest.
+- **El evaluador cerraba antes de tiempo.** Pedía 20 velas futuras pero evaluaba con las que
+  hubiera; al no tocar ningún nivel marcaba `timeout` y, como el resultado dejaba de ser nulo, no
+  volvía a mirarse nunca. En 1d eso convertía el 100 % de los registros en timeouts artificiales.
+  Regla nueva y asimétrica: un toque de objetivo o stop es definitivo aunque ocurra en la primera
+  vela; un timeout solo vale si transcurrió el horizonte completo.
+- **Migración 015:** columna `candle_open` (retroactiva) para poder quedarse con una decisión por
+  vela sin borrar nada, y reapertura de los timeouts cerrados prematuramente para que el piloto los
+  vuelva a medir bien. No se elimina ningún registro.
+- Las estadísticas de Registros y el entrenamiento del meta-modelo deduplican por vela, preservando
+  el orden cronológico que necesita la división temporal.
+
+## [0.27.0] — 2026-07-31
+
 ### Added — Multi-activo, multi-proveedor + visualizaciones del motor
 
 - **Arquitectura multi-proveedor:** nueva capa `apps/api/src/providers` con el contrato
@@ -225,6 +302,10 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **docs:** `docs/proveedores.md`, que explica el contrato, los dos modos de entrega, los límites del
   plan gratuito y **por qué TradingView no puede ser proveedor de datos**.
 
+## [0.26.0] — 2026-07-31
+
+### Added — Multi-activo + visualizaciones del motor
+
 - **Multi-activo:** nueva tabla `watchlist` (migración 013) y endpoints `/assets*`; buscador sobre el
   catálogo del proveedor (Binance spot, con caché de 6 h) y **suscripción en caliente**: al añadir un
   activo, el motor se suscribe, siembra su histórico y el piloto lo incluye en sus ciclos, con
@@ -240,6 +321,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   `docs/reditum-tradingview.md` para configurar las alertas.
 - **docs:** `multiactivo.md`.
 
+## [0.25.0] — 2026-07-31
+
 ### Added — M10 (cierre) · captura server-side y auditoría
 
 - **Captura automática en el servidor:** la API registra las decisiones operables (confianza ≥ 40 %,
@@ -253,6 +336,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   táctiles cómodas en móvil.
 - **Estado del sistema:** nuevo componente «Captura automática de registros».
 - **Novedades:** al día con las versiones 0.24.0 y 0.25.0.
+
+## [0.24.0] — 2026-07-31
 
 ### Added — M10 (seguridad base) + pulido de interfaz para móvil
 
@@ -276,6 +361,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **Registros:** los niveles de entrada, stop y objetivo se dibujan con etiqueta en el eje del
   gráfico del snapshot, con leyenda y el resultado real si ya cerró.
 
+## [0.23.1] — 2026-07-30
+
 ### Fixed — Despliegue tras un túnel (Tailscale Funnel)
 
 - **web:** el servidor de *preview* de Vite bloqueaba el dominio del túnel («Blocked request… not
@@ -284,6 +371,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **docs:** guía corregida con lo aprendido en el despliegue real — migración del dataset entre
   entornos (sin `>` de PowerShell, que corrompe el volcado a UTF-16), creación de usuarios con `tsx`
   (Node 20 no admite `--experimental-strip-types`) y recreación de la API si no publica su puerto.
+
+## [0.23.0] — 2026-07-29
 
 ### Added — El filtro ML se gradúa solo (política automática)
 
@@ -296,6 +385,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   automatización nunca lo supera). Nuevo componente «Meta-modelo» en `GET /status`.
 - **snapshots:** columna `meta_confidence` (migración 011) para poder evaluar el modo sombra.
 - **web:** el Laboratorio muestra el modo del filtro ML y por qué está en ese modo.
+
+## [0.22.0] — 2026-07-28
 
 ### Added — Módulo 2 cerrado · inferencia del meta-modelo en vivo
 
@@ -311,6 +402,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   el Panel. `POST /reload` recarga también el meta-modelo.
 - **Paridad:** vectores dorados del bosque (Node≡Python) en la suite de CI.
 
+## [0.21.0] — 2026-07-28
+
 ### Added — Centro de ayuda, Laboratorio, Novedades y Estado del sistema
 
 - **web · Centro de ayuda:** manual de usuario paso a paso, base de conocimientos (cómo funciona por
@@ -325,6 +418,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **api:** `GET /status` — comprueba de verdad cada componente y su comunicación.
 - **web:** el botón 🧠 Entrenar ahora explica qué hace y cuándo pulsarlo; la barra de temporalidades
   muestra de entrada el rango operativo (15m–1d) y el resto se alcanza deslizando.
+
+## [0.20.0] — 2026-07-27
 
 ### Added — Módulo 2 · Meta-modelo (meta-labeling) + calibración automatizada
 
@@ -342,17 +437,7 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   antes/después) y estado de calibración/meta-modelo en la tarjeta del piloto.
 - **snapshots:** nueva columna `supertrend_score` (migración 010) — feature que faltaba desde M1b.
 
-### Added — Confirmaciones, política editable y adiós a la terminal
-
-- **web:** los botones ▶/⚙ piden **confirmación** explicando cómo interfieren con el piloto (⚙
-  reinicia su reloj; optimizar seguido = sobreajuste). Botón **⚙ Configurar** en la tarjeta del
-  piloto: política editable desde la UI (activo, frecuencias, cooldown, temporalidades) — se guarda
-  en el servidor (`artifacts/automation.json`) y el worker la aplica en su siguiente ciclo, sin
-  reiniciar. Botón **🎯 Calibrar** (entrena calibradores desde la UI). Eliminados todos los textos
-  con comandos de terminal.
-- **quant:** overrides persistentes de la política (env como defaults) releídos por ciclo;
-  `POST /automation` y `POST /run-calibration`; `calibrate_and_publish()` usa la config ACTIVA del TF.
-- **api:** `POST /automation` (validado) y `POST /calibrate/run`.
+## [0.19.0] — 2026-07-27
 
 ### Added — 🤖 Piloto automático de backtest/optimización
 
@@ -365,14 +450,19 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **web:** tarjeta **Piloto automático** en Backtest (política, estado por TF, última medición/
   optimización) y guía: los botones quedan para resultados inmediatos.
 
-### Added — Registros: filtros, orden y contadores reales
+### Added — Confirmaciones, política editable y adiós a la terminal
 
-- **web · Registros:** barra de **filtros** por Temporalidad, Acción, Dirección y Estado
-  (En curso / ✓ TP / ✗ SL / Expirados / Sin plan) con chip "Filtradas" y botón limpiar;
-  **orden** pulsando las cabeceras Fecha y hora, Confianza o R en vivo (↓/↑).
-- **Contadores arreglados:** la web pedía solo 50 filas (los chips se congelaban en 50). Ahora pide
-  hasta 500, la API admite 1000 (antes 200) y devuelve el **total real** desde la base de datos; el
-  chip Total muestra `total (últimos N)` si hay más de los cargados.
+- **web:** los botones ▶/⚙ piden **confirmación** explicando cómo interfieren con el piloto (⚙
+  reinicia su reloj; optimizar seguido = sobreajuste). Botón **⚙ Configurar** en la tarjeta del
+  piloto: política editable desde la UI (activo, frecuencias, cooldown, temporalidades) — se guarda
+  en el servidor (`artifacts/automation.json`) y el worker la aplica en su siguiente ciclo, sin
+  reiniciar. Botón **🎯 Calibrar** (entrena calibradores desde la UI). Eliminados todos los textos
+  con comandos de terminal.
+- **quant:** overrides persistentes de la política (env como defaults) releídos por ciclo;
+  `POST /automation` y `POST /run-calibration`; `calibrate_and_publish()` usa la config ACTIVA del TF.
+- **api:** `POST /automation` (validado) y `POST /calibrate/run`.
+
+## [0.18.0] — 2026-07-27
 
 ### Fixed — Parámetros optimizados POR temporalidad
 
@@ -386,6 +476,17 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **web:** el panel de Optimización muestra la temporalidad y se actualiza al cambiarla.
 - Los artefactos optimizados legados (globales) quedan ignorados; re-optimiza por TF.
 
+### Added — Registros: filtros, orden y contadores reales
+
+- **web · Registros:** barra de **filtros** por Temporalidad, Acción, Dirección y Estado
+  (En curso / ✓ TP / ✗ SL / Expirados / Sin plan) con chip "Filtradas" y botón limpiar;
+  **orden** pulsando las cabeceras Fecha y hora, Confianza o R en vivo (↓/↑).
+- **Contadores arreglados:** la web pedía solo 50 filas (los chips se congelaban en 50). Ahora pide
+  hasta 500, la API admite 1000 (antes 200) y devuelve el **total real** desde la base de datos; el
+  chip Total muestra `total (últimos N)` si hay más de los cargados.
+
+## [0.17.0] — 2026-07-26
+
 ### Added — Claridad de botones · Dataset ML · despliegue gratis
 
 - **web · Backtest:** aclaración de los botones (▶ mide la estrategia actual y evalúa registros;
@@ -394,11 +495,17 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **quant:** módulo `dataset.py` (informe de preparación con criterios mínimos: ≥60 evaluadas,
   ≥20 por clase, ≥90% features completas) + endpoint `/dataset-report` en el servicio.
 - **api:** `GET /ml/dataset` (proxy al servicio quant, protegido por el auth global).
+- **docs:** `despliegue-gratis.md` — opción sin costo recomendada (Tailscale, 3 usuarios gratis,
+  HTTPS ts.net para PWA/push, app corriendo en la PC con el compose intacto; alternativa Oracle
+  Always Free para 24/7).
+
 - **docs:** `despliegue-gratis.md` (Tailscale en tu PC) y `despliegue-oracle.md` (VM Always Free
   de Oracle + Tailscale, 24/7 gratis, paso a paso).
 - **infra:** `docker-compose.prod.yml` (volúmenes nombrados, restart automático, servicios internos,
   web/API solo en localhost detrás de Tailscale, CORS estricto) + `.env.prod.example` (secrets fuera
   del repo); el Dockerfile de la web acepta `VITE_API_URL` como build-arg.
+
+## [0.16.0] — 2026-07-24
 
 ### Added — Módulo 3 · Auth del equipo + despliegue PaaS
 
@@ -415,6 +522,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **docs:** `docs/despliegue.md` — Vercel (web) + Railway (api/quant/Postgres-Timescale/Redis) en
   vez de Caddy/VPS; sin dominio propio aún, todo parametrizado por variables de entorno.
 
+## [0.15.0] — 2026-07-24
+
 ### Added — Módulo 1b · Supertrend
 
 - **ensemble (api+quant):** nuevo indicador **Supertrend(10, 3)**, `kind: trend`. No existe en
@@ -426,6 +535,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - **ensemble:** peso inicial `1.0` (igual que EMA/MACD) — balancea el ensemble a 3 indicadores de
   tendencia/momentum vs 3 de reversión.
 - **optimize:** Optuna ahora también afina `w_supertrend`.
+
+## [0.14.0] — 2026-07-24
 
 ### Changed — Módulo 1a · ADX continuo + estructura w_macro por TF (flag off)
 
@@ -439,11 +550,7 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   el análisis fundamental, sin interferir en la fase solo-técnica.
 - **web:** definición ampliada del botón **⚙ Optimizar** (tooltip + acordeón).
 
-### Changed — Optimizador ampliado (afinar técnico)
-
-- **quant/optimize:** Optuna ahora ajusta también la "forma" de la decisión —`hold_band`,
-  `temperature` y el umbral de régimen `adx_threshold`— además de los pesos y multiplicadores. La
-  penalización de complejidad se aplica solo a pesos/multiplicadores (no a la forma).
+## [0.13.0] — 2026-07-22
 
 ### Added — Backtest desde la UI + Δ + límite de auto-snapshot
 
@@ -456,22 +563,13 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   indicadores **Δ** (verde/rojo) junto a cada métrica respecto a la corrida previa; en el engranaje,
   **límite** de snapshots automáticos (al alcanzarlo se desactiva y hay que reactivarlo).
 
-### Changed / Added — Afinar técnico
+### Changed — Optimizador ampliado (afinar técnico)
 
-- **ensemble:** `hold_band` 0.15 → 0.06 (menos zona neutra). En modo solo-técnico la decisión ya no
-  cae en FLAT tan a menudo: sugiere COMPRAR/VENDER cuando |net| > 0.06 (antes 0.15). Vectores de
-  paridad regenerados (Node≡Python).
-- **web:** snapshot **automático** (toggle en el engranaje): guarda un snapshot al superar el umbral
-  de una temporalidad, con el mismo cooldown, sin tener que registrarlo a mano.
+- **quant/optimize:** Optuna ahora ajusta también la "forma" de la decisión —`hold_band`,
+  `temperature` y el umbral de régimen `adx_threshold`— además de los pesos y multiplicadores. La
+  penalización de complejidad se aplica solo a pesos/multiplicadores (no a la forma).
 
-### Changed — Modo solo-técnico (separar fundamental del técnico)
-
-- **api:** flag `MACRO_ENABLED` (por defecto `false`): el sesgo macro/fundamental deja de inyectarse
-  en la decisión en vivo, que pasa a ser **solo-técnica** y queda consistente con el backtest (que ya
-  era solo-técnico). Reversible con `MACRO_ENABLED=true`. La matemática macro y su paridad quedan
-  intactas (en pausa, no eliminadas).
-- **web:** el panel Macro indica "modo solo-técnico"; la pestaña Backtest explica de forma intuitiva
-  por qué emerge el número de operaciones.
+## [0.12.0] — 2026-07-22
 
 ### Added — M9 · PWA + Web Push
 
@@ -482,6 +580,25 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   (con cooldown). Dependencia `web-push`.
 - El push real completa el hueco dejado en M8 (avisos con la app cerrada).
 
+### Changed — Modo solo-técnico (separar fundamental del técnico)
+
+- **api:** flag `MACRO_ENABLED` (por defecto `false`): el sesgo macro/fundamental deja de inyectarse
+  en la decisión en vivo, que pasa a ser **solo-técnica** y queda consistente con el backtest (que ya
+  era solo-técnico). Reversible con `MACRO_ENABLED=true`. La matemática macro y su paridad quedan
+  intactas (en pausa, no eliminadas).
+- **web:** el panel Macro indica "modo solo-técnico"; la pestaña Backtest explica de forma intuitiva
+  por qué emerge el número de operaciones.
+
+### Changed / Added — Afinar técnico
+
+- **ensemble:** `hold_band` 0.15 → 0.06 (menos zona neutra). En modo solo-técnico la decisión ya no
+  cae en FLAT tan a menudo: sugiere COMPRAR/VENDER cuando |net| > 0.06 (antes 0.15). Vectores de
+  paridad regenerados (Node≡Python).
+- **web:** snapshot **automático** (toggle en el engranaje): guarda un snapshot al superar el umbral
+  de una temporalidad, con el mismo cooldown, sin tener que registrarlo a mano.
+
+## [0.11.0] — 2026-07-19
+
 ### Added — M8 · Notificaciones
 
 - **api:** tabla `alerts` (historial) + endpoints `GET /alerts`, `POST /alerts`, `POST /alerts/read`.
@@ -489,6 +606,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   **motor de reglas en el cliente** (decisión ≥ umbral, señal Reditum, snapshot TP/SL, cambio de
   dirección/macro, avance 10% al objetivo) con **cooldown configurable** en el engranaje.
 - El push móvil real (FCM/APNs) queda para M9 (requiere la app móvil).
+
+## [0.10.0] — 2026-07-19
 
 ### Added — Fase presentación (UX)
 
@@ -504,6 +623,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   el panel de Optimización también aparece cuando hay backtest.
 - **api:** `/candles?to=<ms>` (histórico hasta un instante) y `DELETE /snapshots/:id`.
 
+## [0.9.0] — 2026-07-18
+
 ### Added — M7 · Optimización (Slice B)
 
 - `apps/quant`: **Optuna** (TPE) optimiza pesos de indicadores y multiplicadores de régimen
@@ -516,6 +637,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   optimizado). Además, layout de Backtest a dos columnas y guía en acordeón.
 - Sin cambios de contrato ni de la matemática de decisión (mismos campos del ensemble): la paridad
   Node≡Python sigue vigente.
+
+## [0.8.0] — 2026-07-18
 
 ### Added — M7 · Calibración (Slice A)
 
@@ -530,6 +653,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - Contrato: `calibrated_confidence`/`calibration_version` en el esquema; vectores de paridad del
   calibrador en `macro_vectors.json`.
 
+## [0.7.0] — 2026-07-17
+
 ### Added — M6 · Backtesting
 
 - `apps/quant`: mirror de la decisión (`decision.py`, agregación + plan) con **paridad** ampliada;
@@ -539,6 +664,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - `apps/api`: tabla `backtests` (TimescaleDB) y `GET /backtest` (último resultado).
 - `apps/web`: pestaña **Backtest** (métricas + curva de equity).
 - Reditum: se añade `reditum_geny` (Geny Trend) al mapeo; atribución corregida a **Ingresarios**.
+
+## [0.6.1] — 2026-07-16
 
 ### Added — M5.6 · UX, registros y validez del plan
 
@@ -554,6 +681,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - El sesgo macro ahora se aplica de verdad en las señales en vivo (`/signal`, WS y `/snapshots`):
   en M5.5 el `macro` no se pasaba en esas llamadas.
 
+## [0.6.0] — 2026-07-14
+
 ### Added — M5.5 · Macro Bias, Direccionalidad y Snapshots
 
 - `apps/api`: sesgo macro (funding + tendencia semanal EMA 1w) inyectado en los logits del softmax,
@@ -563,6 +692,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - `apps/quant`: mirrors `macro.py` e `inference.py` con paridad (nuevos vectores dorados `macro_vectors.json`).
 - `apps/web`: anillo LONG/SHORT/FLAT, panel Macro (sesgo/funding/tendencia/confluencia) y botón 📸 Snapshot.
 - Contrato `signal.schema.json` v1.1.0 (`direction`, `macro`).
+
+## [0.5.0] — 2026-07-10
 
 ### Added — M5 · Integración TradingView (Reditum)
 
@@ -580,6 +711,12 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   secret NT8 y toda referencia en código, tests y docs. La integración externa es exclusivamente
   TradingView (Reditum). El peso 2× pasa a `tradingview`.
 
+- `artifacts/ensemble.yaml`: pesos, reglas de régimen, temperatura y la fuente externa con peso 2×.
+  endpoint de señales externas con mapeo declarativo `config/external_signals.yaml` y TTL.
+- `apps/web`: heatmap de indicadores en vivo (color por score, intensidad por confianza, badge de fuente externa).
+
+## [0.4.0] — 2026-07-08
+
 ### Added — M4 · Plan de acción
 
 - `apps/api`: `buildPlan` (entrada, stop-loss por ATR, take-profit por múltiplo de riesgo y tamaño
@@ -588,26 +725,33 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - `apps/quant`: validación de la sección `risk` del `ensemble.yaml`.
 - `apps/web`: panel "Plan de acción" con el checklist numerado.
 
+## [0.3.0] — 2026-07-07
+
 ### Added — M3 · Ensemble + probabilidades
 
 - `apps/api`: agregador ponderado por régimen (ADX), inferencia `net → BUY/HOLD/SELL` vía softmax
   con temperatura, objeto Signal completo, `GET /signal` y WS `{type:'signal'}`.
-- `artifacts/ensemble.yaml`: pesos, reglas de régimen, temperatura y la fuente externa con peso 2×.
+- `artifacts/ensemble.yaml`: pesos, reglas de régimen, temperatura y NinjaTrader con peso 2×.
 - `apps/quant`: validación de esquema de `ensemble.yaml` (`load_ensemble`/`validate_ensemble`).
 - `apps/web`: panel de decisión con anillo de confianza y desglose de probabilidades BUY/HOLD/SELL.
+
 - Multi-temporalidad: soporte para `1m, 5m, 15m, 30m, 1h, 4h, 1d` (suscritas en vivo; configurable
   vía `TRADEME_INTERVALS`). El selector del dashboard se puebla desde `GET /symbols`.
+
+## [0.2.0] — 2026-07-06
 
 ### Added — M2 · Indicadores plugin + paridad
 
 - `apps/api`: contrato `Indicator`/voto (con `source`, `ts`, `ttlMs`), 7 built-in con
   `technicalindicators` y normalización a `score` en [-1,+1], `IndicatorRegistry` y `GET /indicators`.
 - `apps/api`: votos en vivo por WS (`{type:'votes'}`), `GET /votes`, y slot de señales externas
-  endpoint de señales externas con mapeo declarativo `config/external_signals.yaml` y TTL.
+  `POST /signals/ninjatrader` con mapeo declarativo `config/external_signals.yaml` y TTL (stub NT8).
 - `apps/quant`: mirror de indicadores en numpy (paridad con technicalindicators) y runner de paridad.
 - `packages/core-signals`: vectores dorados `parity/vectors.json` (generador `gen-parity.ts`).
 - CI: tercer job **parity** (Node y Python contra los mismos vectores).
-- `apps/web`: heatmap de indicadores en vivo (color por score, intensidad por confianza, badge de fuente externa).
+- `apps/web`: heatmap de indicadores en vivo (color por score, intensidad por confianza, badge NT8).
+
+## [0.1.0] — 2026-07-03
 
 ### Added — M1 · Datos en vivo (Binance)
 
@@ -623,10 +767,11 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - Tests nuevos (Node y Python), incluida la prueba de reconexión del adaptador.
 
 ### Fixed
-
 - Build de imágenes Docker de `apps/api` y `apps/web`: se instala el workspace pnpm completo
   (devDeps incluidas, `tsc` disponible) y se añade `.dockerignore` para no arrastrar `node_modules`
   del host. Resuelve `MODULE_NOT_FOUND` de `tsc` en `docker compose build`.
+
+## [0.0.0] — 2026-06-29
 
 ### Added — M0 · Scaffolding
 

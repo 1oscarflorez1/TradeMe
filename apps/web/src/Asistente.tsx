@@ -97,11 +97,22 @@ const TEMAS: Array<{
       '• **Max drawdown** — la peor racha acumulada. No mide si ganas, mide si podrías aguantarlo.',
   },
   {
-    claves: ['calibracion', 'calibrar', 'probabilidad', 'confianza', 'isotonica', 'platt'],
+    // Remisión, no explicación (M10.6). Esta base vive en el navegador y no puede leer `docs/`, así
+    // que cualquier concepto que se escribiera aquí sería una copia más envejeciendo en paralelo:
+    // es exactamente lo que pasó con la calibración, explicada aquí y en otros tres sitios.
+    // Con un modelo configurado, el asistente consulta la documentación real y responde con ella.
+    claves: [
+      'calibracion', 'calibrar', 'isotonica', 'platt',
+      'independencia', 'desinflado', 'votos efectivos', 'correlacion',
+      'cuarentena', 'no trade', 'documentacion', 'docs',
+    ],
     responder: () =>
-      'La calibración responde a: cuando el sistema dice «70 % de confianza», ¿acierta de verdad el 70 % de las veces?\n\n' +
-      'Se comparan las confianzas anunciadas con los resultados reales y se ajusta la escala, por régimen, con dos métodos (isotónica y Platt) eligiendo el que menor error de Brier tenga.\n\n' +
-      'Importante: la calibración **no cambia la dirección** de la decisión, solo el número de confianza. Y si el sistema acierta poco, la confianza calibrada **bajará** — subirla sería mentir.',
+      'Eso está explicado en la **documentación del proyecto**, que se mantiene con cada entrega: ' +
+      'la tienes en el **Centro de ayuda**.\n\n' +
+      'Yo, sin un modelo de lenguaje configurado, respondo con el estado en vivo y tus cifras — ' +
+      'pregúntame por la decisión de ahora, los registros, el régimen o el estado del sistema.\n\n' +
+      'Con un modelo configurado puedo además **consultar la documentación** y explicarte cualquier ' +
+      'concepto con el texto vigente, no con una copia que se quedó atrás.',
   },
   {
     claves: ['optuna', 'optimizacion', 'optimizar', 'pesos', 'peso'],

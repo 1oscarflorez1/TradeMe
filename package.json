@@ -13,7 +13,8 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",
-    "format": "prettier --check ."
+    "format": "prettier --check .",
+    "version:check": "node scripts/check-version.mjs"
   },
   "devDependencies": {
     "prettier": "^3.3.3"

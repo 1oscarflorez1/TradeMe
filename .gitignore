@@ -30,7 +30,13 @@ Thumbs.db
 artifacts/*.onnx
 artifacts/calibrators.json
 artifacts/independence.json
+artifacts/meta_policy.json
+artifacts/metamodel.json
 artifacts/optimization_report.json
 artifacts/ensemble.optimized.yaml
 artifacts/optimized/
 infra/.env.prod
+
+# Volcados de base de datos (datos, no código)
+*.sql.bak
+dataset-backup.sql

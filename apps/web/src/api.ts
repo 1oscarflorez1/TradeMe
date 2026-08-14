@@ -79,6 +79,39 @@ export async function fetchAuthRequired(): Promise<boolean> {
   }
 }
 
+/** Una sección del registro de cambios: Added · Changed · Fixed… con su título y sus viñetas. */
+export interface ReleaseSection {
+  categoria: string;
+  titulo: string;
+  puntos: string[];
+}
+
+export interface Release {
+  version: string;
+  fecha: string | null;
+  nota: string | null;
+  secciones: ReleaseSection[];
+}
+
+export interface ReleasesResponse {
+  /** Versión que la plataforma está ejecutando ahora mismo. */
+  actual: string;
+  total: number;
+  releases: Release[];
+}
+
+/**
+ * Historial de versiones, leído del CHANGELOG por la API (M10.6).
+ *
+ * Antes esta lista vivía escrita a mano dentro de `NewsView.tsx` y se quedó seis versiones atrás:
+ * el portal mostraba la 0.28.0 mientras la plataforma ejecutaba la 0.34.0.
+ */
+export async function fetchReleases(): Promise<ReleasesResponse> {
+  const res = await apiFetch(`/releases`);
+  if (!res.ok) throw new Error(`GET /releases ${res.status}`);
+  return (await res.json()) as ReleasesResponse;
+}
+
 export async function fetchSymbols(): Promise<SymbolsResponse> {
   const res = await apiFetch(`/symbols`);
   if (!res.ok) throw new Error(`GET /symbols ${res.status}`);
