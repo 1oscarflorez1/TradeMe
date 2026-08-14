@@ -16,6 +16,9 @@ import { BacktestsRepo } from './db/backtests-repo.js';
 import { EvidenceRepo } from './db/evidence-repo.js';
 import { AssistantProvider, AssistantQuota } from './assistant/provider.js';
 import { SYSTEM_PROMPT, construirContexto } from './assistant/context.js';
+import { PKG_VERSION } from './app.js';
+import { Releases } from './releases/parse.js';
+import { Docs } from './releases/docs.js';
 import { TOOLS, TOOL_BUSCAR, resumirPrecios } from './assistant/tools.js';
 import { WebSearch } from './assistant/search.js';
 import { AlertsRepo } from './db/alerts-repo.js';
@@ -52,7 +55,10 @@ import { fetchFundingRate } from './macro/funding.js';
 import { EMA } from 'technicalindicators';
 
 const MIN_CANDLES_FOR_VOTES = 40;
-const pkgVersion = process.env.npm_package_version ?? 'desconocida';
+// `npm_package_version` solo existe si el proceso se lanzó con un script de npm; en el contenedor se
+// arranca el binario directamente y valía «desconocida», así que el asistente decía no saber en qué
+// versión corría. `PKG_VERSION` lee el package.json real y siempre acierta.
+const pkgVersion = process.env.npm_package_version ?? PKG_VERSION;
 
 function loadMapper(path: string, warn: (msg: string) => void): ExternalMapper {
   try {
@@ -88,6 +94,9 @@ async function main(): Promise<void> {
   const artifactsDir = dirname(env.ENSEMBLE_CONFIG);
   const ensembleCache = new Map<string, EnsembleConfig>();
   const independence = Independence.load(env.INDEPENDENCE_PATH);
+  // Historial y documentación: una sola fuente para el portal y para el asistente (M10.6).
+  const releases = new Releases(env.CHANGELOG_PATH);
+  const docs = new Docs(env.DOCS_DIR);
   // Config ACTIVA por símbolo+TF: la optimizada de esa temporalidad si existe; si no, la base.
   function getEnsembleFor(symbol: string, interval: string): EnsembleConfig {
     const key = `${symbol.toUpperCase()}:${interval}`;
@@ -196,6 +205,8 @@ async function main(): Promise<void> {
       minConfidence: env.AUTO_CAPTURE_MIN_CONFIDENCE,
       cooldownMin: env.AUTO_CAPTURE_COOLDOWN_MIN,
     }),
+    releases,
+    docs,
     metaVetoThreshold: env.META_VETO_THRESHOLD,
     metaModulateWeight: env.META_MODULATE_WEIGHT,
     reloadArtifacts,
@@ -323,6 +334,7 @@ async function main(): Promise<void> {
             },
             version: pkgVersion,
             liveTrading: env.ENABLE_LIVE_TRADING === 'true',
+            novedades: releases.resumen(3),
           });
           /** Ejecuta lo que el modelo pida. Todo es de solo lectura y con salidas acotadas. */
           const ejecutar = async (
@@ -415,6 +427,26 @@ async function main(): Promise<void> {
                   optimizado: ensembleMeta(symbol, x).optimized,
                   registros: porTf.get(x) ?? 0,
                 }));
+              }
+              // ---- M10.6: el asistente puede consultar la historia y la documentación ----
+              case 'cambios_de_version': {
+                const v = typeof args.version === 'string' ? args.version : '';
+                if (v) {
+                  const r = releases.find(v);
+                  return r ?? { error: `no hay ninguna versión ${v} en el registro de cambios` };
+                }
+                return { actual: PKG_VERSION, ultimas: releases.all().slice(0, 3) };
+              }
+              case 'consultar_documentacion': {
+                const tema = typeof args.tema === 'string' ? args.tema.trim() : '';
+                if (!tema) return { documentos: docs.list() };
+                // Primero como identificador («calibracion»), y si no, como búsqueda.
+                const directo = docs.read(tema);
+                if (directo) return directo;
+                const hallazgos = docs.search(tema);
+                return hallazgos.length > 0
+                  ? { termino: tema, hallazgos }
+                  : { termino: tema, hallazgos: [], documentos: docs.list() };
               }
               default:
                 return { error: `herramienta desconocida: ${nombre}` };

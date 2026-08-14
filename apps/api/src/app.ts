@@ -11,6 +11,8 @@ import type { ExternalMapper } from './signals/external-mapper.js';
 import type { EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
 import type { Calibrators } from './calibration/load.js';
+import type { Docs } from './releases/docs.js';
+import type { Releases } from './releases/parse.js';
 import type { MetaModel } from './metamodel/apply.js';
 import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
 import { estadoFinal, trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
@@ -80,6 +82,10 @@ export interface AppDeps {
     minConfidence: number;
     cooldownMin: number;
   };
+  /** Historial de versiones leído del CHANGELOG: lo consumen Novedades y el asistente. */
+  releases?: Releases;
+  /** Documentación conceptual de `docs/`: la lee el asistente, no se duplica en el portal. */
+  docs?: Docs;
   metaVetoThreshold?: number;
   metaModulateWeight?: number;
   reloadArtifacts?: () => {
@@ -159,6 +165,9 @@ export interface ExternalRecord {
 const PKG = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
   version: string;
 };
+
+/** Versión que ejecuta la plataforma. CI comprueba que coincide con la última del CHANGELOG. */
+export const PKG_VERSION = PKG.version;
 
 const CandlesQuery = z.object({
   symbol: z.string().min(1),
@@ -450,6 +459,29 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       took_ms: Date.now() - t0,
       version: PKG.version,
       components,
+    };
+  });
+
+  /**
+   * Historial de versiones, leído del CHANGELOG (M10.6).
+   *
+   * La pestaña Novedades consume esto en vez de tener su propia copia escrita a mano, que es como
+   * llegó a mostrar la 0.28.0 mientras la plataforma ejecutaba la 0.34.0.
+   */
+  app.get('/releases', async (request, reply) => {
+    if (!deps.releases) return reply.status(503).send({ error: 'historial no disponible' });
+    const q = request.query as { version?: string; limite?: string };
+    if (q.version) {
+      const r = deps.releases.find(q.version);
+      if (!r) return reply.status(404).send({ error: `versión ${q.version} no encontrada` });
+      return { release: r, actual: PKG.version };
+    }
+    const todas = deps.releases.all();
+    const limite = Number(q.limite);
+    return {
+      actual: PKG.version,
+      total: todas.length,
+      releases: Number.isFinite(limite) && limite > 0 ? todas.slice(0, limite) : todas,
     };
   });
 

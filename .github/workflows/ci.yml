@@ -26,6 +26,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Va antes que nada: es barato y detecta el fallo más silencioso de todos —entregar una
+      # versión sin anotarla en el CHANGELOG, que es de donde Novedades y el asistente sacan
+      # lo que le cuentan al equipo.
+      - name: Puerta de versión (package.json ≡ CHANGELOG)
+        run: node scripts/check-version.mjs
+
       - name: Lint
         run: pnpm lint
 

@@ -39,7 +39,15 @@ CÓMO ES TRADEME (para que respondas con propiedad):
 HERRAMIENTAS:
 Tienes herramientas de SOLO LECTURA para consultar lo que no venga en el contexto de abajo: la
 decisión de otra temporalidad, el resumen de registros, el historial de backtests, la evidencia por
-indicador, el recorrido reciente del precio, el estado del sistema y el uso por temporalidad.
+indicador, el recorrido reciente del precio, el estado del sistema, el uso por temporalidad, los
+cambios de cada versión y la documentación técnica.
+- **Sobre qué cambió y cuándo**: usa SIEMPRE \`cambios_de_version\`. El registro de cambios es la
+  única fuente fiable del historial; tú no lo sabes de memoria y no debes deducirlo. Si te preguntan
+  qué trae la última actualización, qué se hizo en la última entrega o cuándo se añadió algo,
+  consúltala antes de responder.
+- **Sobre cómo funciona algo por dentro** (la calibración, el meta-modelo, el régimen, la
+  independencia de los votos, los proveedores): usa \`consultar_documentacion\`. Es el texto vigente
+  del proyecto; si difiere de lo que recuerdas, gana el documento y lo dices.
 - Úsalas cuando la pregunta necesite datos que no tengas. Si te preguntan por otra temporalidad,
   consúltala en vez de decir que no la tienes.
 - Si comparan varias temporalidades, consulta cada una antes de responder.
@@ -67,6 +75,8 @@ export interface ContextoVivo {
   sustento: unknown;
   version: string;
   liveTrading: boolean;
+  /** Últimas entregas, resumidas (M10.6). Sin esto el modelo no sabe qué cambió y lo inventa. */
+  novedades?: string;
 }
 
 /** Serializa el estado en un bloque compacto y legible que el modelo pueda citar. */
@@ -74,6 +84,9 @@ export function construirContexto(c: ContextoVivo): string {
   const l: string[] = [`ESTADO ACTUAL DEL SISTEMA (versión ${c.version})`];
   l.push(`Ejecución con dinero real: ${c.liveTrading ? 'HABILITADA' : 'deshabilitada'}.`);
   l.push(`Activo y temporalidad en pantalla: ${c.symbol} · ${c.interval}.`);
+  if (c.novedades) {
+    l.push(`Últimas entregas (para el detalle, usa la herramienta):\n${c.novedades}`);
+  }
 
   if (c.signal) {
     const s = c.signal;
