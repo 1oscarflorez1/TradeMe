@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchReleases, type Release, type ReleasesResponse } from './api';
+import { fetchReleases, type ReleasesResponse } from './api';
+import { categoriaDe, filtra, formatea, recuento, titularDe } from './news';
 
 /**
  * Novedades: el historial de versiones, leído del CHANGELOG.
@@ -13,32 +14,6 @@ import { fetchReleases, type Release, type ReleasesResponse } from './api';
  * desviarse de la realidad porque no tiene nada propio que desviar, y CI falla si la versión del
  * paquete no coincide con la primera entrada del registro.
  */
-
-const MESES = [
-  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
-];
-
-/** Categorías del CHANGELOG traducidas a lo que el equipo lee en pantalla. */
-const CATEGORIAS: Record<string, { etiqueta: string; clase: string }> = {
-  Added: { etiqueta: 'Novedades', clase: 'nv-add' },
-  Changed: { etiqueta: 'Cambios', clase: 'nv-chg' },
-  Fixed: { etiqueta: 'Correcciones', clase: 'nv-fix' },
-  Removed: { etiqueta: 'Retirado', clase: 'nv-chg' },
-  Deprecated: { etiqueta: 'En desuso', clase: 'nv-chg' },
-  Security: { etiqueta: 'Seguridad', clase: 'nv-fix' },
-};
-
-function formatea(fecha: string | null): { dia: string; largo: string } {
-  if (!fecha) return { dia: '—', largo: 'sin fecha en el registro de cambios' };
-  const [a, m, d] = fecha.split('-').map(Number);
-  if (!a || !m || !d) return { dia: fecha, largo: fecha };
-  const fmt = new Date(a, m - 1, d);
-  return {
-    dia: `${d} ${MESES[m - 1]}`,
-    largo: fmt.toLocaleDateString('es', { dateStyle: 'full' }),
-  };
-}
 
 /** Convierte **negrita** y `código` sin meter una librería de markdown por tan poco. */
 function Texto({ children }: { children: string }) {
@@ -54,25 +29,6 @@ function Texto({ children }: { children: string }) {
       })}
     </>
   );
-}
-
-/** Texto de una versión, para buscar dentro. */
-function textoDe(r: Release): string {
-  return [
-    r.version,
-    r.nota ?? '',
-    ...r.secciones.flatMap((s) => [s.categoria, s.titulo, ...s.puntos]),
-  ]
-    .join(' ')
-    .toLowerCase();
-}
-
-/** Titular de una versión: el de su primera sección con título, o la nota. */
-function titularDe(r: Release): string {
-  const conTitulo = r.secciones.find((s) => s.titulo.length > 0);
-  if (conTitulo) return conTitulo.titulo;
-  if (r.nota) return r.nota.slice(0, 120);
-  return `Versión ${r.version}`;
 }
 
 export function NewsView() {
@@ -98,11 +54,7 @@ export function NewsView() {
   }, []);
 
   const releases = datos?.releases ?? [];
-  const lista = useMemo(() => {
-    const busca = q.trim().toLowerCase();
-    if (!busca) return releases;
-    return releases.filter((r) => textoDe(r).includes(busca));
-  }, [q, releases]);
+  const lista = useMemo(() => filtra(releases, q), [q, releases]);
 
   if (error) {
     return (
@@ -198,11 +150,9 @@ export function NewsView() {
                   <span className="nv-txt">
                     <strong>{titularDe(r)}</strong>
                     <span className="nv-res">
-                      {r.secciones.length === 1
-                        ? '1 apartado'
-                        : `${r.secciones.length} apartados`}
+                      {recuento(r).apartados === 1 ? '1 apartado' : `${recuento(r).apartados} apartados`}
                       {' · '}
-                      {r.secciones.reduce((n, s) => n + s.puntos.length, 0)} cambios
+                      {recuento(r).cambios} cambios
                     </span>
                   </span>
                   <span className="nv-fecha" title={f.largo}>
@@ -221,10 +171,7 @@ export function NewsView() {
                       </p>
                     )}
                     {r.secciones.map((s, i) => {
-                      const cat = CATEGORIAS[s.categoria] ?? {
-                        etiqueta: s.categoria,
-                        clase: 'nv-chg',
-                      };
+                      const cat = categoriaDe(s.categoria);
                       return (
                         <div className={`nv-bloque ${cat.clase}`} key={i}>
                           <span className="nv-bloque-h">

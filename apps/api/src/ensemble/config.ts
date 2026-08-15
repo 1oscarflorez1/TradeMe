@@ -175,11 +175,14 @@ export function forInterval(
   cfg: EnsembleConfig,
   interval: string,
   independenceFactor = 1,
+  /** Cuarentena efectiva. Sin argumento manda `quarantine_intervals` de la configuración. */
+  quarantined?: boolean,
 ): EnsembleConfig {
+  const base = (cfg.quarantineIntervals ?? []).includes(interval);
   return {
     ...cfg,
     plan: { ...cfg.plan, validCandles: validCandlesFor(cfg, interval) },
-    quarantined: (cfg.quarantineIntervals ?? []).includes(interval),
+    quarantined: quarantined ?? base,
     independenceFactor,
   };
 }

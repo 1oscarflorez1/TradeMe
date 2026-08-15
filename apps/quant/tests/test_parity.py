@@ -120,6 +120,9 @@ def test_parity_decision() -> None:
         assert got["action"] == exp["action"], (got["action"], exp)
         assert got["direction"] == exp["direction"]
         assert got["hold_reason"] == exp["hold_reason"], (got["hold_reason"], exp["hold_reason"])
+        # La sombra de la cuarentena: sin ella una temporalidad vetada no podría salir nunca.
+        assert got["shadow_action"] == exp["shadow_action"], (got, exp)
+        assert got["shadow_direction"] == exp["shadow_direction"], (got, exp)
         assert abs(got["net"] - exp["net"]) < 1e-4, (got["net"], exp["net"])
         if exp["levels"] is not None:
             assert got["levels"] is not None

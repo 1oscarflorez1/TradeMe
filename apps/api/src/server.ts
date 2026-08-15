@@ -42,6 +42,7 @@ import {
   type EnsembleConfig,
 } from './ensemble/config.js';
 import { Independence } from './ensemble/independence.js';
+import { QuarantinePolicy } from './ensemble/quarantine.js';
 import { buildSignal } from './ensemble/signal.js';
 import { computePlanLevels } from './ensemble/plan.js';
 import { intervalMs } from './domain/candle.js';
@@ -94,6 +95,7 @@ async function main(): Promise<void> {
   const artifactsDir = dirname(env.ENSEMBLE_CONFIG);
   const ensembleCache = new Map<string, EnsembleConfig>();
   const independence = Independence.load(env.INDEPENDENCE_PATH);
+  const quarantine = QuarantinePolicy.load(env.QUARANTINE_PATH);
   // Historial y documentación: una sola fuente para el portal y para el asistente (M10.6).
   const releases = new Releases(env.CHANGELOG_PATH);
   const docs = new Docs(env.DOCS_DIR);
@@ -106,7 +108,17 @@ async function main(): Promise<void> {
     const base = existsSync(p) ? loadEnsembleSafe(p, (m) => console.warn(m)) : ensemble;
     // Se especializa aquí, una sola vez por símbolo+TF: validez del plan, cuarentena y factor de
     // independencia quedan resueltos y ningún punto de llamada tiene que acordarse de aplicarlos.
-    const cfg = forInterval(base, interval, independence.factorFor(symbol, interval));
+    const vetada = quarantine.isQuarantined(
+      symbol,
+      interval,
+      (base.quarantineIntervals ?? []).includes(interval),
+    );
+    const cfg = forInterval(
+      base,
+      interval,
+      independence.factorFor(symbol, interval),
+      vetada,
+    );
     ensembleCache.set(key, cfg);
     return cfg;
   }
@@ -164,6 +176,7 @@ async function main(): Promise<void> {
     metaModel.reload();
     metaPolicy.reload();
     independence.reload();
+    quarantine.reload();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
@@ -588,15 +601,28 @@ async function main(): Promise<void> {
     const velaActual = Math.floor(now / intervalMs(iv)) * intervalMs(iv);
     if ((lastCapture.get(key) ?? -1) === velaActual) return;
     lastCapture.set(key, velaActual);
+    const risk = getEnsembleFor(symbol, iv).risk;
     const levels = computePlanLevels(
       signal.action,
       signal.price,
       signal.atr,
-      getEnsembleFor(symbol, iv).risk,
+      risk,
       env.ACCOUNT_EQUITY,
     );
+    // Plan sombra: el que se habría emitido si la temporalidad no estuviera en cuarentena. Se
+    // calcula con exactamente el mismo riesgo y los mismos niveles que uno real, porque su razón
+    // de ser es responder «¿qué habría pasado?» de forma comparable.
+    const shadowLevels = signal.shadow_action
+      ? computePlanLevels(
+          signal.shadow_action,
+          signal.price,
+          signal.atr,
+          risk,
+          env.ACCOUNT_EQUITY,
+        )
+      : null;
     await snapshotsRepo
-      .record(signal, iv, levels, 'auto-servidor')
+      .record(signal, iv, levels, 'auto-servidor', shadowLevels)
       .catch((err: unknown) => app.log.warn({ err: String(err) }, 'no se pudo capturar el snapshot'));
   }
 

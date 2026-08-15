@@ -259,6 +259,34 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin independencia se decide sin desinflar
         log.append(f"error independencia: {err}")
 
+    # Gobierno de la cuarentena: mide el expediente sombra de las temporalidades vetadas y el
+    # rendimiento real de las que operan, y decide. Sin esto, `quarantine_intervals` sería una
+    # lista fija que alguien tendría que acordarse de vaciar.
+    try:
+        from .ensemble import load_ensemble
+        from .quarantine_policy import publish as publish_quarantine
+
+        base = load_ensemble(artifacts_dir() / "ensemble.yaml")
+        vetadas = [str(x) for x in base.get("quarantine_intervals", [])]
+        qtn = publish_quarantine(artifacts_dir(), dsn, vetadas)
+        cambios = [v for v in qtn["intervals"].values() if v["changed"]]
+        for c in cambios:
+            estado = "entra en" if c["quarantined"] else "sale de"
+            log.append(f"cuarentena: {c['interval']} {estado} cuarentena — {c['reason']}")
+            insert_alert(
+                dsn,
+                "cuarentena",
+                "warning" if c["quarantined"] else "success",
+                f"{c['interval']}: {estado} cuarentena",
+                c["reason"],
+                None,
+                c["interval"],
+            )
+        if not cambios:
+            log.append(f"cuarentena revisada ({len(qtn['intervals'])} claves, sin cambios)")
+    except Exception as err:  # noqa: BLE001 - sin política, manda ensemble.yaml
+        log.append(f"error cuarentena: {err}")
+
     # Calibración de mantenimiento (independiente de que haya habido optimización).
     try:
         cal_ok, cal_reason = should_calibrate(

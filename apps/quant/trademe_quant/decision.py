@@ -152,7 +152,13 @@ def decide(
             hold_reason = "conflicto_macro"
 
     # Cuarentena: la última palabra y la más fuerte (mirror de ensemble/signal.ts).
+    # Se conserva lo que se iba a emitir: es el expediente con el que la temporalidad podrá
+    # demostrar que merece salir. Sin él la cuarentena no tendría salida posible.
+    shadow_action: str | None = None
+    shadow_direction: str | None = None
     if quarantined and action != "HOLD":
+        shadow_action = action
+        shadow_direction = "LONG" if action == "BUY" else "SHORT"
         action = "HOLD"
         hold_reason = "cuarentena"
 
@@ -168,6 +174,8 @@ def decide(
         "action": action,
         "direction": direction,
         "hold_reason": hold_reason,
+        "shadow_action": shadow_action,
+        "shadow_direction": shadow_direction,
         "independence": independence,
         "quarantined": quarantined,
         "confluence": confluence,

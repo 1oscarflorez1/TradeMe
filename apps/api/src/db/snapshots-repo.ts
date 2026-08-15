@@ -32,6 +32,15 @@ export interface SnapshotStats {
   sinPlan: number;
   /** Decisiones de NO TRADE registradas con su motivo (subconjunto de `sinPlan`). */
   noTrade: number;
+  /**
+   * Decisiones sombra ya evaluadas: lo que una temporalidad en cuarentena habría hecho.
+   *
+   * **No es rendimiento y no entra en `expectancy` ni en `winRate`**: nadie operó. Se cuenta aparte
+   * porque es lo que decide si la cuarentena se levanta. Confundir ambas cosas apuntaría como
+   * ganado un dinero que no existe.
+   */
+  sombraEvaluadas: number;
+  sombraExpectancy: number | null;
   resueltos: number;
   winRate: number | null;
   expectancy: number | null;
@@ -46,6 +55,8 @@ export class SnapshotsRepo {
     interval: string,
     levels: PlanLevels | null,
     note: string | undefined,
+    /** Plan que se habría emitido si la temporalidad no estuviera en cuarentena. */
+    shadowLevels: PlanLevels | null = null,
   ): Promise<string> {
     const res = await this.pool.query<{ id: string }>(
       `INSERT INTO snapshots (
@@ -55,7 +66,9 @@ export class SnapshotsRepo {
         ema_cross_score, macd_score, rsi14_score, rsi14_value, bbands_score,
         stoch14_score, supertrend_score, meta_confidence, adx14_value, atr14_value, reditum_sniper_score, reditum_poc_score,
         plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr, valid_until,
-        model_version, source, note, raw_signal, hold_reason, independence_factor, candle_open
+        model_version, source, note, raw_signal, hold_reason, independence_factor,
+        shadow_action, shadow_direction, shadow_entry, shadow_stop, shadow_take_profit,
+        candle_open
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
         $7,$8,$9,$10,$11,$12,$13,
@@ -64,8 +77,9 @@ export class SnapshotsRepo {
         $24,$25,$26,$27,$28,$29,$30,
         $31,$32,$33,$34,$35,$36,
         $37,'manual',$38,$39,$40,$41,
+        $42,$43,$44,$45,$46,
         -- Vela a la que pertenece la decisión: es lo que garantiza una sola por vela.
-        to_timestamp(floor(extract(epoch FROM now()) / $42) * $42)
+        to_timestamp(floor(extract(epoch FROM now()) / $47) * $47)
       ) RETURNING id`,
       [
         signal.symbol,
@@ -109,6 +123,11 @@ export class SnapshotsRepo {
         JSON.stringify(signal),
         signal.hold_reason ?? null,
         signal.independence_factor ?? null,
+        signal.shadow_action ?? null,
+        signal.shadow_direction ?? null,
+        shadowLevels?.entry ?? null,
+        shadowLevels?.stop ?? null,
+        shadowLevels?.takeProfit ?? null,
         Math.round(intervalMs(interval as Interval) / 1000),
       ],
     );
@@ -150,6 +169,7 @@ export class SnapshotsRepo {
     const res = await this.pool.query<{
       total: number; tp: number; sl: number; timeout: number;
       abiertos: number; sin_plan: number; no_trade: number; expectancy: string | null;
+      sombra_evaluadas: number; sombra_expectancy: string | null;
     }>(
       `WITH una_por_vela AS (
          SELECT DISTINCT ON (interval, candle_open) *
@@ -168,7 +188,13 @@ export class SnapshotsRepo {
               -- La expectancy solo mira lo que tuvo desenlace. Un NO TRADE nunca lo tiene (no hay
               -- plan que evaluar), así que registrar los descartes no mueve ni un decimal de estas
               -- cifras: solo llena el hueco que tenía el dataset.
-              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
+              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy,
+              -- Expediente sombra, en columnas propias: lo que una temporalidad en cuarentena
+              -- habría hecho. Va aparte de la expectancy porque NO se operó, y contarlo como
+              -- rendimiento sería apuntarse un dinero que nadie ganó.
+              COUNT(*) FILTER (WHERE shadow_outcome_result IS NOT NULL)::int AS sombra_evaluadas,
+              AVG(shadow_outcome_return_r) FILTER (WHERE shadow_outcome_result IS NOT NULL)
+                AS sombra_expectancy
          FROM una_por_vela`,
       [sym],
     );
@@ -203,6 +229,8 @@ export class SnapshotsRepo {
       abiertos: fila?.abiertos ?? 0,
       sinPlan: fila?.sin_plan ?? 0,
       noTrade: fila?.no_trade ?? 0,
+      sombraEvaluadas: fila?.sombra_evaluadas ?? 0,
+      sombraExpectancy: num(fila?.sombra_expectancy ?? null),
       expectancy: num(fila?.expectancy ?? null),
     };
     return {
