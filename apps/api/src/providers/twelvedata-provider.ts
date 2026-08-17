@@ -129,18 +129,36 @@ export class TwelveDataProvider extends PollingProvider {
       symbol: q,
       outputsize: String(Math.min(50, limit * 2)),
     });
+    // El mismo ticker cotiza en muchas bolsas: AAPL vuelve diez veces (NASDAQ en dólares, BMV en
+    // pesos mexicanos, GPW en zlotys…). Se deduplica por símbolo, pero antes hay que decidir con
+    // cuál quedarse, porque la primera que devuelva la API no siempre es la buena. Se prefiere el
+    // mercado de referencia: cotización en USD y bolsa principal.
+    const BOLSAS_PRINCIPALES = new Set(['NASDAQ', 'NYSE', 'NYSE ARCA', 'AMEX', 'CBOE', 'BATS']);
+    const prioridad = (h: SearchHit): number => {
+      let p = 0;
+      if ((h.currency ?? '').toUpperCase() === 'USD') p -= 2;
+      if (BOLSAS_PRINCIPALES.has((h.exchange ?? '').toUpperCase())) p -= 1;
+      // Un ADR es un envoltorio del original: si está el original, mejor el original.
+      if ((h.instrument_type ?? '').toLowerCase().includes('depositary')) p += 1;
+      return p;
+    };
+    const ordenados = [...(body.data ?? [])].sort((a, b) => prioridad(a) - prioridad(b));
+
     const vistos = new Set<string>();
     const hits: CatalogEntry[] = [];
-    for (const h of body.data ?? []) {
+    for (const h of ordenados) {
       const symbol = toCanonical(h.symbol);
       if (vistos.has(symbol)) continue;
       vistos.add(symbol);
       const assetClass = claseDe(h.instrument_type);
+      // La moneda va en la etiqueta: es lo que distingue de un vistazo el AAPL de Nueva York del
+      // de Ciudad de México cuando ambos aparecen.
+      const mercado = [h.exchange, h.currency].filter(Boolean).join(' · ');
       hits.push({
         symbol,
         base: symbol.split('-')[0] ?? symbol,
         quote: h.currency ?? '',
-        label: h.instrument_name ? `${h.instrument_name} · ${h.exchange ?? ''}`.trim() : symbol,
+        label: h.instrument_name ? `${h.instrument_name}${mercado ? ` · ${mercado}` : ''}` : symbol,
         provider: this.id,
         assetClass,
         tvSymbol: h.exchange ? `${h.exchange}:${h.symbol.replace(/\//g, '')}` : undefined,
