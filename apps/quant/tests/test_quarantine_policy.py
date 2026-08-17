@@ -7,6 +7,7 @@ from typing import Any
 from trademe_quant.quarantine_policy import (
     MAX_EXPECTANCY_ENTRADA,
     MIN_EXPECTANCY_SALIDA,
+    MIN_SAMPLES_ENTRADA,
     MIN_SAMPLES_SALIDA,
     decide_quarantine,
     evaluate_real,
@@ -117,3 +118,44 @@ def test_el_motivo_siempre_explica_la_decision() -> None:
             ev = evaluate_shadow(filas) if en_cuarentena else evaluate_real(filas)
             _, motivo = decide_quarantine(en_cuarentena, ev)
             assert isinstance(motivo, str) and len(motivo) > 10
+
+
+# --- El expediente mira lo reciente, no toda la historia (arreglo del 17/08/2026) ------------
+
+
+def test_lo_antiguo_no_diluye_lo_reciente() -> None:
+    """El caso real de 15m: 65 decisiones malas recientes tapadas por 155 buenas antiguas.
+
+    Promediando todo salía −0,029 R y la temporalidad se libraba de la cuarentena por un pasado
+    que ya no la describe. Cambiar la configuración cambia el sujeto medido.
+    """
+    recientes = _real(65, -0.26)
+    antiguas = _real(155, 0.068)
+    filas = recientes + antiguas  # ordenado de más reciente a más antigua, como llega de la BD
+
+    todo = sum(float(r["outcome_return_r"]) for r in filas) / len(filas)
+    assert -0.05 < todo < 0.0, todo  # promediando todo, no llega al umbral
+
+    ev = evaluate_real(filas)
+    assert ev["n"] == MIN_SAMPLES_ENTRADA
+    assert ev["expectancy"] < MAX_EXPECTANCY_ENTRADA
+    assert decide_quarantine(False, ev)[0] is True  # ahora sí entra
+
+
+def test_la_ventana_es_el_minimo_de_muestra_ya_exigido() -> None:
+    """La ventana no se eligió mirando el resultado: es el umbral que ya estaba escrito."""
+    assert evaluate_real(_real(500, 1.0))["n"] == MIN_SAMPLES_ENTRADA
+    assert evaluate_shadow(_sombra(500, 1.0))["n"] == MIN_SAMPLES_SALIDA
+
+
+def test_con_menos_decisiones_que_la_ventana_se_usan_todas() -> None:
+    ev = evaluate_real(_real(7, -0.5))
+    assert ev["n"] == 7
+    assert decide_quarantine(False, ev)[0] is False  # y sigue sin bastar para decidir
+
+
+def test_se_respeta_el_orden_de_llegada() -> None:
+    """Si la base devolviera lo antiguo primero, el arreglo no serviría de nada."""
+    filas = _real(40, 1.0) + _real(40, -1.0)
+    assert evaluate_real(filas)["expectancy"] == 1.0
+    assert evaluate_real(list(reversed(filas)))["expectancy"] == -1.0
