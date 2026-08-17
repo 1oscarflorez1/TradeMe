@@ -7,6 +7,30 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.36.1] — 2026-08-17
+
+### Fixed — El buscador de activos decía que no había nada cuando no había buscado
+
+- Con la barra vacía mostraba «Sin coincidencias», que parecía indicar que el catálogo estaba vacío.
+  Ahora invita a escribir y **sugiere qué teclear en la clase seleccionada** (`AAPL, NVDA, TSLA` en
+  Acciones, `EUR/USD` en Divisas…).
+- Cuando de verdad no hay resultados **en una clase**, lo dice sin ambigüedad y ofrece repetir la
+  búsqueda en todas: la causa habitual no es que el activo no exista, sino que se buscó en la clase
+  equivocada. El buscador solo pregunta a los proveedores de la clase elegida, así que en «Cripto»
+  jamás aparecerá una acción.
+
+### Fixed — El mismo ticker aparecía repetido
+
+- Un ticker cotiza en muchas bolsas: `AAPL` vuelve **diez veces** de Twelve Data (NASDAQ en dólares,
+  BMV en pesos mexicanos, GPW en zlotys, ADR en Toronto…). Se deduplicaba por símbolo, pero
+  quedándose con la primera que llegara, que no siempre es la de referencia.
+- Ahora se prioriza **cotización en USD y bolsa principal**, y se descartan los ADR cuando está el
+  original. La etiqueta incluye la **moneda** además del mercado, que es lo que distingue de un
+  vistazo el AAPL de Nueva York del de Ciudad de México.
+- Un mismo símbolo puede seguir apareciendo dos veces si lo ofrecen **dos proveedores distintos**
+  (Binance y Twelve Data). Eso es correcto y son activos distintos: la insignia de proveedor y la de
+  clase los diferencian.
+
 ## [0.36.0] — 2026-08-14
 
 > M10.7. La cuarentena que se entregó en M10.5 era irreversible por construcción: una temporalidad

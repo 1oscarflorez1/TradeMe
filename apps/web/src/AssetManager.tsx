@@ -19,6 +19,16 @@ const CLASES: Array<{ id: string; label: string }> = [
   { id: 'materias', label: 'Materias' },
 ];
 
+/** Qué teclear en cada clase. Con la barra vacía, saber por dónde empezar es media búsqueda. */
+const EJEMPLOS: Record<string, string> = {
+  '': 'BTCUSDT, AAPL, EUR/USD',
+  cripto: 'BTCUSDT, ETHUSDT, SOLUSDT',
+  acciones: 'AAPL, NVDA, TSLA, SPY',
+  forex: 'EUR/USD, GBP/USD, USD/JPY',
+  indices: 'SPX, NDX, DJI',
+  materias: 'XAU/USD, WTI, BRENT',
+};
+
 const CLASE_ICONO: Record<string, string> = {
   cripto: '₿',
   acciones: '🏛',
@@ -91,6 +101,7 @@ export function AssetManager({ onClose, onChanged }: { onClose: () => void; onCh
   }, [q, clase]);
 
   const seguidos = new Set(assets.map((a) => a.symbol));
+  const nombreClase = CLASES.find((c) => c.id === clase)?.label ?? clase;
   const inactivos = useMemo(() => providers.filter((p) => !p.available), [providers]);
 
   const doAdd = async (h: CatalogHit) => {
@@ -166,11 +177,36 @@ export function AssetManager({ onClose, onChanged }: { onClose: () => void; onCh
           <div>
             <h4 className="asset-h">Resultados del catálogo</h4>
             <div className="asset-list">
-              {buscando && hits.length === 0 ? (
+              {q.trim().length === 0 ? (
+                // Antes, con la barra vacía, ponía «Sin coincidencias»: parecía que no había nada
+                // cuando en realidad no se había buscado nada. Aquí se invita a escribir y se dan
+                // ejemplos de la clase seleccionada, que es lo que resuelve la duda de qué teclear.
+                <p className="muted asset-vacio">
+                  Escribe el nombre o el símbolo de un activo para buscarlo.
+                  <br />
+                  <span className="muted">
+                    Por ejemplo: <strong>{EJEMPLOS[clase] ?? EJEMPLOS['']}</strong>
+                  </span>
+                </p>
+              ) : buscando && hits.length === 0 ? (
                 <p className="muted">Buscando…</p>
               ) : hits.length === 0 ? (
                 <p className="muted">
-                  Sin coincidencias{clase ? ' en esta clase' : ''}.
+                  {clase ? (
+                    <>
+                      Ningún activo llamado «{q.trim()}» en <strong>{nombreClase}</strong>.{' '}
+                      {/* La causa habitual no es que no exista, es que se buscó en la clase
+                          equivocada: el buscador solo pregunta a los proveedores de la clase
+                          elegida, así que en «Cripto» nunca aparecerá una acción. */}
+                      Puede que exista en otra clase:{' '}
+                      <button type="button" className="lnk" onClick={() => setClase('')}>
+                        buscar en todas
+                      </button>
+                      .
+                    </>
+                  ) : (
+                    <>Ningún activo llamado «{q.trim()}» en los proveedores disponibles.</>
+                  )}
                   {inactivos.length > 0 && ' Hay proveedores sin configurar (mira los puntos de arriba).'}
                 </p>
               ) : (
