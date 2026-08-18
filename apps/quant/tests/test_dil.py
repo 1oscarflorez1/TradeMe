@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from trademe_quant.dil import DataProvider, ProviderError, Record, Scheduler, run_once
 from trademe_quant.dil.macro_ecb import ECBMacro, FREDMacro, _fecha_periodo
 from trademe_quant.dil.sentiment_fng import FearAndGreed
@@ -21,15 +23,20 @@ class ProveedorFalso(DataProvider):
     table = "sentiment"
     cadence_s = 60
 
-    def __init__(self, records=None, falla=False, disponible=True):  # type: ignore[no-untyped-def]
-        self._records = records or []
+    def __init__(
+        self,
+        records: list[Record] | None = None,
+        falla: bool = False,
+        disponible: bool = True,
+    ) -> None:
+        self._records: list[Record] = records or []
         self._falla = falla
         self._disponible = disponible
         self.llamadas = 0
 
     @property
     def available(self) -> bool:
-        return self._disponible
+        return bool(self._disponible)
 
     @property
     def unavailable_reason(self) -> str | None:
@@ -150,7 +157,7 @@ def test_fng_declara_su_cadencia_y_tabla() -> None:
     assert p.cadence_s >= 3600  # es un dato diario: preguntar más sería gastar por gastar
 
 
-def test_el_planificador_se_comparte_entre_ciclos(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_el_planificador_se_comparte_entre_ciclos(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sin planificador compartido, cada ciclo preguntaría a todas las fuentes.
 
     La cadencia declarada por cada proveedor sería decorativa y el BCE se consultaría cada pocos
@@ -169,7 +176,7 @@ def test_el_planificador_se_comparte_entre_ciclos(monkeypatch) -> None:  # type:
     assert p.llamadas == 1, "la cadencia no se respetó entre ciclos"
 
 
-def test_una_fuente_caida_no_tumba_el_ciclo(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_una_fuente_caida_no_tumba_el_ciclo(monkeypatch: pytest.MonkeyPatch) -> None:
     """Degradación grácil: la que falla se anota y las demás siguen."""
     from trademe_quant import dil
 
