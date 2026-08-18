@@ -25,6 +25,8 @@ import {
   fetchSignal,
   fetchSnapshots,
   fetchAssets,
+  fetchProviders,
+  ErrorDeProveedor,
   fetchSymbols,
   fetchVotes,
   logout,
@@ -36,6 +38,60 @@ import type { Candle, ConnectionStatus, Interval, Signal, Vote } from './types';
 
 const TF_ALERT_KEY = 'trademe.tfAlertThresholds';
 type TfAlert = { action: string; conf: number };
+
+/**
+ * Explica por qué no hay mercado, distinguiendo tres cosas que antes se veían igual.
+ *
+ * Hasta la 0.37.1 cualquier fallo del proveedor salía como «Error: GET /candles 502», que no decía
+ * ni la causa ni si se arreglaba solo. El caso real que lo destapó fue agotar el cupo diario de un
+ * plan gratuito: el sistema estaba sano y el dato volvía a medianoche, pero el portal parecía roto.
+ */
+function ErrorDeMercado({ error, symbol }: { error: Error; symbol: string }) {
+  const prov = error instanceof ErrorDeProveedor ? error : null;
+  const kind = prov?.kind ?? null;
+  const retry = prov?.retryAt;
+
+  if (kind === 'sin_cupo') {
+    const cuando = retry
+      ? new Date(retry).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })
+      : 'medianoche UTC';
+    return (
+      <>
+        <p>
+          <strong>Cupo diario de datos agotado</strong>
+          {prov?.provider ? <> en {prov.provider}</> : null}.
+        </p>
+        <p className="hint">
+          Se restablece a las <strong>00:00 UTC</strong> ({cuando}). No es una avería: el plan
+          gratuito limita las peticiones por día, y los activos por sondeo consumen unas 400 cada
+          uno. Mientras tanto, los activos en tiempo real (cripto) siguen funcionando.
+        </p>
+      </>
+    );
+  }
+  if (kind === 'no_soportado') {
+    return (
+      <>
+        <p>
+          <strong>{symbol}</strong> no está disponible en su proveedor de datos.
+        </p>
+        <p className="hint">
+          El activo existe en el catálogo, pero la fuente no sirve esta temporalidad. Prueba con
+          15m o superior, que es donde estos proveedores tienen datos.
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <p>No se pudo cargar el mercado: {error.message}</p>
+      <p className="hint">
+        Puede ser un fallo temporal del proveedor. Si persiste, revisa la pestaña Estado.
+      </p>
+    </>
+  );
+}
+
 const ACT_ES: Record<string, string> = { BUY: 'Compra', SELL: 'Venta', HOLD: 'Mantener' };
 
 /**
@@ -90,11 +146,15 @@ export function App() {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [signal, setSignal] = useState<Signal | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [chartTab, setChartTab] = useState<'local' | 'tv'>('local');
   const [now, setNow] = useState<number>(Date.now());
   const [view, setView] = useState<View>('panel');
   const [alerts, setAlerts] = useState<Record<string, TfAlert>>({});
+  /** Modo de entrega de cada activo. Decide cada cuánto se puede preguntar sin agotar el cupo. */
+  const [assetsInfo, setAssetsInfo] = useState<Array<{ symbol: string; mode: 'stream' | 'poll' }>>(
+    [],
+  );
   const [thresholds, setThresholds] = useState<Record<string, number>>(loadThresholds);
   const [showGear, setShowGear] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
@@ -123,27 +183,36 @@ export function App() {
   }, []);
 
   // Alertas por temporalidad: consulta la decisión de cada TF y marca las accionables >= umbral.
+  //
+  // Se consultan **en serie y espaciado**, no las nueve a la vez cada 15 segundos como hasta la
+  // 0.37.1. Aquello eran 36 peticiones por minuto: para un activo por sondeo, cuyas velas salen de
+  // un plan gratuito de 800 al día, agotaba el cupo en veintidós minutos y el panel acababa
+  // mostrando «Error: GET /candles 502» sin decir por qué. Los activos en streaming no pagan por
+  // petición, así que conservan una cadencia viva.
   useEffect(() => {
     if (!symbol || intervals.length === 0) return;
     let cancelled = false;
+    const porSondeo = assetsInfo.find((a) => a.symbol === symbol)?.mode === 'poll';
+    const cadencia = porSondeo ? 300_000 : 20_000;
+
     const poll = async () => {
-      const entries = await Promise.all(
-        intervals.map(async (iv) => [iv, await fetchSignal(symbol, iv)] as const),
-      );
-      if (cancelled) return;
       const next: Record<string, TfAlert> = {};
-      for (const [iv, sig] of entries) {
+      for (const iv of intervals) {
+        if (cancelled) return;
+        const sig = await fetchSignal(symbol, iv).catch(() => null);
         if (sig) next[iv] = { action: sig.action, conf: sig.confidence };
+        // Un respiro entre peticiones: el límite de estos planes es por minuto además de por día.
+        if (porSondeo) await new Promise((r) => setTimeout(r, 1200));
       }
-      setAlerts(next);
+      if (!cancelled) setAlerts(next);
     };
     void poll();
-    const pid = setInterval(() => void poll(), 15000);
+    const pid = setInterval(() => void poll(), cadencia);
     return () => {
       cancelled = true;
       clearInterval(pid);
     };
-  }, [symbol, intervals]);
+  }, [symbol, intervals, assetsInfo]);
 
 
   useEffect(() => {
@@ -153,10 +222,16 @@ export function App() {
         setIntervals(r.intervals);
         setSymbol((current) => current || r.symbols[0] || '');
       })
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(e instanceof Error ? e : new Error(String(e))));
     // Cada activo trae su equivalente en TradingView según el proveedor de sus velas
     // (BINANCE:BTCUSDT, NASDAQ:AAPL…), para que la pestaña del widget muestre el mercado correcto.
-    void fetchAssets().then(setTvSymbols);
+    // Cruzar activos con proveedores da el modo de entrega de cada uno: es lo que decide si se
+    // puede preguntar cada veinte segundos o hay que espaciar para no agotar un plan gratuito.
+    void Promise.all([fetchAssets(), fetchProviders()]).then(([assets, provs]) => {
+      setTvSymbols(assets);
+      const modo = new Map(provs.map((p) => [p.id, p.mode]));
+      setAssetsInfo(assets.map((a) => ({ symbol: a.symbol, mode: modo.get(a.provider) ?? 'stream' })));
+    });
   }, []);
 
   useEffect(() => {
@@ -174,7 +249,7 @@ export function App() {
         }
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(String(e));
+        if (!cancelled) setError(e instanceof Error ? e : new Error(String(e)));
       });
 
     fetchVotes(symbol, tf)
@@ -613,7 +688,7 @@ export function App() {
 
       <main className="content">
         {view === 'registros' ? (
-          <SnapshotsView symbol={symbol} />
+          <SnapshotsView symbol={symbol} activos={symbols} />
         ) : view === 'backtest' ? (
           <BacktestView symbol={symbol} interval={tf} />
         ) : view === 'lab' ? (
@@ -626,8 +701,7 @@ export function App() {
           <StatusView />
         ) : error ? (
           <div className="panel error">
-            <p>No se pudo cargar el mercado: {error}</p>
-            <p className="hint">¿Está la API en marcha? (`pnpm --filter @trademe/api dev`)</p>
+            <ErrorDeMercado error={error} symbol={symbol} />
           </div>
         ) : (
           <>

@@ -7,6 +7,50 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.37.1] — 2026-08-18
+
+> Un «Error: GET /candles 502» al cambiar de activo destapó tres cosas: el presupuesto de peticiones
+> no cubría la vía de mayor consumo, el portal pedía nueve temporalidades cada quince segundos, y
+> cualquier fallo del proveedor se veía igual que una avería.
+
+### Fixed — El presupuesto no cubría las peticiones del portal
+
+- `tryTake()` solo se llamaba en el sondeo y en la búsqueda. **`getHistory` —la vía que usa el
+  panel— no pasaba por el presupuesto en absoluto**, así que el límite documentado como «6/min y
+  700/día con margen» no protegía nada de lo que hace un usuario mirando la pantalla.
+- Resultado medido: **1822 créditos consumidos sobre un límite de 800**.
+- El cupo diario pasa a contarse **por día natural UTC** en vez de en ventana deslizante de 24 h,
+  que es como lo cuentan los proveedores. Con ventana deslizante el presupuesto y el proveedor
+  discrepaban, y el aviso de «se repone a medianoche» habría sido mentira.
+
+### Fixed — Nueve peticiones cada quince segundos
+
+- El panel consultaba la decisión de **todas** las temporalidades en paralelo cada 15 s: 36
+  peticiones por minuto. Con 800 créditos diarios, el cupo se agotaba en **veintidós minutos**.
+- Ahora se consultan **en serie y espaciado**, y la cadencia depende del proveedor: 20 s para los de
+  tiempo real —que no pagan por petición— y 5 minutos para los de sondeo, con una pausa entre
+  llamadas porque estos planes limitan también por minuto.
+
+### Fixed — Un 502 para todo escondía la causa
+
+- Nuevos errores tipados: **sin cupo** (429, se resuelve solo), **activo no servido** (422, no se
+  arregla esperando) y **proveedor caído** (502). Twelve Data responde 200 con `{status:"error",
+  code:429}` al agotar el cupo, así que sin traducirlo era indistinguible de cualquier otro fallo.
+- El panel lo explica en castellano y dice **cuándo vuelve**: «Cupo diario de datos agotado. Se
+  restablece a las 00:00 UTC», con la nota de que los activos en tiempo real siguen funcionando.
+
+### Added — Filtro por activo en Registros
+
+- Selector de activo dentro de la pestaña y el símbolo visible en la cabecera. Las decisiones, el
+  desinflado por dependencia y la cuarentena funcionan por **símbolo y temporalidad**: mezclar
+  activos en una misma media agregada no dice nada útil, y ahora se ve de qué activo son las cifras.
+
+### Notas
+
+- 9 pruebas nuevas del presupuesto y del mapeo de errores, incluido el caso del cambio de día UTC.
+- `ARQQ` **estaba bien añadido**: la validación de `POST /assets` funcionó. El fallo era posterior,
+  al pedir las velas.
+
 ## [0.37.0] — 2026-08-18 · M11 · Data Intelligence Layer
 
 > La capa que prepara datos y **no decide nada**. Registrar primero y decidir después es lo que

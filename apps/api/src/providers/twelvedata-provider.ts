@@ -1,6 +1,7 @@
 import { CandleSchema, intervalMs, type Candle, type Interval } from '../domain/candle.js';
 import { PollingProvider, type PollingOptions } from './polling-provider.js';
 import { RateBudget } from './rate-budget.js';
+import { ProviderError } from './errors.js';
 import type { AssetClass, CatalogEntry } from './types.js';
 
 const BASE = 'https://api.twelvedata.com';
@@ -112,9 +113,11 @@ export class TwelveDataProvider extends PollingProvider {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     url.searchParams.set('apikey', this.apiKey);
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`twelvedata ${path} ${res.status}`);
+    if (!res.ok) throw this.traduce(res.status, `${path} respondió ${res.status}`);
     const body = (await res.json()) as T & { status?: string; message?: string; code?: number };
-    if (body.status === 'error') throw new Error(`twelvedata: ${body.message ?? 'error'}`);
+    // Twelve Data responde 200 con `{status:"error", code:429}` cuando se agota el cupo. Sin esta
+    // rama, quedarse sin créditos era indistinguible de cualquier otro fallo.
+    if (body.status === 'error') throw this.traduce(body.code ?? 0, body.message ?? 'error');
     return body;
   }
 
@@ -174,6 +177,22 @@ export class TwelveDataProvider extends PollingProvider {
     return hits.find((h) => h.symbol === objetivo) ?? null;
   }
 
+  /** Convierte un código del proveedor en un error que dice qué pasó y si se arregla solo. */
+  private traduce(code: number, mensaje: string): ProviderError {
+    if (code === 429) {
+      return new ProviderError(
+        'sin_cupo',
+        this.id,
+        `Cupo diario de ${this.id} agotado. ${mensaje}`,
+        this.budget.resetAt(),
+      );
+    }
+    if (code === 400 || code === 404) {
+      return new ProviderError('no_soportado', this.id, `${this.id} no sirve ese dato: ${mensaje}`);
+    }
+    return new ProviderError('proveedor_caido', this.id, `${this.id}: ${mensaje}`);
+  }
+
   async getHistory(
     symbol: string,
     interval: Interval,
@@ -182,7 +201,26 @@ export class TwelveDataProvider extends PollingProvider {
   ): Promise<Candle[]> {
     if (!this.available) return [];
     const tdInterval = INTERVAL_MAP[interval];
-    if (!tdInterval) throw new Error(`temporalidad no soportada por ${this.id}: ${interval}`);
+    if (!tdInterval) {
+      throw new ProviderError(
+        'no_soportado',
+        this.id,
+        `${this.id} no ofrece la temporalidad ${interval}`,
+      );
+    }
+    // El presupuesto tiene que cubrir ESTA vía, que es la del portal y la de mayor consumo.
+    // Hasta M11.1 solo protegía el sondeo y la búsqueda: abrir el panel con una acción disparaba
+    // ocho peticiones sin control —una por temporalidad— y agotaba 800 créditos en una tarde.
+    if (!this.budget.tryTake()) {
+      throw new ProviderError(
+        'sin_cupo',
+        this.id,
+        this.budget.agotadoDia
+          ? `Cupo diario de ${this.id} agotado.`
+          : `Límite por minuto de ${this.id} alcanzado; inténtalo en unos segundos.`,
+        this.budget.agotadoDia ? this.budget.resetAt() : undefined,
+      );
+    }
     const params: Record<string, string> = {
       symbol: toProviderSymbol(symbol),
       interval: tdInterval,

@@ -118,13 +118,41 @@ export async function fetchSymbols(): Promise<SymbolsResponse> {
   return (await res.json()) as SymbolsResponse;
 }
 
+/** Fallo de un proveedor de datos, con la causa y —si aplica— cuándo se resuelve solo. */
+export class ErrorDeProveedor extends Error {
+  constructor(
+    readonly kind: 'sin_cupo' | 'no_soportado' | 'proveedor_caido',
+    mensaje: string,
+    readonly provider?: string,
+    readonly retryAt?: string,
+  ) {
+    super(mensaje);
+    this.name = 'ErrorDeProveedor';
+  }
+}
+
 export async function fetchCandles(
   symbol: string,
   interval: Interval,
   limit = 300,
 ): Promise<Candle[]> {
   const res = await apiFetch(`/candles?symbol=${symbol}&interval=${interval}&limit=${limit}`);
-  if (!res.ok) throw new Error(`GET /candles ${res.status}`);
+  if (!res.ok) {
+    // El backend distingue sin cupo, activo no servido y proveedor caído. Perder ese matiz aquí
+    // devolvería al «Error: GET /candles 502» que no decía nada.
+    const detalle = (await res.json().catch(() => null)) as {
+      error?: string;
+      kind?: 'sin_cupo' | 'no_soportado' | 'proveedor_caido';
+      provider?: string;
+      retryAt?: string;
+    } | null;
+    throw new ErrorDeProveedor(
+      detalle?.kind ?? 'proveedor_caido',
+      detalle?.error ?? `GET /candles ${res.status}`,
+      detalle?.provider,
+      detalle?.retryAt,
+    );
+  }
   const body = (await res.json()) as { candles: Candle[] };
   return body.candles;
 }
