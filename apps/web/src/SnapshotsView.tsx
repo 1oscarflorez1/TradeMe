@@ -147,7 +147,19 @@ function DetailField({ label, children }: { label: string; children: React.React
   );
 }
 
-export function SnapshotsView({ symbol }: { symbol: string }) {
+export function SnapshotsView({
+  symbol,
+  activos = [],
+}: {
+  symbol: string;
+  /** Activos seguidos, para poder aislar el historial sin salir de la pestaña. */
+  activos?: string[];
+}) {
+  // Activo del que se muestran los registros. Arranca en el del panel y se puede cambiar aquí:
+  // las decisiones, el desinflado por dependencia y la cuarentena funcionan por símbolo Y
+  // temporalidad, así que mezclar activos en una misma cifra agregada no dice nada útil.
+  const [activo, setActivo] = useState(symbol);
+  useEffect(() => setActivo(symbol), [symbol]);
   const [rows, setRows] = useState<SnapshotRow[]>([]);
   const [price, setPrice] = useState<number>(0);
   const [total, setTotal] = useState<number>(0);
@@ -166,7 +178,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   const [chartLoading, setChartLoading] = useState(false);
 
   const load = () =>
-    fetchSnapshots(symbol).then((r) => {
+    fetchSnapshots(activo).then((r) => {
       if (r) {
         setRows(r.snapshots);
         setPrice(r.currentPrice);
@@ -177,7 +189,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
     });
 
   useEffect(() => {
-    if (!symbol) return;
+    if (!activo) return;
     let cancelled = false;
     const run = () => {
       if (!cancelled) void load();
@@ -188,7 +200,7 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
       cancelled = true;
       clearInterval(id);
     };
-  }, [symbol]);
+  }, [activo]);
 
   useEffect(() => {
     if (!chartFor) return;
@@ -262,7 +274,9 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
   return (
     <section className="panel registros">
       <div className="reg-head">
-        <h2>Registros · decisiones capturadas en vivo</h2>
+        <h2>
+          Registros · <span className="reg-activo">{activo}</span>
+        </h2>
         <p className="reg-intro">
           Cada fila es una decisión que guardaste con 📸 en el momento real. TradeMe la sigue{' '}
           <strong>hacia adelante</strong> comparando el precio actual con su plan (entrada, stop,
@@ -270,12 +284,16 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
           <strong>✗ SL</strong>. El objetivo: medir cómo se comportan de verdad las decisiones del
           copiloto (test hacia adelante) y alimentar el dataset que calibra y optimiza el modelo.
           Pulsa la flecha de cada fila para ver todos los datos, o la ✕ para eliminar el registro.
+          <br />
+          <strong>Todas las cifras de abajo son de {activo}.</strong> Cada activo y cada
+          temporalidad tienen su propia configuración, su propio desinflado por dependencia y su
+          propia cuarentena, así que mezclarlos en una misma media no diría nada útil.
         </p>
       </div>
 
       <div className="reg-summary">
         <span className="reg-chip" title={CHIP_TIPS.precio}>
-          Precio {symbol} <strong>{price.toFixed(2)}</strong>
+          Precio {activo} <strong>{price.toFixed(2)}</strong>
         </span>
         <span className="reg-chip" title={CHIP_TIPS.total}>
           Total <strong>{stats?.total ?? total}</strong>
@@ -314,6 +332,18 @@ export function SnapshotsView({ symbol }: { symbol: string }) {
 
       {rows.length > 0 && (
         <div className="reg-filters">
+          {activos.length > 1 && (
+            <label>
+              <span>Activo</span>
+              <select value={activo} onChange={(e) => setActivo(e.target.value)}>
+                {activos.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             <span>Temporalidad</span>
             <select value={fTf} onChange={(e) => setFTf(e.target.value)}>

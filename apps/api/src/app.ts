@@ -11,6 +11,7 @@ import type { ExternalMapper } from './signals/external-mapper.js';
 import type { EnsembleConfig } from './ensemble/config.js';
 import { buildSignal } from './ensemble/signal.js';
 import type { Calibrators } from './calibration/load.js';
+import { isProviderError } from './providers/errors.js';
 import type { Docs } from './releases/docs.js';
 import type { Releases } from './releases/parse.js';
 import type { MetaModel } from './metamodel/apply.js';
@@ -702,8 +703,17 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       const candles = await deps.getHistory(symbol.toUpperCase(), interval, limit, to);
       return { symbol: symbol.toUpperCase(), interval, candles };
     } catch (err) {
+      // Un 502 para todo escondía la causa: agotar el cupo diario del proveedor se veía igual que
+      // una caída. Cada situación tiene ahora su código y su mensaje, y el portal puede explicarla.
+      if (isProviderError(err)) {
+        request.log.warn({ kind: err.kind, provider: err.provider }, err.message);
+        return reply.status(err.status).send(err.toJSON());
+      }
       request.log.warn({ err: String(err) }, 'fallo al obtener histórico del proveedor');
-      return reply.status(502).send({ error: 'proveedor de datos no disponible' });
+      return reply.status(502).send({
+        error: 'proveedor de datos no disponible',
+        kind: 'proveedor_caido',
+      });
     }
   });
 

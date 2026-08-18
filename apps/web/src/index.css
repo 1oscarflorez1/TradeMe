@@ -2860,3 +2860,10 @@ html, body { overflow-x: hidden; }
 }
 .lnk:hover { filter: brightness(1.2); }
 .asset-vacio { line-height: 1.7; }
+
+/* Activo del que son los registros: se lee de un vistazo en la cabecera. */
+.reg-activo {
+  color: var(--accent);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .92em;
+}
