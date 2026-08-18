@@ -37,33 +37,54 @@ MAX_EXPECTANCY_ENTRADA = -0.15
 MIN_SAMPLES_ENTRADA = 30
 
 
-def evaluate_shadow(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Resume el expediente sombra de una temporalidad: qué habría pasado si hubiera operado."""
-    rs = [
-        float(r["shadow_outcome_return_r"])
-        for r in rows
-        if r.get("shadow_outcome_return_r") is not None
-    ]
-    n = len(rs)
-    if n == 0:
-        return {"n": 0, "expectancy": 0.0, "aciertos": 0, "win_rate": 0.0}
-    aciertos = sum(1 for r in rs if r > 0)
-    return {
-        "n": n,
-        "expectancy": sum(rs) / n,
-        "aciertos": aciertos,
-        "win_rate": aciertos / n,
-    }
-
-
-def evaluate_real(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Resume el rendimiento REAL de una temporalidad que sí opera."""
-    rs = [float(r["outcome_return_r"]) for r in rows if r.get("outcome_return_r") is not None]
+def _resumen(rs: list[float]) -> dict[str, Any]:
     n = len(rs)
     if n == 0:
         return {"n": 0, "expectancy": 0.0, "aciertos": 0, "win_rate": 0.0}
     aciertos = sum(1 for r in rs if r > 0)
     return {"n": n, "expectancy": sum(rs) / n, "aciertos": aciertos, "win_rate": aciertos / n}
+
+
+def evaluate_shadow(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_SALIDA) -> dict[str, Any]:
+    """Resume el expediente sombra: qué habría pasado si la temporalidad hubiera operado.
+
+    `rows` llega ordenado de la decisión más reciente a la más antigua, y solo se miran las
+    `limite` primeras. Ver `evaluate_real` para el porqué.
+    """
+    rs = [
+        float(r["shadow_outcome_return_r"])
+        for r in rows
+        if r.get("shadow_outcome_return_r") is not None
+    ][:limite]
+    return _resumen(rs)
+
+
+def evaluate_real(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_ENTRADA) -> dict[str, Any]:
+    """Resume el rendimiento REAL de una temporalidad que sí opera.
+
+    **Solo las `limite` decisiones evaluadas más recientes**, y esto es lo que corrige el defecto
+    detectado el 17 de agosto de 2026: el expediente promediaba toda la historia, mezclando
+    decisiones tomadas con configuraciones distintas. En 15m eso diluía 65 decisiones recientes a
+    −0,260 R con 155 antiguas a +0,068 R y daba −0,029 R, por encima del umbral. Una temporalidad
+    se libraba de la cuarentena por un pasado que ya no la describe.
+
+    Cambiar la configuración cambia el sujeto medido: el historial anterior describe a un sistema
+    que ya no existe.
+
+    ¿Por qué la ventana vale exactamente `limite`, es decir, el mínimo de muestra que ya exigía la
+    política? Porque **es el único número que no se elige mirando el resultado**. Estaba fijado
+    desde M10.7, antes de que existiera este problema. Cualquier otra ventana habría que
+    justificarla, y la única justificación disponible hoy sería el desenlace que produce, que es
+    justamente el sesgo que este proyecto evita.
+
+    No se filtra por `model_version` exacta porque Optuna publica una nueva cada una o dos semanas
+    y el expediente se reiniciaría con ella, dejando el gobierno paralizado justo después de cada
+    reoptimización. La recencia consigue lo mismo sin ese efecto.
+    """
+    rs = [float(r["outcome_return_r"]) for r in rows if r.get("outcome_return_r") is not None][
+        :limite
+    ]
+    return _resumen(rs)
 
 
 def decide_quarantine(en_cuarentena: bool, ev: dict[str, Any]) -> tuple[bool, str]:
@@ -131,10 +152,13 @@ def _fetch(dsn: str) -> dict[str, list[dict[str, Any]]]:
 
     agrupado: dict[str, list[dict[str, Any]]] = {}
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        # De la más reciente a la más antigua: el expediente se queda con las primeras, porque lo
+        # que describe al sistema de hoy es lo que ha hecho últimamente, no su historia entera.
         cur.execute("""
             SELECT symbol, interval, outcome_return_r, shadow_outcome_return_r
               FROM snapshots
              WHERE outcome_return_r IS NOT NULL OR shadow_outcome_return_r IS NOT NULL
+             ORDER BY captured_at DESC
             """)
         for symbol, interval, real, sombra in cur.fetchall():
             agrupado.setdefault(f"{symbol}:{interval}", []).append(
@@ -155,7 +179,13 @@ def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
     for clave, filas in datos.items():
         interval = clave.split(":", 1)[1]
         vetada = interval in actuales
-        ev = evaluate_shadow(filas) if vetada else evaluate_real(filas)
+        # Cada caso mira su propio expediente y su propia ventana: la de salida es más larga porque
+        # volver a operar exige más pruebas que dejar de hacerlo.
+        ev = (
+            evaluate_shadow(filas, MIN_SAMPLES_SALIDA)
+            if vetada
+            else evaluate_real(filas, MIN_SAMPLES_ENTRADA)
+        )
         nueva, motivo = decide_quarantine(vetada, ev)
         decisiones[clave] = {
             "interval": interval,

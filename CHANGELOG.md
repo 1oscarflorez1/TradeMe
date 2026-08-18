@@ -7,6 +7,26 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.36.2] — 2026-08-17
+
+### Fixed — El expediente de cuarentena promediaba toda la historia
+
+- El gobierno entregado en M10.7 medía **todas** las decisiones evaluadas de una temporalidad, sin
+  distinguir con qué configuración se tomaron. En 15m eso mezclaba 65 decisiones recientes a
+  −0,260 R con 155 antiguas a +0,068 R y daba **−0,029 R**: por encima del umbral de entrada, así
+  que la temporalidad se libraba de la cuarentena por un pasado que ya no la describe.
+- **Cambiar la configuración cambia el sujeto medido.** El historial anterior describe a un sistema
+  que ya no existe. Corta en las dos direcciones: también podía dejar vetada una temporalidad por
+  un mal pasado ya corregido.
+- Ahora el expediente mira **solo las decisiones evaluadas más recientes**, en número igual al
+  mínimo de muestra que la política ya exigía (30 para entrar, 40 para salir).
+- **La ventana no se eligió mirando el resultado**: es el umbral que estaba fijado desde M10.7,
+  antes de que este problema existiera. Cualquier otro número habría que justificarlo, y la única
+  justificación disponible sería el desenlace que produce.
+- No se filtra por `model_version` exacta a propósito: Optuna publica una nueva cada una o dos
+  semanas y el expediente se reiniciaría con ella, dejando el gobierno paralizado justo después de
+  cada reoptimización.
+
 ## [0.36.1] — 2026-08-17
 
 ### Fixed — El buscador de activos decía que no había nada cuando no había buscado
