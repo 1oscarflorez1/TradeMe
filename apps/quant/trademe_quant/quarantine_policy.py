@@ -1,7 +1,8 @@
 """Gobierno automático de la cuarentena de temporalidades (M10.7).
 
-En M10.5 se retiró 4h de la operativa: −0,485 R en 89 decisiones, 69 cortos con el 85,6 % al stop
-contra una tendencia alcista de fondo. La medida era correcta. Su implementación tenía un fallo:
+En M10.5 se retiró 4h de la operativa: −0,485 R en 89 decisiones, 69 cortos con el 85,6 % al stop.
+La medida era correcta (la causa, en cambio, no era la que se creyó: ver M11). Su
+implementación tenía un fallo:
 `quarantine_intervals` era una lista fija que alguien tendría que acordarse de vaciar, y —peor— una
 temporalidad vetada no generaba ninguna operación evaluable, así que **no podía demostrar nunca que
 merecía volver**. Una medida temporal, irreversible por construcción.

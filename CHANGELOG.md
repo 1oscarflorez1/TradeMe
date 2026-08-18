@@ -7,6 +7,69 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.37.0] — 2026-08-18 · M11 · Data Intelligence Layer
+
+> La capa que prepara datos y **no decide nada**. Registrar primero y decidir después es lo que
+> permite comprobar si el análisis fundamental aporta algo — y la primera comprobación que se hizo
+> con ella desmintió la hipótesis que lo justificaba.
+
+### Fixed — «El fundamental habría salvado el 4h» era falso
+
+- Desde el primer informe se sostuvo que el escudo macro habría impedido los 69 cortos de 4h que
+  costaron −0,723 R. Reconstruido el funding real desde el 23 de julio y recalculado el sesgo con la
+  fórmula y los parámetros exactos del motor (EMA 20 semanal, cierre semanal):
+
+  | Métrica | Ventana de los 69 cortos |
+  |---|---|
+  | macroBias medio | **−0,496** (bajista) |
+  | Componente tendencia semanal | −0,884 |
+  | Veces que habría **vetado** un corto | **0 de 60** |
+  | Veces que habría **reforzado** el corto | **60 de 60** |
+
+- **El escudo macro habría estado de acuerdo con los cortos.** El diagnóstico original —«contra una
+  tendencia alcista de fondo»— era una inferencia a partir de los desenlaces, no una medición: hubo
+  un rebote de corto plazo dentro de una tendencia semanal claramente bajista.
+- La afirmación se corrige en los cinco sitios donde estaba escrita (CHANGELOG de 0.34.0,
+  `ensemble.yaml`, `config.ts`, `quarantine_policy.py` y el propio proveedor).
+- **No invalida el análisis fundamental, cambia su argumento**: sigue justificándose porque el
+  funding, el macro y el calendario **no derivan del precio** —son la primera evidencia
+  independiente en un comité cuyos seis votos colapsan en 1,41 efectivos—, no por haber salvado nada.
+- Si M12 se hubiera construido sobre aquella tesis, habríamos cableado un escudo que empeora el
+  problema que decía resolver. Es exactamente para esto que M11 va antes.
+
+### Added — Esquema point-in-time (migración 018)
+
+- `macro_series`, `derivatives_metrics`, `sentiment` y `econ_calendar`, cada fila con **dos fechas**:
+  `observed_at` (a qué momento se refiere) y `published_at` (cuándo se supo). El IPC de julio se
+  publica a mediados de agosto; un backtest situado el 10 de agosto no puede verlo.
+- `published_at` es **obligatorio**: un dato sin fecha de conocimiento no se puede usar honestamente,
+  así que no se guarda.
+- `as_of()` es la única forma autorizada de leer estas tablas, y filtra por `published_at`. Cualquier
+  otra consulta podría olvidar el filtro y devolver datos del futuro sin que nadie lo note.
+- Tabla `data_sources` con la salud de cada fuente: sin ella, una fuente caída y una sin novedades
+  son indistinguibles.
+
+### Added — Framework de proveedores y cuatro fuentes gratuitas
+
+- Contrato `DataProvider`: implementar `fetch()` y declarar cadencia. Validación, deduplicación,
+  salud y aislamiento de errores ya están resueltos.
+- **Binance** (funding, interés abierto, long/short), **Fear & Greed**, **BCE** — las tres sin clave
+  ni registro, funcionando desde el primer despliegue. **FRED** con clave gratuita opcional: sin ella
+  queda **apagado, no roto**.
+- **Degradación grácil**: cada fuente va aislada; si una falla se anota y las demás siguen. Una
+  fuente ausente nunca se convierte en un dato inventado.
+- **Relleno retroactivo** del funding: permite comprobar hipótesis sobre decisiones ya tomadas sin
+  inventar nada.
+- Planificador **compartido entre ciclos**: sin él la cadencia declarada sería decorativa y el BCE
+  se consultaría cada pocos minutos en vez de dos veces al día.
+
+### Notas
+
+- **M11 no toca la decisión.** Ni una señal cambia. La paridad Node≡Python sigue verde por eso mismo.
+- 15 pruebas nuevas, centradas en la regla de oro: que un dato conocido después no se pueda usar
+  antes, y que una fuente caída no tumbe el ciclo.
+- `docs/datos-externos.md` con el diseño completo.
+
 ## [0.36.2] — 2026-08-17
 
 ### Fixed — El expediente de cuarentena promediaba toda la historia
@@ -205,7 +268,9 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 ### Changed — Cuarentena de temporalidades
 
 - `quarantine_intervals` en `ensemble.yaml`, con **4h dentro**: −0,485 R en 89 decisiones, 69 cortos
-  con el 85,6 % al stop contra una tendencia alcista de fondo.
+  con el 85,6 % al stop. *(Se dijo entonces que era «contra una tendencia alcista de fondo»; era una
+  inferencia a partir de los desenlaces, y M11 la desmintió al reconstruir los datos reales. Ver la
+  entrada de 0.37.0.)*
 - Una temporalidad en cuarentena **se calcula y se registra, pero no emite señal operable**. Se
   retira el permiso para operar, no la observación: el backtest la sigue simulando a propósito,
   porque si dejara de hacerlo no habría forma de saber cuándo levantarla.

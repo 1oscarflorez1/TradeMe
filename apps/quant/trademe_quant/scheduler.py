@@ -259,6 +259,17 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin independencia se decide sin desinflar
         log.append(f"error independencia: {err}")
 
+    # Data Intelligence Layer (M11): trae los datos externos y los guarda con su fecha de
+    # conocimiento. NO decide nada — el Fundamental Score es M12. Cada fuente va aislada: si una
+    # cae, se anota en `data_sources` y las demás siguen.
+    try:
+        from .dil import run_once as dil_run_once
+
+        for linea in dil_run_once(dsn):
+            log.append(f"datos: {linea}")
+    except Exception as err:  # noqa: BLE001 - sin datos externos el motor decide igual que hoy
+        log.append(f"error datos externos: {err}")
+
     # Gobierno de la cuarentena: mide el expediente sombra de las temporalidades vetadas y el
     # rendimiento real de las que operan, y decide. Sin esto, `quarantine_intervals` sería una
     # lista fija que alguien tendría que acordarse de vaciar.

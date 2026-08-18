@@ -55,7 +55,9 @@ evaluation:
   horizon_by_tf: { '1m': 30, '5m': 25, '15m': 20, '30m': 20, '1h': 18, '4h': 15, '1d': 10, '1w': 6, '1M': 4 }
 
 # Temporalidades en cuarentena (M10.5): se calculan y se registran, pero NO emiten señal operable.
-# 4h acumulaba −0,485 R en 89 decisiones (69 cortos, el 85,6 % al stop, contra tendencia alcista).
+# 4h acumulaba −0,485 R en 89 decisiones (69 cortos, el 85,6 % al stop). La causa NO era falta de
+# contexto macro: M11 reconstruyó el sesgo real del periodo y habría reforzado esos cortos, no
+# vetados. Sigue vetada mientras su expediente sombra no demuestre lo contrario.
 # Se retira el permiso para operar, no la observación: el backtest sigue simulándola para saber
 # cuándo puede levantarse.
 quarantine_intervals: ['4h']

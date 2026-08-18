@@ -83,10 +83,14 @@ export interface EnsembleConfig {
   /**
    * Temporalidades en cuarentena: se calculan y se registran, pero no emiten señal operable.
    *
-   * 4h acumulaba −0,485 R en 89 decisiones (69 cortos con el 85,6 % al stop, contra una tendencia
-   * alcista de fondo). Una temporalidad que pierde de forma sistemática no debería seguir
-   * proponiendo entradas mientras se le busca el contexto direccional que le falta. Sigue
-   * midiéndose: lo que se retira es el permiso para operar, no la observación.
+   * 4h acumulaba −0,485 R en 89 decisiones (69 cortos con el 85,6 % al stop). Se creyó que era por
+   * operar contra una tendencia alcista de fondo; M11 reconstruyó el sesgo macro real del periodo y
+   * resultó bajista, así que habría reforzado esos cortos en vez de vetarlos. La cuarentena sigue
+   * justificada por el resultado; la causa está por determinar.
+   *
+   * Una temporalidad en cuarentena se calcula y se registra, pero no emite señal operable. Se
+   * retira el permiso para operar, no la observación: desde M10.7 conserva su decisión sombra para
+   * poder demostrar que merece volver.
    */
   quarantineIntervals: string[];
   /** Resuelto por temporalidad en `forInterval`. */
