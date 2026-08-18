@@ -17,6 +17,12 @@ Repositorio: `1oscarflorez1/TradeMe`. Despliegue: Docker Compose + Tailscale Fun
 5. **Puertas verdes antes de entregar**: api (lint + typecheck + test), quant (ruff + black + mypy +
    pytest), web (build + lint) y la **suite de paridad**. Si se toca la matemática de la decisión,
    regenerar vectores con `pnpm exec tsx scripts/gen-parity.ts` desde `apps/api`.
+
+   **Ejecutar exactamente los comandos de CI**, no variantes. En quant CI corre `mypy` a secas, que
+   comprueba **54 ficheros incluidos los tests**; `mypy trademe_quant` solo mira 35 y deja pasar
+   errores. Ha roto CI dos veces. Si el entorno local no admite el comando tal cual (los stubs de
+   numpy modernos exigen `--python-version` mayor que el 3.11 de CI), mantener al menos el mismo
+   **alcance**: `mypy --python-version 3.14 .` desde `apps/quant`.
 6. **Pedir confirmación** antes de: borrar ficheros o datos, `force-push`, tocar secretos, instalar
    dependencias pesadas, o cualquier acción irreversible.
 7. **No incluir código propietario Reditum/Pine** en el repositorio. Solo se mapean sus salidas por
