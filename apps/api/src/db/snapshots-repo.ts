@@ -68,6 +68,8 @@ export class SnapshotsRepo {
         plan_entry, plan_stop, plan_take_profit, plan_size, plan_rr, valid_until,
         model_version, source, note, raw_signal, hold_reason, independence_factor,
         shadow_action, shadow_direction, shadow_entry, shadow_stop, shadow_take_profit,
+        fund_percentile, fund_penalty, fund_mode, fund_version,
+        fund_shadow_action, fund_shadow_confidence,
         candle_open
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
@@ -78,8 +80,10 @@ export class SnapshotsRepo {
         $31,$32,$33,$34,$35,$36,
         $37,'manual',$38,$39,$40,$41,
         $42,$43,$44,$45,$46,
+        $47,$48,$49,$50,
+        $51,$52,
         -- Vela a la que pertenece la decisión: es lo que garantiza una sola por vela.
-        to_timestamp(floor(extract(epoch FROM now()) / $47) * $47)
+        to_timestamp(floor(extract(epoch FROM now()) / $53) * $53)
       ) RETURNING id`,
       [
         signal.symbol,
@@ -128,6 +132,12 @@ export class SnapshotsRepo {
         shadowLevels?.entry ?? null,
         shadowLevels?.stop ?? null,
         shadowLevels?.takeProfit ?? null,
+        signal.fundamental?.percentile ?? null,
+        signal.fundamental?.penalty ?? null,
+        signal.fundamental?.mode ?? null,
+        signal.fundamental?.version ?? null,
+        signal.fund_shadow_action ?? null,
+        signal.fund_shadow_confidence ?? null,
         Math.round(intervalMs(interval as Interval) / 1000),
       ],
     );

@@ -7,6 +7,7 @@ import { ActionPlan } from './ActionPlan';
 import { TradingViewChart } from './TradingViewChart';
 import { WebhookStatus } from './WebhookStatus';
 import { MacroPanel } from './MacroPanel';
+import { FundamentalPanel } from './FundamentalPanel';
 import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
 import { BacktestView } from './BacktestView';
@@ -801,6 +802,11 @@ export function App() {
                         <ProbabilityBars probs={signal.probs} />
                       </div>
                       <MacroPanel macro={signal.macro} />
+                      <FundamentalPanel
+                        fundamental={signal.fundamental}
+                        action={signal.action}
+                        shadowAction={signal.fund_shadow_action}
+                      />
                     </>
                   ) : (
                     <p className="muted">Calculando la señal…</p>

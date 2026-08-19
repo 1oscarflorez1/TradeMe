@@ -153,6 +153,64 @@
         }
       }
     },
+    "fundamental": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Fundamental Score (M12): el funding situado por percentil sobre ventana móvil de 90 días y aplicado SOLO a los largos. No es el macro otra vez: macro.bias mezcla funding con tendencia semanal, que deriva del precio y ya está en los votos; esto aísla la parte que no deriva del precio. Entra en sombra y no influye hasta demostrar lift >= 0,05 R y AUC >= 0,55.",
+      "required": ["funding", "percentile", "penalty", "mode", "applied", "stale"],
+      "properties": {
+        "funding": {
+          "type": "number",
+          "description": "Funding rate del momento, tal cual lo dio el proveedor."
+        },
+        "percentile": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Lugar del funding en la ventana móvil de 90 días."
+        },
+        "penalty": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Penalización cruda a los largos. Cero por debajo del tercil inferior, donde los largos rendían +0,200 R."
+        },
+        "w_fund": {
+          "type": "number",
+          "description": "Peso con que la penalización se resta del logit BUY."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["off", "shadow", "active"]
+        },
+        "applied": {
+          "type": "boolean",
+          "description": "true solo si mode es active y hay distribución suficiente. Es la única bandera que decide si esto toca la decisión."
+        },
+        "stale": {
+          "type": "boolean",
+          "description": "Sin muestra suficiente: la penalización efectiva es 0, no una estimación. Una fuente muda no debe empujar la decisión."
+        },
+        "n": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Observaciones de la ventana con que se construyó la distribución."
+        },
+        "version": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "fund_shadow_action": {
+      "type": "string",
+      "enum": ["BUY", "HOLD", "SELL"],
+      "description": "Lo que se habría decidido con la penalización fundamental aplicada (M12, modo sombra). Nunca cuenta como rendimiento: no se opera con ello. Solo difiere de action cuando la penalización habría cambiado el resultado, y esa diferencia es la que se mide para promocionar el score."
+    },
+    "fund_shadow_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
     "valid_until": {
       "type": "string",
       "format": "date-time",

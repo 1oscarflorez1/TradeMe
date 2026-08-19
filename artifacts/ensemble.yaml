@@ -77,3 +77,21 @@ macro:
   # Escalado de w_macro por temporalidad (M1) — DESACTIVADO (fase solo-técnico).
   enable_scaling: false
   tf_scale: { '1m': 0.2, '5m': 0.3, '15m': 0.4, '30m': 0.5, '1h': 0.6, '4h': 0.8, '1d': 1.0, '1w': 1.0, '1M': 1.0 }
+
+# Fundamental Score (M12): el funding, situado por percentil sobre ventana móvil de 90 días y
+# aplicado SOLO a los largos. Medido sobre 728 decisiones evaluadas: en LARGOS el tercil bajo de
+# funding rinde +0,200 R y el alto −0,230 R (t=2,95, supera Bonferroni); en CORTOS no hay patrón.
+# Por eso `logit_BUY -= w_fund * penalización` y `logit_SELL` no se toca.
+#
+# `mode: shadow` -> se calcula, se registra y NO influye. Solo se promociona a `active` si demuestra
+# lift >= 0,05 R y AUC >= 0,55 sobre decisiones reales cerradas. Umbrales fijados de antemano.
+#
+# `absorbs_funding` gobierna además la migración: al pasar a `active`, el funding sale de `macro`
+# (funding_weight -> 0) y su peso se transfiere a trend_weight. Sin esa transferencia |bias| <= 0,5
+# y el escudo macro, que exige |bias| > conflict_threshold, no volvería a dispararse nunca.
+fundamental:
+  mode: 'shadow'
+  w_fund: 0.5
+  start: 0.3333333333333333
+  window_days: 90
+  absorbs_funding: true

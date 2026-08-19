@@ -7,6 +7,78 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.38.0] — 2026-08-18
+
+> El análisis fundamental entra en la decisión, y lo hace **torcido a propósito**: el funding
+> penaliza los largos y no dice nada de los cortos. No es una elección de diseño elegante, es lo
+> único que sostienen los datos. Y entra en sombra: se calcula, se registra y no manda.
+
+### Added — Fundamental Score asimétrico (en sombra)
+
+- Cruzadas **728 decisiones evaluadas** con el valor *as-of* de cada serie de la Data Intelligence
+  Layer, se probaron seis relaciones y **sobrevivió una sola** —también a la corrección de
+  Bonferroni (t=2,95 sobre umbral 2,64)—, y solo en un lado:
+
+  | LARGOS por tercil de funding | n | Expectancy | Acierto |
+  |---|---|---|---|
+  | funding **bajo** | 117 | **+0,200 R** | 47,9 % |
+  | funding medio | 117 | −0,005 R | 41,9 % |
+  | funding **alto** | 117 | **−0,230 R** | 29,1 % |
+
+  En **cortos no hay patrón** (−0,111 / +0,131 / −0,004). Spearman funding↔R en LONG: ρ = −0,156,
+  n=351.
+- De ahí la asimetría: `logit_BUY -= w · penalización` y **`logit_SELL` no se toca**. Aplicarlo a los
+  dos lados por simetría formal habría añadido ruido en la mitad de las decisiones.
+- **Percentil, no valor absoluto.** El rango observado fue 0,000003–0,0001; cualquier umbral fijo
+  describiría este régimen, no una regla. La ventana móvil de 90 días pregunta lo único que se
+  sostiene cuando el mercado cambie: ¿está caro el apalancamiento *comparado con lo normal
+  últimamente*?
+- **Fear & Greed y BCE se quedan fuera de la decisión**, y no por inútiles: no se puede saber. F&G
+  osciló solo entre 25 y 41 —siempre «miedo»— y el BCE tiene uno o dos valores distintos en un mes.
+  Sin contraste no hay nada que medir. Se siguen registrando.
+
+### Added — Gobierno en sombra, con los umbrales fijados de antemano
+
+- El score **no influye en ninguna decisión**. Se calcula, se guarda y se compara. Solo pasará a
+  mandar si demuestra **lift ≥ 0,05 R y AUC ≥ 0,55** sobre decisiones reales cerradas. Los umbrales
+  quedan escritos en la migración 019 antes de ver el primer resultado: elegirlos después sería
+  elegirlos mirando el desenlace.
+- Columnas propias en `snapshots` (`fund_*`), nunca las de `outcome_*`. Mismo criterio que la sombra
+  de la cuarentena: el aislamiento tiene que ser **estructural**, para que una consulta que olvide
+  filtrar no pueda contaminar la expectancy.
+- Se registra además **qué se habría decidido** con la penalización aplicada. Sin eso no habría nada
+  que comparar el día de la revisión, y el score estaría condenado a no promocionar nunca — el mismo
+  fallo de diseño que tuvo la cuarentena en M10.5.
+
+### Changed — La migración del funding va atada a la promoción, no a la entrega
+
+- El acuerdo de M12 es que el funding deje `macro.bias` y viva solo en el score. Pero moverlo el día
+  de la entrega haría **lo contrario** de lo que pretende el gobierno en sombra: quitaría el funding
+  de las decisiones reales sin que nada lo sustituyera y sin haberlo medido.
+- Por eso `effectiveMacro()` solo retira el funding cuando el score está en `active`. Mientras siga
+  en sombra, **el sesgo macro se calcula exactamente igual que antes de M12**.
+- Y al promocionarlo, el peso del funding **se transfiere** a la tendencia en vez de desaparecer.
+  Sin esa transferencia `|bias| ≤ 0,5`, y el escudo macro —que exige `|bias| > conflict_threshold`,
+  hoy 0,5— no volvería a dispararse jamás: se habría desactivado una salvaguarda sin que nadie lo
+  decidiera ni lo notara.
+
+### Added — Reparto Python/Node y paridad acotada
+
+- `apps/quant` publica la **distribución de referencia** (101 cortes de percentil de los últimos 90
+  días) en `artifacts/fundamental/<SÍMBOLO>.json`, leyendo `derivatives_metrics` por `published_at`.
+  `apps/api` sitúa contra esos cortes el funding del momento. Mismo reparto que el calibrador y el
+  meta-modelo: Python mide, Node aplica.
+- A la suite de paridad entra **solo la fórmula de inyección** —dónde cae un funding y cuánto
+  penaliza—, no el cómputo del score, que es un input como Reditum o el funding crudo.
+- Un símbolo sin histórico suficiente se declara `stale` y penaliza **0**. Una fuente muda no debe
+  empujar la decisión en ninguna dirección, y menos disimuladamente.
+
+### Added — El Panel enseña el score y dice que no manda
+
+- Nuevo bloque en el sustento: percentil del funding, la barra con el umbral del tercil, y qué
+  habría decidido el score si estuviera activo. Un indicador visible que el usuario cree que manda,
+  y no manda, es peor que no enseñarlo.
+
 ## [0.37.1] — 2026-08-18
 
 > Un «Error: GET /candles 502» al cambiar de activo destapó tres cosas: el presupuesto de peticiones

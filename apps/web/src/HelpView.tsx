@@ -324,13 +324,52 @@ const KB: Article[] = [
     ),
   },
   {
-    title: 'Análisis fundamental (en pausa)',
+    title: 'Análisis fundamental: el funding, y solo contra las compras',
+    body: (
+      <>
+        <p>
+          La plataforma mira el <strong>funding rate</strong>: lo que pagan los que están comprados a
+          los que están vendidos en los futuros perpetuos. Cuando es alto, mucha gente está comprada
+          con dinero prestado y esa posición se ha vuelto cara de mantener.
+        </p>
+        <p>
+          Lo llamativo es <strong>cómo</strong> entra en la decisión: solo <em>desaconseja comprar</em>.
+          No dice nada sobre vender. No es una elección de estilo — al medirlo sobre 728 decisiones
+          ya evaluadas, el efecto aparecía nítido en las compras (el tercio con funding bajo rendía
+          +0,20 R y el alto −0,23 R) y <strong>no aparecía en absoluto en las ventas</strong>.
+          Aplicarlo también ahí por simetría habría sido añadir ruido a media plataforma.
+        </p>
+        <p>
+          Se compara por <strong>percentil de los últimos 90 días</strong>, no contra un número fijo:
+          la pregunta útil no es «¿el funding es alto?» sino «¿está caro comparado con lo normal
+          últimamente?». Un umbral fijo describiría el mercado de hoy y envejecería mal.
+        </p>
+        <p>
+          <strong>Ahora mismo no manda.</strong> Está en modo sombra: se calcula, se registra y se
+          compara con lo que la plataforma decidió de verdad, pero no cambia ni una decisión. Solo
+          empezará a influir si demuestra que mejora los resultados sobre operaciones reales ya
+          cerradas. Es la misma prueba que tuvieron que pasar el meta-modelo y la cuarentena, y por
+          la misma razón: aquí nada gana poder sobre una decisión por parecer buena idea.
+        </p>
+        <p>
+          El <strong>sesgo macro</strong> (funding + tendencia semanal) sigue funcionando como hasta
+          ahora. Cuando el score fundamental se promocione, el funding pasará a vivir solo en él y el
+          sesgo macro se quedará con la tendencia.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: 'Miedo y codicia, tipos del BCE: por qué se registran y no deciden',
     body: (
       <p>
-        La plataforma tuvo un <strong>sesgo macro</strong> (funding + tendencia semanal) que
-        inclinaba la decisión. Está <strong>desactivado a propósito</strong> para afinar primero el
-        análisis técnico puro y que backtest y vivo midan exactamente lo mismo. La arquitectura para
-        reincorporarlo —con peso ajustado por temporalidad— ya está programada y en espera.
+        La plataforma también recoge el índice de <strong>miedo y codicia</strong> y datos del
+        <strong> Banco Central Europeo</strong>. No influyen en ninguna decisión, y el motivo no es
+        que se consideren inútiles: es que <strong>no se puede saber todavía</strong>. El índice de
+        miedo y codicia solo ha oscilado entre 25 y 41 —siempre dentro de «miedo»— y el BCE cambia
+        sus cifras una o dos veces al mes. Sin variedad no hay nada que medir: no se puede comprobar
+        si algo predice cuando ese algo casi no ha cambiado. Se siguen registrando para poder
+        decidirlo el día que haya contraste.
       </p>
     ),
   },
@@ -595,7 +634,9 @@ const GLOSARIO: Array<[string, string, string]> = [
   ['AUC', 'ML', 'Capacidad de distinguir aciertos de fallos: 0,5 azar, 1,0 perfecto.'],
   ['ONNX', 'ML', 'Formato estándar para ejecutar modelos entrenados de forma rápida y portable.'],
   ['Funding rate', 'Fundamental', 'Coste de financiación de los perpetuos; refleja el posicionamiento del mercado.'],
-  ['Sesgo macro', 'Fundamental', 'Inclinación de fondo (funding + tendencia semanal). Hoy desactivado a propósito.'],
+  ['Sesgo macro', 'Fundamental', 'Inclinación de fondo (funding + tendencia semanal), inyectada en los logits.'],
+  ['Fundamental Score', 'Fundamental', 'Percentil del funding a 90 días. Solo penaliza compras; hoy en sombra, sin influir.'],
+  ['Modo sombra', 'Método', 'Se calcula y se registra sin influir, para poder demostrar que merece influir.'],
 ];
 
 /** Una frase por artículo: es lo que permite decidir si merece la pena abrirlo. */

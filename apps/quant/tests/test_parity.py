@@ -4,6 +4,7 @@ import pathlib
 from trademe_quant.calibration import apply_calibrator
 from trademe_quant.decision import decide, horizon_for, is_quarantined, valid_candles_for
 from trademe_quant.ensemble import load_ensemble
+from trademe_quant.fundamental import long_penalty, percentile_of
 from trademe_quant.indicators import compute_readings
 from trademe_quant.inference import infer_probs, pick_action
 from trademe_quant.macro import compute_macro_bias
@@ -159,3 +160,63 @@ def test_parity_metamodel() -> None:
     for v in mm["vectors"]:
         got = predict_forest(mm["forest"], v["input"])
         assert abs(got - v["expected"]) < 1e-6, (v["input"], got, v["expected"])
+
+
+def test_parity_fundamental_percentil() -> None:
+    """Situar un funding en la distribución debe dar lo mismo en Node y en Python."""
+    for v in MACRO["fundamental"]["percentile"]:
+        got = percentile_of([float(k) for k in v["knots"]], float(v["funding"]))
+        assert abs(got - v["expected"]) < 1e-6, (v["funding"], got, v["expected"])
+
+
+def test_parity_fundamental_penalizacion() -> None:
+    """La curva de penalización a los largos debe coincidir Node<->Python."""
+    for v in MACRO["fundamental"]["penalty"]:
+        got = long_penalty(float(v["pct"]), float(v["start"]))
+        assert abs(got - v["expected"]) < 1e-6, (v["pct"], got, v["expected"])
+
+
+def test_parity_fundamental_inferencia() -> None:
+    """La inyección asimétrica en el softmax debe ser idéntica en los dos motores."""
+    for v in MACRO["fundamental"]["inference"]:
+        i = v["input"]
+        probs = infer_probs(
+            float(i["net"]),
+            float(i["temperature"]),
+            float(i["holdBand"]),
+            float(i["bias"]),
+            float(i["wMacro"]),
+            float(i["independence"]),
+            float(i["fundTerm"]),
+        )
+        for k in ("BUY", "HOLD", "SELL"):
+            assert abs(probs[k] - v["expected"][k]) < 1e-6, (i, k, probs[k], v["expected"][k])
+        assert pick_action(probs) == v["expected"]["action"], i
+
+
+def test_la_penalizacion_no_toca_el_lado_corto() -> None:
+    """La asimetría, comprobada donde de verdad vive: en los logits.
+
+    Ojo con leer esto como «P(SELL) no cambia»: sí cambia, y debe cambiar. El softmax normaliza, así
+    que al hundir el logit BUY la masa sobrante se reparte entre HOLD y SELL. Lo que no se toca es
+    el **logit** de SELL, y su consecuencia observable es esta: la relación SELL/HOLD queda
+    exactamente igual, penalice lo que penalice el funding. El score desaconseja ponerse largo; no
+    opina sobre ponerse corto, que es justo lo que dicen los datos (en cortos no hay patrón).
+    """
+    base = infer_probs(0.5, 0.5, 0.06, 0.0, 1.0, 1.0, 0.0)
+    for fund_term in (0.1, 0.25, 0.5, 1.0, 3.0):
+        p = infer_probs(0.5, 0.5, 0.06, 0.0, 1.0, 1.0, fund_term)
+        assert abs(p["SELL"] / p["HOLD"] - base["SELL"] / base["HOLD"]) < 1e-9, fund_term
+        assert p["BUY"] < base["BUY"], fund_term
+
+
+def test_la_penalizacion_es_monotona_y_nunca_empuja_a_comprar() -> None:
+    """Más funding nunca puede favorecer al largo.
+
+    Sin esta comprobación, un signo cambiado en la inyección pasaría inadvertido.
+    """
+    previo = 1.0
+    for fund_term in (0.0, 0.25, 0.5, 0.75, 1.0, 2.0):
+        p = infer_probs(0.4, 0.5, 0.06, 0.2, 1.0, 0.7, fund_term)
+        assert p["BUY"] <= previo + 1e-12, fund_term
+        previo = p["BUY"]

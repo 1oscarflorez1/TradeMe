@@ -1,9 +1,14 @@
 import type { Vote } from '../indicators/types.js';
-import type { Action, Direction, HoldReason, Macro, Signal } from '../domain/signal.js';
+import type { Action, Direction, Fundamental, HoldReason, Macro, Signal } from '../domain/signal.js';
 import { intervalMs, type Interval } from '../domain/candle.js';
 import type { EnsembleConfig } from './config.js';
 import { aggregate } from './aggregate.js';
 import { confluence, inferProbs, pickAction } from './inference.js';
+import {
+  computeFundamental,
+  fundamentalTerm,
+  type FundamentalArtifact,
+} from './fundamental.js';
 import { buildPlan } from './plan.js';
 import { applyCalibrator } from '../calibration/apply.js';
 import type { Calibrators } from '../calibration/load.js';
@@ -17,6 +22,10 @@ export interface BuildSignalParams {
   equity: number;
   interval: Interval;
   macro?: Macro;
+  /** Distribución de referencia del funding publicada por quant (M12). */
+  fundamentalArtifact?: FundamentalArtifact | null;
+  /** Funding del momento cuando no viene dentro de `macro` (p. ej. con el macro apagado). */
+  funding?: number;
   ts?: string;
   calibrators?: Calibrators;
   metaModel?: MetaModel;
@@ -45,15 +54,47 @@ export function buildSignal(params: BuildSignalParams): Signal {
       : undefined;
   // Desinflado por dependencia: los seis votos no son seis evidencias (ver ensemble/independence.ts).
   const independence = params.config.independenceFactor ?? 1;
+
+  // ---- Fundamental Score (M12): penaliza los largos, nunca los cortos ----
+  // `fundamentalTerm` devuelve 0 mientras el score esté en sombra, así que hasta que se promocione
+  // estas dos líneas no alteran ni un dígito de la decisión.
+  const fundamental: Fundamental | undefined = params.config.fundamental
+    ? computeFundamental({
+        funding: params.macro?.funding ?? params.funding ?? 0,
+        artifact: params.fundamentalArtifact,
+        config: params.config.fundamental,
+      })
+    : undefined;
+  const fundTerm = fundamentalTerm(fundamental);
+
   const probs = inferProbs(
     net,
     params.config.temperature,
     params.config.holdBand,
     macroInput,
     independence,
+    fundTerm,
   );
   let { action, confidence } = pickAction(probs);
   let holdReason: HoldReason | undefined = action === 'HOLD' ? 'banda_neutra' : undefined;
+
+  // Lo que habría salido CON la penalización, mientras el score aún no manda. Es el expediente con
+  // el que tendrá que demostrar su lift; sin esto no habría nada que comparar el día de la revisión.
+  let fundShadowAction: Action | undefined;
+  let fundShadowConfidence: number | undefined;
+  if (fundamental && !fundamental.applied && !fundamental.stale && fundamental.penalty > 0) {
+    const sombra = inferProbs(
+      net,
+      params.config.temperature,
+      params.config.holdBand,
+      macroInput,
+      independence,
+      fundamental.w_fund * fundamental.penalty,
+    );
+    const elegida = pickAction(sombra);
+    fundShadowAction = elegida.action;
+    fundShadowConfidence = elegida.confidence;
+  }
 
   let macroOut: Macro | undefined;
   if (params.macro && macroCfg.enabled) {
@@ -168,6 +209,9 @@ export function buildSignal(params: BuildSignalParams): Signal {
     meta_mode: metaMode === 'off' ? undefined : metaMode,
     meta_vetoed: metaVetoed,
     macro: macroOut,
+    fundamental,
+    fund_shadow_action: fundShadowAction,
+    fund_shadow_confidence: fundShadowConfidence,
     plan,
     valid_until: validUntil,
     atr,

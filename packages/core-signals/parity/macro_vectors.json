@@ -746,5 +746,250 @@
         "expected": 0.6
       }
     ]
+  },
+  "fundamental": {
+    "config": {
+      "mode": "shadow",
+      "wFund": 0.5,
+      "start": 0.3333333333333333,
+      "windowDays": 90,
+      "absorbsFunding": true
+    },
+    "percentile": [
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": -0.00005,
+        "expected": 0
+      },
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": 0,
+        "expected": 0
+      },
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": 0.000012,
+        "expected": 0.12
+      },
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": 0.000025,
+        "expected": 0.25
+      },
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": 0.00005,
+        "expected": 0.5
+      },
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": 0.000075,
+        "expected": 0.75
+      },
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": 0.0001,
+        "expected": 1
+      },
+      {
+        "knots": [
+          0,
+          0.000025,
+          0.00005,
+          0.00007500000000000001,
+          0.0001
+        ],
+        "funding": 0.0005,
+        "expected": 1
+      }
+    ],
+    "penalty": [
+      {
+        "pct": 0,
+        "start": 0.3333333333333333,
+        "expected": 0
+      },
+      {
+        "pct": 0.2,
+        "start": 0.3333333333333333,
+        "expected": 0
+      },
+      {
+        "pct": 0.333333,
+        "start": 0.3333333333333333,
+        "expected": 0
+      },
+      {
+        "pct": 0.4,
+        "start": 0.3333333333333333,
+        "expected": 0.1
+      },
+      {
+        "pct": 0.5,
+        "start": 0.3333333333333333,
+        "expected": 0.25
+      },
+      {
+        "pct": 0.666667,
+        "start": 0.3333333333333333,
+        "expected": 0.5
+      },
+      {
+        "pct": 0.9,
+        "start": 0.3333333333333333,
+        "expected": 0.85
+      },
+      {
+        "pct": 1,
+        "start": 0.3333333333333333,
+        "expected": 1
+      }
+    ],
+    "inference": [
+      {
+        "input": {
+          "net": 0.5,
+          "bias": 0,
+          "wMacro": 1,
+          "temperature": 0.5,
+          "holdBand": 0.06,
+          "independence": 1,
+          "fundTerm": 0
+        },
+        "expected": {
+          "BUY": 0.645112,
+          "HOLD": 0.267581,
+          "SELL": 0.087306,
+          "action": "BUY"
+        }
+      },
+      {
+        "input": {
+          "net": 0.5,
+          "bias": 0,
+          "wMacro": 1,
+          "temperature": 0.5,
+          "holdBand": 0.06,
+          "independence": 1,
+          "fundTerm": 0.5
+        },
+        "expected": {
+          "BUY": 0.524386,
+          "HOLD": 0.358607,
+          "SELL": 0.117006,
+          "action": "BUY"
+        }
+      },
+      {
+        "input": {
+          "net": 0.5,
+          "bias": 0.3,
+          "wMacro": 1,
+          "temperature": 0.5,
+          "holdBand": 0.06,
+          "independence": 1,
+          "fundTerm": 0.5
+        },
+        "expected": {
+          "BUY": 0.613846,
+          "HOLD": 0.310985,
+          "SELL": 0.075169,
+          "action": "BUY"
+        }
+      },
+      {
+        "input": {
+          "net": -0.5,
+          "bias": 0,
+          "wMacro": 1,
+          "temperature": 0.5,
+          "holdBand": 0.06,
+          "independence": 1,
+          "fundTerm": 0.5
+        },
+        "expected": {
+          "BUY": 0.054838,
+          "HOLD": 0.277101,
+          "SELL": 0.668062,
+          "action": "SELL"
+        }
+      },
+      {
+        "input": {
+          "net": 0.2,
+          "bias": 0,
+          "wMacro": 1,
+          "temperature": 0.5,
+          "holdBand": 0.06,
+          "independence": 0.485,
+          "fundTerm": 0.5
+        },
+        "expected": {
+          "BUY": 0.335887,
+          "HOLD": 0.373708,
+          "SELL": 0.290405,
+          "action": "HOLD"
+        }
+      },
+      {
+        "input": {
+          "net": 0.9,
+          "bias": -0.4,
+          "wMacro": 1,
+          "temperature": 0.5,
+          "holdBand": 0.06,
+          "independence": 0.66,
+          "fundTerm": 0.25
+        },
+        "expected": {
+          "BUY": 0.59083,
+          "HOLD": 0.299384,
+          "SELL": 0.109785,
+          "action": "BUY"
+        }
+      }
+    ]
   }
 }

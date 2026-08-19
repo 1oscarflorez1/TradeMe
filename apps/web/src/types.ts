@@ -41,6 +41,22 @@ export interface Macro {
   applied: boolean;
 }
 
+/**
+ * Fundamental Score (M12): el funding, situado por percentil y aplicado solo a los largos.
+ * En sombra se calcula y se muestra, pero `applied` es false y no toca la decisión.
+ */
+export interface Fundamental {
+  funding: number;
+  percentile: number;
+  penalty: number;
+  w_fund: number;
+  mode: 'off' | 'shadow' | 'active';
+  applied: boolean;
+  stale: boolean;
+  n: number;
+  version: string | null;
+}
+
 export interface Probs {
   BUY: number;
   HOLD: number;
@@ -80,6 +96,9 @@ export interface Signal {
   independence_factor?: number;
   quarantined?: boolean;
   macro?: Macro;
+  fundamental?: Fundamental;
+  fund_shadow_action?: Action;
+  fund_shadow_confidence?: number;
   plan: PlanStep[];
   valid_until: string;
   atr: number;

@@ -7,13 +7,18 @@ export interface MacroModulation {
 }
 
 /**
- * Softmax con modulación macro y desinflado por dependencia de los votos.
+ * Softmax con modulación macro, penalización fundamental y desinflado por dependencia de los votos.
  *
  * `independence` (ver `ensemble/independence.ts`) escala los TRES logits por igual. Como escalar
  * todos los logits por una constante positiva no altera cuál es el mayor, el ajuste **no cambia la
  * dirección de la decisión**: solo aplana la distribución y baja la confianza declarada. Es una
  * corrección de calibración, no de criterio — el sistema no cree otra cosa, declara con menos
  * seguridad lo que ya creía.
+ *
+ * `fundTerm` (M12) es lo contrario: **sí cambia el criterio, y solo en un lado**. Se resta al logit
+ * BUY y no toca el de SELL, porque el efecto medido del funding existe únicamente en los largos
+ * (ver `ensemble/fundamental.ts`). Vale 0 mientras el score esté en sombra, así que con el valor
+ * por defecto esta función se comporta exactamente igual que antes de M12.
  */
 export function inferProbs(
   net: number,
@@ -21,13 +26,14 @@ export function inferProbs(
   holdBand: number,
   macro?: MacroModulation,
   independence = 1,
+  fundTerm = 0,
 ): Probs {
   const t = temperature > 0 ? temperature : 0.5;
   const macroTerm = macro ? macro.wMacro * macro.bias : 0;
   const k = independence > 0 ? independence : 1;
   const logits = {
-    BUY: k * (net / t + macroTerm),
-    SELL: k * (-net / t - macroTerm),
+    BUY: k * (net / t + macroTerm - fundTerm),
+    SELL: k * (-net / t - macroTerm), // asimetría deliberada: el funding no informa los cortos
     HOLD: k * (holdBand / t),
   };
   const max = Math.max(logits.BUY, logits.SELL, logits.HOLD);

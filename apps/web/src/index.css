@@ -534,6 +534,83 @@ body {
   font-size: 0.72rem;
 }
 
+/* ---- M12: Fundamental Score (funding asimétrico, en sombra) ---- */
+.fundamental {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.fund-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fund-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+/* La barra sitúa el funding de un vistazo; la marca es el tercil donde empieza a penalizar. */
+.fund-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.fund-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--buy), var(--sell));
+}
+
+.fund-bar-umbral {
+  position: absolute;
+  top: -2px;
+  width: 2px;
+  height: 10px;
+  background: var(--muted);
+}
+
+.fund-explica {
+  font-size: 0.78rem;
+  margin: 0;
+  color: var(--text);
+}
+
+.fund-estado {
+  font-size: 0.76rem;
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+}
+
+.fund-sombra {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
+}
+
+.fund-activo {
+  background: color-mix(in srgb, var(--buy) 15%, transparent);
+}
+
+.fund-discrepa {
+  margin-top: 0.35rem;
+  color: var(--text);
+}
+
+.fund-meta {
+  display: flex;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 /* ---- M5.6: pestañas, layout y registros ---- */
 .nav-tabs {
   display: inline-flex;

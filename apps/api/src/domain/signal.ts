@@ -26,6 +26,35 @@ export interface Macro {
   applied: boolean;
 }
 
+/**
+ * Fundamental Score (M12): el funding, situado por percentil y aplicado **solo a los largos**.
+ *
+ * No es «el macro otra vez». `Macro.bias` mezcla funding con tendencia semanal, que deriva del
+ * precio y por tanto ya está representada en los seis votos; este bloque aísla la parte que no
+ * deriva del precio, que es exactamente lo que justifica que exista.
+ *
+ * `applied` es la única bandera que decide si toca la decisión. En `shadow` se calcula, se registra
+ * y no influye: el score tiene que ganarse el sitio con datos que no controlaba, igual que el
+ * meta-modelo y la cuarentena.
+ */
+export interface Fundamental {
+  /** Funding rate del momento, tal cual lo dio el proveedor. */
+  funding: number;
+  /** Su lugar en la ventana móvil de 90 días, en [0,1]. */
+  percentile: number;
+  /** Penalización cruda a los largos, en [0,1]. Cero por debajo del tercil inferior. */
+  penalty: number;
+  w_fund: number;
+  mode: 'off' | 'shadow' | 'active';
+  /** true solo si `mode` es `active` y hay distribución suficiente. */
+  applied: boolean;
+  /** Sin muestra suficiente: la penalización efectiva es 0, no una estimación. */
+  stale: boolean;
+  /** Observaciones de la ventana con que se construyó la distribución. */
+  n: number;
+  version: string | null;
+}
+
 export interface Regime {
   adx: number;
   label: 'tendencia' | 'rango';
@@ -82,6 +111,17 @@ export interface Signal {
   meta_mode?: 'off' | 'shadow' | 'modulate' | 'veto';
   meta_vetoed?: boolean;
   macro?: Macro;
+  fundamental?: Fundamental;
+  /**
+   * Lo que se habría decidido con la penalización fundamental aplicada (M12, modo sombra).
+   *
+   * Columnas propias, no reutilizadas: el aislamiento tiene que ser estructural. Si esto escribiera
+   * en `action`, el score estaría influyendo en la decisión antes de haber demostrado nada, que es
+   * justo lo que el gobierno en sombra impide. Solo difiere de `action` cuando la penalización
+   * habría cambiado el resultado — y esa diferencia es la que se mide para promocionarlo.
+   */
+  fund_shadow_action?: Action;
+  fund_shadow_confidence?: number;
   plan: PlanStep[];
   valid_until: string;
   atr: number;
