@@ -105,6 +105,7 @@ const TEMAS: Array<{
       'calibracion', 'calibrar', 'isotonica', 'platt',
       'independencia', 'desinflado', 'votos efectivos', 'correlacion',
       'cuarentena', 'no trade', 'documentacion', 'docs',
+      'fundamental', 'funding', 'score fundamental', 'sombra', 'percentil',
     ],
     responder: () =>
       'Eso está explicado en la **documentación del proyecto**, que se mantiene con cada entrega: ' +

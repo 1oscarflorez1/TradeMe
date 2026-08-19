@@ -63,6 +63,32 @@ export interface MacroConfig {
   tfScale: Record<string, number>;
 }
 
+/**
+ * Fundamental Score (M12).
+ *
+ * `mode` gobierna además la **migración del funding**. Hoy `MacroConfig` mezcla funding y tendencia
+ * semanal en un único `bias` simétrico; el acuerdo de M12 es que el funding pase a vivir aquí, en
+ * exclusiva y asimétrico. Pero mover el peso el mismo día que entra el score haría lo contrario de
+ * lo que pretende el gobierno en sombra: quitaría el funding de las decisiones reales sin que nada
+ * lo sustituyera, y sin haberlo medido.
+ *
+ * Por eso la migración va atada a la promoción. Mientras `mode` no sea `active`, `bias.ts` se
+ * comporta exactamente como hoy y las decisiones reales no cambian ni un dígito. Ver
+ * `effectiveMacro`.
+ */
+export interface FundamentalConfig {
+  /** `off` ni se calcula · `shadow` se calcula y registra sin influir · `active` penaliza. */
+  mode: 'off' | 'shadow' | 'active';
+  /** Peso de la penalización sobre el logit BUY. */
+  wFund: number;
+  /** Percentil por debajo del cual no se penaliza (tercil inferior de la medición). */
+  start: number;
+  /** Ventana móvil, en días, que define «lo normal últimamente». */
+  windowDays: number;
+  /** Al promocionar, el funding sale de `macro.bias` y vive solo aquí. */
+  absorbsFunding: boolean;
+}
+
 export interface EnsembleConfig {
   version: string;
   temperature: number;
@@ -78,6 +104,7 @@ export interface EnsembleConfig {
   };
   risk: RiskConfig;
   macro: MacroConfig;
+  fundamental: FundamentalConfig;
   plan: PlanConfig;
   evaluation: EvaluationConfig;
   /**
@@ -125,6 +152,16 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
     enableScaling: false,
     tfScale: { '1m': 0.2, '5m': 0.3, '15m': 0.4, '30m': 0.5, '1h': 0.6, '4h': 0.8, '1d': 1, '1w': 1, '1M': 1 },
   },
+  fundamental: {
+    // Entra en sombra, como todo lo que aspira a mandar sobre una decisión.
+    mode: 'shadow',
+    // La mitad del peso macro: actúa en un solo lado, no en los dos. Es un punto de partida
+    // razonado, no medido — se calibrará con decisiones reales cerradas antes de promocionar.
+    wFund: 0.5,
+    start: 1 / 3,
+    windowDays: 90,
+    absorbsFunding: true,
+  },
   plan: {
     validCandles: 3,
     validCandlesByTf: {
@@ -166,6 +203,30 @@ export function validCandlesFor(cfg: EnsembleConfig, interval: string): number {
 export function horizonFor(cfg: EnsembleConfig, interval: string): number {
   const v = cfg.evaluation?.horizonByTf?.[interval];
   return typeof v === 'number' && v > 0 ? v : (cfg.evaluation?.horizon ?? 20);
+}
+
+/**
+ * Pesos del sesgo macro una vez resuelta la migración del funding (M12).
+ *
+ * Mientras el Fundamental Score esté en `shadow` u `off`, devuelve la configuración tal cual: las
+ * decisiones reales no cambian. Al promocionarlo a `active` con `absorbsFunding`, el funding sale
+ * de aquí —pasa a penalizar solo los largos— y el peso que ocupaba **se transfiere a la tendencia**
+ * en vez de desaparecer.
+ *
+ * Esa transferencia no es un adorno. Con `fundingWeight: 0.5` y `trendWeight: 0.5`, anular el
+ * primero sin renormalizar dejaría `|bias| <= 0.5`, y el escudo macro —que exige
+ * `|bias| > conflictThreshold`, hoy 0.5— no volvería a dispararse jamás. Se habría desactivado una
+ * salvaguarda sin que nadie lo decidiera ni lo notara.
+ */
+export function effectiveMacro(cfg: EnsembleConfig): MacroConfig {
+  const f = cfg.fundamental;
+  if (!f || f.mode !== 'active' || !f.absorbsFunding) return cfg.macro;
+  const total = cfg.macro.fundingWeight + cfg.macro.trendWeight;
+  return {
+    ...cfg.macro,
+    fundingWeight: 0,
+    trendWeight: total > 0 ? total : cfg.macro.trendWeight,
+  };
 }
 
 /**
@@ -225,6 +286,13 @@ interface RawConfig {
     conflict_downgrade?: boolean;
     conflict_threshold?: number;
   };
+  fundamental?: {
+    mode?: 'off' | 'shadow' | 'active';
+    w_fund?: number;
+    start?: number;
+    window_days?: number;
+    absorbs_funding?: boolean;
+  };
 }
 
 function mult(raw: RawRegimeMult | undefined, fallback: RegimeMultipliers): RegimeMultipliers {
@@ -266,6 +334,13 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
       conflictThreshold: raw.macro?.conflict_threshold ?? d.macro.conflictThreshold,
       enableScaling: raw.macro?.enable_scaling ?? d.macro.enableScaling,
       tfScale: raw.macro?.tf_scale ?? d.macro.tfScale,
+    },
+    fundamental: {
+      mode: raw.fundamental?.mode ?? d.fundamental.mode,
+      wFund: raw.fundamental?.w_fund ?? d.fundamental.wFund,
+      start: raw.fundamental?.start ?? d.fundamental.start,
+      windowDays: raw.fundamental?.window_days ?? d.fundamental.windowDays,
+      absorbsFunding: raw.fundamental?.absorbs_funding ?? d.fundamental.absorbsFunding,
     },
     plan: {
       validCandles: raw.plan?.valid_candles ?? d.plan.validCandles,

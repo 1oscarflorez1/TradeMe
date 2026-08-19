@@ -21,6 +21,7 @@ import type { AlertRow, AlertInput } from './db/alerts-repo.js';
 import type { PushSub } from './push/push.js';
 import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
+import type { FundamentalArtifact } from './ensemble/fundamental.js';
 import type { UserRow } from './db/users-repo.js';
 import { verifyPassword } from './auth/password.js';
 import { signJwt, verifyJwt } from './auth/jwt.js';
@@ -99,6 +100,7 @@ export interface AppDeps {
   ) => { version: string; optimized: boolean; report: unknown };
   getEnsembleFor?: (symbol: string, interval: string) => EnsembleConfig;
   getMacro?: (symbol: string) => Macro | undefined;
+  getFundamental?: (symbol: string) => FundamentalArtifact | undefined;
   recordSnapshot?: (
     signal: Signal,
     interval: string,
@@ -758,6 +760,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),
+        fundamentalArtifact: deps.getFundamental?.(sym),
         calibrators: deps.calibrators,
         metaModel: deps.metaModel,
         metaMode: deps.metaMode,
@@ -1092,6 +1095,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         equity: deps.equity,
         interval,
         macro: deps.getMacro?.(sym),
+        fundamentalArtifact: deps.getFundamental?.(sym),
         calibrators: deps.calibrators,
         metaModel: deps.metaModel,
         metaMode: deps.metaMode,

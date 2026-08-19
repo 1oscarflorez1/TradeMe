@@ -270,6 +270,17 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin datos externos el motor decide igual que hoy
         log.append(f"error datos externos: {err}")
 
+    # Fundamental Score (M12): publica la distribución de referencia del funding de cada símbolo.
+    # Va DESPUÉS de la DIL a propósito — usa lo que esa acaba de guardar. Sigue sin decidir nada:
+    # el score está en sombra y la penalización efectiva es 0 hasta que demuestre su lift.
+    try:
+        from .run_fundamental import publish as publish_fundamental
+
+        for linea in publish_fundamental(dsn, symbols):
+            log.append(f"fundamental: {linea}")
+    except Exception as err:  # noqa: BLE001 - sin score el motor decide igual que hoy
+        log.append(f"error fundamental: {err}")
+
     # Gobierno de la cuarentena: mide el expediente sombra de las temporalidades vetadas y el
     # rendimiento real de las que operan, y decide. Sin esto, `quarantine_intervals` sería una
     # lista fija que alguien tendría que acordarse de vaciar.

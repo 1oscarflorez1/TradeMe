@@ -37,6 +37,7 @@ import { ExternalSignalStore } from './signals/external-store.js';
 import { ExternalMapper } from './signals/external-mapper.js';
 import {
   DEFAULT_ENSEMBLE,
+  effectiveMacro,
   forInterval,
   loadEnsemble,
   type EnsembleConfig,
@@ -51,6 +52,7 @@ import { Calibrators } from './calibration/load.js';
 import { MetaModel } from './metamodel/apply.js';
 import { MetaPolicy } from './metamodel/policy.js';
 import { MacroStore } from './macro/store.js';
+import { Fundamentals } from './ensemble/fundamental.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
 import { EMA } from 'technicalindicators';
@@ -123,6 +125,9 @@ async function main(): Promise<void> {
     return cfg;
   }
   const calibrators = Calibrators.load(env.CALIBRATORS_PATH);
+  // Distribución de referencia del funding por símbolo (M12). Se carga bajo demanda: un símbolo
+  // sin artefacto no es un error, es un score sin datos todavía, y se declara `stale`.
+  const fundamentals = Fundamentals.load(join(artifactsDir, 'fundamental'));
   const metaModel = MetaModel.load(env.METAMODEL_PATH);
   const metaPolicy = MetaPolicy.load(env.META_POLICY_PATH, env.META_MODE);
   // Captura automática server-side: registra decisiones operables aunque nadie tenga el portal
@@ -177,6 +182,7 @@ async function main(): Promise<void> {
     metaPolicy.reload();
     independence.reload();
     quarantine.reload();
+    fundamentals.reload();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
@@ -227,6 +233,7 @@ async function main(): Promise<void> {
     getEnsembleFor,
     equity: env.ACCOUNT_EQUITY,
     getMacro: macroEnabled ? (symbol: string) => macroStore.get(symbol) : undefined,
+    getFundamental: (symbol: string) => fundamentals.get(symbol),
     recordSnapshot: snapshotsRepo
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
@@ -321,6 +328,7 @@ async function main(): Promise<void> {
                   equity: env.ACCOUNT_EQUITY,
                   interval: iv,
                   macro: macroEnabled ? macroStore.get(symbol) : undefined,
+                  fundamentalArtifact: fundamentals.get(symbol),
                   calibrators,
                   metaModel,
                   metaMode: metaPolicy.mode,
@@ -373,6 +381,7 @@ async function main(): Promise<void> {
                   equity: env.ACCOUNT_EQUITY,
                   interval: ivArg,
                   macro: macroEnabled ? macroStore.get(symbol) : undefined,
+                  fundamentalArtifact: fundamentals.get(symbol),
                   calibrators,
                   metaModel,
                   metaMode: metaPolicy.mode,
@@ -553,6 +562,7 @@ async function main(): Promise<void> {
         equity: env.ACCOUNT_EQUITY,
         interval: iv,
         macro: macroEnabled ? macroStore.get(symbol) : undefined,
+        fundamentalArtifact: fundamentals.get(symbol),
         calibrators,
         metaModel,
         metaMode: metaPolicy.mode,
@@ -671,7 +681,9 @@ async function main(): Promise<void> {
       const price = closes[closes.length - 1];
       if (weeklyEma === undefined || price === undefined) return;
       const funding = await fetchFundingRate(symbol);
-      macroStore.put(symbol, computeMacroBias({ funding, price, weeklyEma }, ensemble.macro));
+      // `effectiveMacro` retira el funding de aquí SOLO cuando el Fundamental Score está
+      // promocionado: mientras siga en sombra el sesgo se calcula exactamente igual que antes.
+      macroStore.put(symbol, computeMacroBias({ funding, price, weeklyEma }, effectiveMacro(ensemble)));
     } catch (err) {
       app.log.warn({ err: String(err), symbol }, 'no se pudo refrescar el sesgo macro');
     }

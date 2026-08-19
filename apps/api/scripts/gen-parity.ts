@@ -15,6 +15,7 @@ import { buildSignal } from '../src/ensemble/signal.js';
 import { computePlanLevels } from '../src/ensemble/plan.js';
 import { applyCalibrator, type Calibrator } from '../src/calibration/apply.js';
 import { predictForest, type MetaModelArtifact } from '../src/metamodel/apply.js';
+import { longPenalty, percentileOf } from '../src/ensemble/fundamental.js';
 import type { Macro } from '../src/domain/signal.js';
 import type { Candle } from '../src/domain/candle.js';
 
@@ -252,6 +253,58 @@ const metamodelVectors = metaInputs.map((x) => ({
   expected: round(predictForest(forest, x)),
 }));
 
+// ---- Vectores de paridad del Fundamental Score (M12) ----
+// Solo entra la FÓRMULA DE INYECCIÓN. El cómputo del score (leer la DIL, construir la ventana de
+// 90 días) es un input, como Reditum o el funding crudo: no tiene por qué ser idéntico en Node,
+// que ni siquiera consulta esas tablas. Lo que sí tiene que coincidir al dígito es dónde cae un
+// funding en la distribución y cuánto penaliza, porque de ahí sale la decisión.
+const fundKnots = [0, 0.25, 0.5, 0.75, 1].map((q) => q * 0.0001); // p0..p100 de una ventana ficticia
+const fundStart = DEFAULT_ENSEMBLE.fundamental.start;
+const percentileVectors = [-0.00005, 0, 0.000012, 0.000025, 0.00005, 0.000075, 0.0001, 0.0005].map(
+  (funding) => ({
+    knots: fundKnots,
+    funding,
+    expected: round(percentileOf(fundKnots, funding)),
+  }),
+);
+const penaltyVectors = [0, 0.2, 1 / 3, 0.4, 0.5, 2 / 3, 0.9, 1].map((pct) => ({
+  pct: round(pct),
+  start: fundStart,
+  expected: round(longPenalty(pct, fundStart)),
+}));
+// La asimetría, comprobada donde importa: con el mismo fundTerm, BUY baja y SELL queda intacto.
+// Si alguien «arreglara» la fórmula haciéndola simétrica, estos vectores lo cazan.
+const fundInferenceVectors = [
+  { net: 0.5, bias: 0, fundTerm: 0, independence: 1 },
+  { net: 0.5, bias: 0, fundTerm: 0.5, independence: 1 },
+  { net: 0.5, bias: 0.3, fundTerm: 0.5, independence: 1 },
+  { net: -0.5, bias: 0, fundTerm: 0.5, independence: 1 },
+  { net: 0.2, bias: 0, fundTerm: 0.5, independence: 0.485 },
+  { net: 0.9, bias: -0.4, fundTerm: 0.25, independence: 0.66 },
+].map((c) => {
+  const probs = inferProbs(
+    c.net,
+    T,
+    HB,
+    { bias: c.bias, wMacro: mc.wMacro },
+    c.independence,
+    c.fundTerm,
+  );
+  const { action } = pickAction(probs);
+  return {
+    input: {
+      net: c.net,
+      bias: c.bias,
+      wMacro: mc.wMacro,
+      temperature: T,
+      holdBand: HB,
+      independence: c.independence,
+      fundTerm: c.fundTerm,
+    },
+    expected: { BUY: round(probs.BUY), HOLD: round(probs.HOLD), SELL: round(probs.SELL), action },
+  };
+});
+
 writeFileSync(
   new URL('../../../packages/core-signals/parity/macro_vectors.json', import.meta.url),
   JSON.stringify(
@@ -266,6 +319,12 @@ writeFileSync(
       timeframes: tfVectors,
       calibration: calibrationVectors,
       metamodel: { forest, vectors: metamodelVectors },
+      fundamental: {
+        config: DEFAULT_ENSEMBLE.fundamental,
+        percentile: percentileVectors,
+        penalty: penaltyVectors,
+        inference: fundInferenceVectors,
+      },
     },
     null,
     2,
