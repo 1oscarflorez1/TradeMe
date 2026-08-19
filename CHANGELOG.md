@@ -7,6 +7,45 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.38.2] — 2026-08-19
+
+> Un hito que se cierra sin entregar nada al motor, y que aun así deja algo importante: la métrica
+> con la que el proyecto pensaba juzgar futuros «ejes independientes» no distinguía una fuente nueva
+> de un generador de números aleatorios.
+
+### Added — Analista de Niveles, Fase 0: medición previa con resultado **negativo**
+
+- Se midió antes de darle voto, como se acordó. Dos listones fijados de antemano: **+0,5 votos
+  efectivos** y expectancy por tercil con Bonferroni sobre 24 comparaciones declaradas (|t| ≥ 3,124).
+- Tres temporalidades (15m, 30m, 1h) superaban el listón de independencia. Parecía un aprobado.
+- **Un control que no estaba en el plan lo tumbó**: una columna de ruido aleatorio añade entre
+  **+0,42 y +0,61** votos efectivos. El detector no supera al azar en ninguna temporalidad, y queda
+  por debajo en cinco de siete. El criterio medía «variabilidad no compartida», que es justo lo que
+  el ruido tiene de sobra.
+- El único |t| significativo (7,30 en 4h) **no rescata nada**: es la temporalidad en cuarentena, con
+  la muestra del periodo que acumuló −0,485 R, y es donde el detector ha degenerado en un oscilador
+  —correlación 0,54 con Bollinger/Estocástico en 4h y **0,90 con RSI en 1d**, frente a 0,11 en 15m—.
+  A menos historia disponible, más se parece a lo que ya teníamos. Darlo por bueno sería repetir el
+  error de «el fundamental habría salvado el 4h».
+- **No se le da voto.** La decisión no se tocó en ningún momento. Informe completo en
+  `docs/analista-niveles-fase0.md`.
+
+### Changed — El lift de votos efectivos exige control de ruido
+
+- `docs/independencia.md` proponía *«¿cuántos votos efectivos añade?»* como métrica para juzgar
+  candidatos a eje independiente — y es la métrica de juicio escrita en la especificación del
+  Fundamental Score. Queda anotado que **sola no sirve**: hay que superar el lift de una columna
+  aleatoria sobre la misma muestra, no alcanzar un número absoluto.
+- Y superar el ruido demuestra que la fuente es **distinta**, no que **sirva**. Para eso sigue
+  haciendo falta que prediga algo sobre decisiones reales cerradas.
+
+### Added — Detector de niveles con las garantías puestas (sin uso en producción)
+
+- `levels.py` no vota ni se importa desde ningún camino de decisión. Ocho tests, incluido el que
+  comprueba que **un pivote sin confirmar no se detecta**: sin esa garantía el estudio habría usado
+  información que en el momento de decidir no existía, y habría dado resultados excelentes e
+  irreproducibles.
+
 ## [0.38.1] — 2026-08-19
 
 > El Fundamental Score se veía bien en el Panel y no estaba midiendo nada. Enseñaba «percentil 1»

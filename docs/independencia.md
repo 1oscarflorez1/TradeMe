@@ -130,3 +130,23 @@ valen 1,41 seguirán valiendo 1,41 después del ajuste. La única forma de que e
 miembros de verdad es **añadir evidencia que no derive del precio**: el sesgo macro, el funding, el
 calendario, las noticias. Ese, y no «más información», es el argumento fuerte del análisis
 fundamental (M11–M12), y ahora hay una métrica para juzgarlo: *¿cuántos votos efectivos añade?*
+
+## ⚠ Esa métrica, sola, no sirve — hace falta un control de ruido
+
+Medido el 19 de agosto de 2026 al evaluar el Analista de Niveles: **una columna de ruido aleatorio
+añade entre +0,42 y +0,61 votos efectivos**, según la temporalidad. Más que el detector que se
+estaba evaluando, en cinco de las siete.
+
+La razón es aritmética. La participación de autovalores mide cuánta variabilidad **no compartida**
+entra en el sistema, y el ruido, por definición, no comparte nada con nadie. La métrica premia por
+igual a una fuente de información nueva y a un dado.
+
+**Consecuencia práctica**: cualquier candidato a «eje independiente» —un agente nuevo, otra fuente
+de datos, un indicador estructural— tiene que **superar el lift de una columna aleatoria** sobre la
+misma muestra, no alcanzar un número absoluto. Doscientas repeticiones bastan para tener el p95.
+Está implementado en `run_levels_study.py` y el caso completo, en
+[analista-niveles-fase0.md](analista-niveles-fase0.md).
+
+Y el corolario incómodo: superar el ruido demuestra que la fuente **es distinta**, no que **sirva**.
+Para eso sigue haciendo falta la otra mitad, la de siempre: que prediga algo sobre decisiones reales
+cerradas.
