@@ -469,11 +469,28 @@ export async function fetchSystemStatus(): Promise<SystemStatus | null> {
   }
 }
 
+/** Salud del modelo configurado. `sin_catalogo` = no se puede verificar, que no es lo mismo que falle. */
+export interface ModelHealth {
+  status:
+    | 'ok'
+    | 'modelo_ausente'
+    | 'clave_rechazada'
+    | 'proveedor_caido'
+    | 'sin_catalogo'
+    | 'sin_clave'
+    | 'no_configurado';
+  detail: string;
+  checkedAt: string | null;
+  /** Modelos que sí ofrece el proveedor. Solo viene cuando el configurado no está. */
+  available?: string[];
+}
+
 export interface AssistantInfo {
   enabled: boolean;
   model: string;
   host: string;
   busqueda?: { enabled: boolean; provider: string };
+  modelo?: ModelHealth;
 }
 
 export async function fetchAssistantInfo(): Promise<AssistantInfo> {

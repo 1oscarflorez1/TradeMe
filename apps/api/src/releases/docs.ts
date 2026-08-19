@@ -25,7 +25,12 @@ export interface DocResumen {
 }
 
 /** Tope por documento entregado al modelo. Un `docs/` largo llenaría la ventana de contexto. */
-const MAX_CARACTERES = 6000;
+// Tope por documento enviado al modelo. A 6000 se truncaban 7 de los 29 documentos, y justamente
+// los conceptuales —independencia, fundamental, cuarentena, asistente—, que son los que alguien
+// pregunta. El asistente recibía la mitad de la explicación y respondía con ella. A 9000 entran
+// todos enteros con margen; el coste es de unos 800 tokens más por consulta, que a cambio de no
+// explicar a medias sale barato.
+const MAX_CARACTERES = 9000;
 
 export class Docs {
   private indice: DocResumen[] | null = null;
@@ -67,11 +72,46 @@ export class Docs {
     return out;
   }
 
+  /**
+   * Resuelve un tema contra los documentos que existen, tolerando cómo se escribe de verdad.
+   *
+   * Nace de un fallo real: al preguntar «¿por qué las cuarentenas?», el modelo pide el tema
+   * `cuarentenas` y el fichero se llama `cuarentena.md`. Sin esto, la respuesta era «no hay
+   * documentación» teniéndola delante. Lo mismo pasaría con `calibración` (con tilde) o
+   * `meta-modelo` (con guion).
+   *
+   * Compara **contra la lista de ficheros reales**, nunca construyendo una ruta con lo que llega de
+   * fuera, así que además cierra la puerta a salirse del directorio.
+   */
+  private resolver(entrada: string): string | null {
+    const normaliza = (x: string): string =>
+      x
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '') // tildes
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, ''); // guiones, espacios, subrayados
+    const buscado = normaliza(entrada.replace(/\.md$/i, ''));
+    if (!buscado) return null;
+    const ids = this.ficheros().map((f) => f.replace(/\.md$/i, ''));
+    const exacto = ids.find((id) => normaliza(id) === buscado);
+    if (exacto) return exacto;
+    // Singular y plural, en las dos direcciones y con las dos formas del castellano («-s» y
+    // «-es»): «cuarentenas» → `cuarentena.md`, «indicador» → `indicadores.md`.
+    const coincide = (a: string, b: string): boolean =>
+      a === b || a === `${b}s` || a === `${b}es`;
+    return ids.find((id) => {
+      const n = normaliza(id);
+      return coincide(n, buscado) || coincide(buscado, n);
+    }) ?? null;
+  }
+
   /** Contenido de un documento, recortado. `null` si no existe. */
   read(id: string): { id: string; titulo: string; contenido: string; truncado: boolean } | null {
     // Solo el nombre base: nada de rutas relativas ni de salir del directorio.
-    const limpio = basename(String(id)).replace(/\.md$/i, '');
-    if (!limpio || limpio.startsWith('.')) return null;
+    const pedido = basename(String(id)).replace(/\.md$/i, '');
+    if (!pedido || pedido.startsWith('.')) return null;
+    const limpio = this.resolver(pedido);
+    if (!limpio) return null;
     const ruta = join(this.dir, `${limpio}.md`);
     if (!existsSync(ruta)) return null;
     try {

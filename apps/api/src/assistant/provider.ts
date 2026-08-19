@@ -39,8 +39,48 @@ export interface AssistantReply {
   consultas?: string[];
 }
 
+/**
+ * Salud del modelo configurado.
+ *
+ * Existe por un fallo real: Groq retiró `llama-3.3-70b-versatile` y el asistente quedó respondiendo
+ * desde su base local durante días. **Nadie se enteró hasta que alguien le preguntó algo.** Un
+ * proveedor que devuelve 404 en cada consulta es indistinguible de un asistente sin configurar si
+ * no se comprueba nunca.
+ *
+ * Los estados distinguen lo que se sabe de lo que no. `sin_catalogo` es importante: si el proveedor
+ * no publica `/models`, **no se puede concluir que el modelo falte**, y decir que falta sería peor
+ * que no decir nada.
+ */
+export type ModelStatus =
+  | 'ok' // el modelo está en el catálogo del proveedor
+  | 'modelo_ausente' // el proveedor responde, pero ese modelo ya no existe
+  | 'clave_rechazada' // 401/403: la clave no vale
+  | 'proveedor_caido' // no responde, o error del servidor
+  | 'sin_catalogo' // no publica /models: no se puede verificar, y no se inventa
+  | 'sin_clave'
+  | 'no_configurado';
+
+export interface ModelHealth {
+  status: ModelStatus;
+  detail: string;
+  /** Instante de la última comprobación real. `null` si todavía no se ha hecho ninguna. */
+  checkedAt: string | null;
+  /** Modelos que sí ofrece el proveedor. Solo se rellena cuando el configurado no está. */
+  available?: string[];
+}
+
+/** Cada cuánto se recomprueba el catálogo. Un modelo no desaparece dos veces en una hora. */
+const HEALTH_TTL_MS = 15 * 60 * 1000;
+
 export class AssistantProvider {
   constructor(private readonly cfg: AssistantConfig) {}
+
+  private health: ModelHealth = {
+    status: 'no_configurado',
+    detail: 'sin comprobar',
+    checkedAt: null,
+  };
+  private comprobando: Promise<ModelHealth> | null = null;
 
   get enabled(): boolean {
     return this.cfg.baseUrl.trim().length > 0 && this.cfg.model.trim().length > 0;
@@ -55,6 +95,129 @@ export class AssistantProvider {
       host = 'configuración inválida';
     }
     return { enabled: this.enabled, model: this.cfg.model, host };
+  }
+
+  /**
+   * Último veredicto conocido, sin llamar a nadie.
+   *
+   * `/health` tiene que ser barato: si consultara el catálogo en cada petición, el estado de la
+   * plataforma dependería de la latencia de un tercero. Si la medición ha caducado se dispara una
+   * comprobación en segundo plano y se devuelve la anterior, que sigue siendo la mejor que hay.
+   */
+  modelHealth(): ModelHealth {
+    const vencida =
+      this.health.checkedAt === null ||
+      Date.now() - Date.parse(this.health.checkedAt) > HEALTH_TTL_MS;
+    if (vencida) void this.checkModel();
+    return this.health;
+  }
+
+  /**
+   * Comprueba contra el proveedor que el modelo configurado existe.
+   *
+   * Una sola llamada en vuelo: al arrancar, varias peticiones a `/health` podrían dispararla a la
+   * vez y gastar cupo en preguntar tres veces lo mismo.
+   */
+  async checkModel(): Promise<ModelHealth> {
+    if (this.comprobando) return this.comprobando;
+    this.comprobando = this.consultarCatalogo().finally(() => {
+      this.comprobando = null;
+    });
+    return this.comprobando;
+  }
+
+  private async consultarCatalogo(): Promise<ModelHealth> {
+    const ahora = () => new Date().toISOString();
+    const modelo = this.cfg.model.trim();
+    const base = this.cfg.baseUrl.trim().replace(/\/+$/, '');
+
+    if (!base || !modelo) {
+      this.health = {
+        status: 'no_configurado',
+        detail: 'ASSISTANT_BASE_URL o ASSISTANT_MODEL sin valor: el asistente usa su base local.',
+        checkedAt: ahora(),
+      };
+      return this.health;
+    }
+    if (!this.cfg.apiKey) {
+      this.health = {
+        status: 'sin_clave',
+        detail: 'ASSISTANT_API_KEY sin valor: no se puede consultar al proveedor.',
+        checkedAt: ahora(),
+      };
+      return this.health;
+    }
+
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), Math.min(this.cfg.timeoutMs, 10_000));
+      let res: Response;
+      try {
+        res = await fetch(`${base}/models`, {
+          headers: { Authorization: `Bearer ${this.cfg.apiKey}` },
+          signal: ctrl.signal,
+        });
+      } finally {
+        clearTimeout(t);
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        this.health = {
+          status: 'clave_rechazada',
+          detail: `El proveedor rechazó la clave (HTTP ${res.status}).`,
+          checkedAt: ahora(),
+        };
+        return this.health;
+      }
+      if (!res.ok) {
+        // Un 404 aquí es del *endpoint* de catálogo, no del modelo: hay proveedores que no lo
+        // publican. Concluir que el modelo falta sería inventarse un diagnóstico.
+        this.health = {
+          status: res.status === 404 ? 'sin_catalogo' : 'proveedor_caido',
+          detail:
+            res.status === 404
+              ? 'El proveedor no publica catálogo de modelos: no se puede verificar el configurado.'
+              : `El proveedor respondió HTTP ${res.status}.`,
+          checkedAt: ahora(),
+        };
+        return this.health;
+      }
+
+      const datos = (await res.json()) as { data?: Array<{ id?: string }> };
+      const ids = (datos.data ?? []).map((m) => String(m.id ?? '')).filter(Boolean);
+      if (ids.length === 0) {
+        this.health = {
+          status: 'sin_catalogo',
+          detail: 'El proveedor devolvió un catálogo vacío: no se puede verificar el modelo.',
+          checkedAt: ahora(),
+        };
+        return this.health;
+      }
+      if (ids.includes(modelo)) {
+        this.health = {
+          status: 'ok',
+          detail: `${modelo} disponible en el proveedor.`,
+          checkedAt: ahora(),
+        };
+        return this.health;
+      }
+      this.health = {
+        status: 'modelo_ausente',
+        detail:
+          `El proveedor ya no ofrece «${modelo}». El asistente responde desde su base local ` +
+          `hasta que se configure uno de los disponibles en ASSISTANT_MODEL.`,
+        checkedAt: ahora(),
+        available: ids.sort(),
+      };
+      return this.health;
+    } catch (err) {
+      this.health = {
+        status: 'proveedor_caido',
+        detail: `No se pudo consultar el catálogo: ${String(err).slice(0, 120)}`,
+        checkedAt: ahora(),
+      };
+      return this.health;
+    }
   }
 
   /**

@@ -360,6 +360,41 @@ const KB: Article[] = [
     ),
   },
   {
+    title: 'Cuarentena: cuando el sistema se retira de una temporalidad',
+    body: (
+      <>
+        <p>
+          A veces una temporalidad concreta pierde dinero de forma sostenida. La de 4 horas acumuló{' '}
+          <strong>−0,485 R en 89 decisiones</strong>, y el 85,6 % de sus ventas acabó en el stop. No
+          era mala suerte: era un patrón.
+        </p>
+        <p>
+          Lo tentador sería tocarle los parámetros. Pero cuando algo falla y no sabes por qué,
+          ajustar números es apostar a que la causa era el número que tocaste. La plataforma hace
+          otra cosa: <strong>deja de operar esa temporalidad y sigue mirándola</strong>. Sus
+          decisiones se calculan y se registran como siempre; simplemente no salen como operables.
+          Verás que pone «cuarentena» como motivo de no operar.
+        </p>
+        <p>
+          Lo importante es que <strong>puede volver</strong>. Se sigue anotando qué habría hecho, y
+          con eso se le lleva un expediente. Si acumula 40 decisiones en la sombra con un resultado
+          claramente positivo, sale sola. Y al revés: una temporalidad que opera y baja de −0,15 R en
+          sus últimas 30 decisiones entra sola. Nadie mantiene una lista a mano.
+        </p>
+        <p>
+          Cuesta más salir que entrar, y es a propósito: dejar de operar algo dudoso es barato,
+          volver a operarlo no.
+        </p>
+        <p>
+          Una honestidad que conviene decir: <strong>no se sabe por qué falla el 4 horas</strong>. Se
+          creyó durante meses que era por operar sin contexto de fondo, y al poder medirlo resultó
+          falso — el contexto de aquel periodo habría reforzado esas ventas, no evitado ninguna. La
+          cuarentena está justificada por el resultado; la causa sigue abierta.
+        </p>
+      </>
+    ),
+  },
+  {
     title: 'Miedo y codicia, tipos del BCE: por qué se registran y no deciden',
     body: (
       <p>
@@ -637,6 +672,7 @@ const GLOSARIO: Array<[string, string, string]> = [
   ['Sesgo macro', 'Fundamental', 'Inclinación de fondo (funding + tendencia semanal), inyectada en los logits.'],
   ['Fundamental Score', 'Fundamental', 'Percentil del funding a 90 días. Solo penaliza compras; hoy en sombra, sin influir.'],
   ['Modo sombra', 'Método', 'Se calcula y se registra sin influir, para poder demostrar que merece influir.'],
+  ['Cuarentena', 'Método', 'Temporalidad retirada de la operativa: se sigue calculando y midiendo, pero no opera.'],
 ];
 
 /** Una frase por artículo: es lo que permite decidir si merece la pena abrirlo. */

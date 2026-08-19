@@ -309,7 +309,11 @@ async function main(): Promise<void> {
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
       : undefined,
-    assistantInfo: () => ({ ...asistente.describe(), busqueda: buscador.describe() }),
+    assistantInfo: () => ({
+      ...asistente.describe(),
+      busqueda: buscador.describe(),
+      modelo: asistente.modelHealth(),
+    }),
     askAssistant: asistente.enabled
       ? async (pregunta, historial, symbol, interval, usuario) => {
           const cupo = cupoAsistente.intentar(usuario);
@@ -751,6 +755,13 @@ async function main(): Promise<void> {
   await applyWatchlist().catch((err: unknown) =>
     app.log.warn({ err: String(err) }, 'no se pudo aplicar la lista de activos'),
   );
+  // Comprobación del modelo al arrancar: si el proveedor lo ha retirado, que se sepa aquí y no
+  // dentro de tres días, cuando alguien pregunte algo y reciba la respuesta de la base local.
+  void asistente.checkModel().then((h) => {
+    if (h.status === 'ok') return;
+    app.log.warn({ estado: h.status, detalle: h.detail }, 'el modelo del asistente no está listo');
+  });
+
   for (const symbol of activeSymbols) {
     await refreshFunding(symbol);
     await refreshMacro(symbol);
