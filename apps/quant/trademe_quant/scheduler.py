@@ -213,8 +213,10 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
                     cfg.calibrate_cooldown_h,
                 )
                 if cal_ok:
-                    calibrate_and_publish(symbol, iv)
-                    log.append(f"calibrado {symbol} {iv} ({cal_reason})")
+                    # Todos los símbolos, no solo el que acaba de optimizarse: el artefacto es uno
+                    # y publicarlo con un único activo borraría los calibradores de los demás.
+                    calibrate_and_publish(symbols, iv)
+                    log.append(f"calibrado {symbols} {iv} ({cal_reason})")
                 if report["promoted"]:
                     insert_alert(
                         dsn,
@@ -262,10 +264,18 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     # Data Intelligence Layer (M11): trae los datos externos y los guarda con su fecha de
     # conocimiento. NO decide nada — el Fundamental Score es M12. Cada fuente va aislada: si una
     # cae, se anota en `data_sources` y las demás siguen.
+    #
+    # Los proveedores se construyen con **los símbolos de la watchlist**, no con el valor por
+    # defecto. Hasta 0.38.2 se llamaba a `run_once(dsn)` a secas, que cae en `default_providers()`
+    # con `["BTCUSDT"]` cableado: cualquier activo añadido después quedaba sin funding, sin interés
+    # abierto y sin long/short, y por tanto con el Fundamental Score `stale` para siempre. Se veía
+    # en la base de datos —`derivatives_metrics` tenía tres filas, todas de BTCUSDT— pero no en
+    # ningún error, porque «no hay datos» es un estado válido del score.
     try:
+        from .dil import default_providers
         from .dil import run_once as dil_run_once
 
-        for linea in dil_run_once(dsn):
+        for linea in dil_run_once(dsn, default_providers(symbols)):
             log.append(f"datos: {linea}")
     except Exception as err:  # noqa: BLE001 - sin datos externos el motor decide igual que hoy
         log.append(f"error datos externos: {err}")
@@ -317,9 +327,12 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
             cfg.calibrate_every_h,
             cfg.calibrate_cooldown_h,
         )
-        if cal_ok and cfg.symbols and cfg.intervals:
-            calibrate_and_publish(cfg.symbols[0], cfg.intervals[0])
-            log.append(f"calibrado {cfg.symbols[0]} {cfg.intervals[0]} ({cal_reason})")
+        if cal_ok and symbols and cfg.intervals:
+            # Con `symbols` (la watchlist), no con `cfg.symbols` (el entorno): el artefacto lleva
+            # un juego de calibradores por activo y se escribe de una vez. Publicarlos por separado
+            # haría que el último borrase a los anteriores.
+            cal_out = calibrate_and_publish(symbols, cfg.intervals[0])
+            log.append(f"calibrado {cal_out['por_simbolo']} {cfg.intervals[0]} ({cal_reason})")
     except Exception as err:  # noqa: BLE001
         log.append(f"error calibración: {err}")
 
