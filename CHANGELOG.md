@@ -7,6 +7,42 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.38.1] — 2026-08-19
+
+> El Fundamental Score se veía bien en el Panel y no estaba midiendo nada. Enseñaba «percentil 1»
+> con cara de medición, y ese número era el cero de un valor por defecto.
+
+### Fixed — El score no recibía el funding y lo sustituía por cero
+
+- El funding solo se pedía dentro de `refreshMacro`, que **sale antes de nada si `MACRO_ENABLED` no
+  está a `true`**. En producción está apagado, así que desde el despliegue de 0.38.0 el score
+  evaluaba `funding = 0` en todas las decisiones.
+- Comprobado en la base de datos: **414 capturas en siete días, 0 con funding**. El percentil que
+  mostraba el Panel (0,007) no era el estado del mercado: era el cero del valor por defecto situado
+  contra la distribución real.
+- Consecuencia, y es la grave: penalización siempre 0, **ninguna decisión sombra registrada** y por
+  tanto **ninguna posibilidad de promocionar nunca**. Exactamente el fallo de diseño que tuvo la
+  cuarentena en M10.5 —un mecanismo que no puede acumular el expediente que necesita para salir—,
+  repetido tres hitos después.
+- El funding pasa a refrescarse por su cuenta, **independiente del sesgo macro**. El score existe
+  precisamente porque el funding no deriva del precio; acoplarlo al interruptor del macro unía justo
+  lo que el hito separaba. Solo se pide a los perpetuos de Binance: preguntarle el funding a una
+  acción de Twelve Data era una petición condenada a fallar cada hora.
+
+### Fixed — «No lo sé» ya no acaba valiendo cero
+
+- `computeFundamental` recibía `funding: number` con un `?? 0` delante. Ahora recibe
+  `funding?: number` y, si no hay dato, se declara **`stale`** igual que si faltara la distribución.
+  Un cero por defecto se sitúa en la distribución y produce un percentil con toda la pinta de ser
+  una medición; un `stale` dice la verdad.
+- `Fundamental.funding` pasa a `number | null`. El Panel distingue ahora los dos motivos de «sin
+  datos»: no conocemos el funding de ahora, o no tenemos con qué compararlo.
+
+### Fixed — Artefactos vacíos para activos sin funding
+
+- El piloto escribía `artifacts/fundamental/<SÍMBOLO>.json` también para acciones, que nunca tendrán
+  funding: un fichero muerto por cada una. Ahora no se publica si no hay ni una observación.
+
 ## [0.38.0] — 2026-08-18
 
 > El análisis fundamental entra en la decisión, y lo hace **torcido a propósito**: el funding

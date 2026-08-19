@@ -101,6 +101,7 @@ export interface AppDeps {
   getEnsembleFor?: (symbol: string, interval: string) => EnsembleConfig;
   getMacro?: (symbol: string) => Macro | undefined;
   getFundamental?: (symbol: string) => FundamentalArtifact | undefined;
+  getFunding?: (symbol: string) => number | undefined;
   recordSnapshot?: (
     signal: Signal,
     interval: string,
@@ -761,6 +762,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         interval,
         macro: deps.getMacro?.(sym),
         fundamentalArtifact: deps.getFundamental?.(sym),
+        funding: deps.getFunding?.(sym),
         calibrators: deps.calibrators,
         metaModel: deps.metaModel,
         metaMode: deps.metaMode,
@@ -1096,6 +1098,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         interval,
         macro: deps.getMacro?.(sym),
         fundamentalArtifact: deps.getFundamental?.(sym),
+        funding: deps.getFunding?.(sym),
         calibrators: deps.calibrators,
         metaModel: deps.metaModel,
         metaMode: deps.metaMode,

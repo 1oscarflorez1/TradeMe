@@ -38,8 +38,8 @@ export interface Macro {
  * meta-modelo y la cuarentena.
  */
 export interface Fundamental {
-  /** Funding rate del momento, tal cual lo dio el proveedor. */
-  funding: number;
+  /** Funding rate del momento. `null` cuando no se conoce — que no es lo mismo que cero. */
+  funding: number | null;
   /** Su lugar en la ventana móvil de 90 días, en [0,1]. */
   percentile: number;
   /** Penalización cruda a los largos, en [0,1]. Cero por debajo del tercil inferior. */

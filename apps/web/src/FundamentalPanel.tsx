@@ -25,6 +25,9 @@ export function FundamentalPanel({
   }
 
   if (fundamental.stale) {
+    // Dos motivos distintos, y conviene distinguirlos: o no sabemos el funding de ahora, o no
+    // tenemos con qué compararlo. Decir «sin datos» a secas escondería cuál de los dos falla.
+    const sinFunding = fundamental.funding === null;
     return (
       <div className="fundamental">
         <div className="fund-head">
@@ -32,9 +35,12 @@ export function FundamentalPanel({
           <span className="wh-flat">SIN DATOS</span>
         </div>
         <p className="muted">
-          Aún no hay histórico suficiente para saber si este funding es alto o bajo{' '}
-          {fundamental.n > 0 ? `(${fundamental.n} observaciones)` : ''}. Mientras tanto no penaliza
-          nada: sin datos no se adivina.
+          {sinFunding
+            ? 'No hay lectura de funding para este activo. Solo la tienen los perpetuos de cripto.'
+            : `Aún no hay histórico suficiente para saber si este funding es alto o bajo${
+                fundamental.n > 0 ? ` (${fundamental.n} observaciones)` : ''
+              }.`}{' '}
+          Mientras tanto no penaliza nada: sin datos no se adivina.
         </p>
       </div>
     );
@@ -96,6 +102,9 @@ export function FundamentalPanel({
       )}
 
       <div className="fund-meta">
+        {fundamental.funding !== null ? (
+          <span>funding {(fundamental.funding * 100).toFixed(4)}%</span>
+        ) : null}
         <span>ventana 90 d</span>
         <span>{fundamental.n} observaciones</span>
         {fundamental.version ? <span>{fundamental.version}</span> : null}

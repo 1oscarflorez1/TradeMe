@@ -67,8 +67,13 @@ Es el mismo reparto que el calibrador y el meta-modelo: Python mide, Node aplica
 funding crudo.
 
 **Sin datos, cero.** Un símbolo con menos de 30 observaciones en la ventana se declara `stale` y la
-penalización es **0**, no una estimación. Una fuente muda no debe empujar la decisión en ninguna
-dirección, y menos disimuladamente.
+penalización es **0**, no una estimación. Lo mismo si no se conoce el funding del momento: `stale`,
+no un cero por defecto. Un cero se situaría en la distribución y produciría un percentil con toda la
+pinta de ser una medición — es el fallo que tuvo 0.38.0 durante su primer día en producción.
+
+**El funding no depende del sesgo macro.** Se refresca por su cuenta, para los perpetuos de Binance,
+tenga `MACRO_ENABLED` el valor que tenga. El score existe precisamente porque el funding no deriva
+del precio; acoplarlo al interruptor del macro uniría justo lo que este hito separa.
 
 ## Gobierno: cómo se promociona
 

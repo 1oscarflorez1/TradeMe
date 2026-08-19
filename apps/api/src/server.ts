@@ -234,6 +234,7 @@ async function main(): Promise<void> {
     equity: env.ACCOUNT_EQUITY,
     getMacro: macroEnabled ? (symbol: string) => macroStore.get(symbol) : undefined,
     getFundamental: (symbol: string) => fundamentals.get(symbol),
+    getFunding: (symbol: string) => fundingStore.get(symbol),
     recordSnapshot: snapshotsRepo
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
@@ -329,6 +330,7 @@ async function main(): Promise<void> {
                   interval: iv,
                   macro: macroEnabled ? macroStore.get(symbol) : undefined,
                   fundamentalArtifact: fundamentals.get(symbol),
+                  funding: fundingStore.get(symbol),
                   calibrators,
                   metaModel,
                   metaMode: metaPolicy.mode,
@@ -382,6 +384,7 @@ async function main(): Promise<void> {
                   interval: ivArg,
                   macro: macroEnabled ? macroStore.get(symbol) : undefined,
                   fundamentalArtifact: fundamentals.get(symbol),
+                  funding: fundingStore.get(symbol),
                   calibrators,
                   metaModel,
                   metaMode: metaPolicy.mode,
@@ -563,6 +566,7 @@ async function main(): Promise<void> {
         interval: iv,
         macro: macroEnabled ? macroStore.get(symbol) : undefined,
         fundamentalArtifact: fundamentals.get(symbol),
+        funding: fundingStore.get(symbol),
         calibrators,
         metaModel,
         metaMode: metaPolicy.mode,
@@ -670,6 +674,34 @@ async function main(): Promise<void> {
   };
 
   const MACRO_REFRESH_MS = 60 * 60 * 1000;
+
+  /**
+   * Funding por símbolo, **independiente del sesgo macro**.
+   *
+   * En 0.38.0 el funding solo se pedía dentro de `refreshMacro`, que sale antes de nada si
+   * `MACRO_ENABLED` no está a true. Como en producción está apagado, el Fundamental Score llevaba
+   * desde el despliegue evaluando un cero por defecto en vez del funding real: penalización siempre
+   * 0, ninguna decisión sombra registrada y, por tanto, **ninguna posibilidad de promocionar
+   * jamás** — el mismo fallo de diseño que tuvo la cuarentena en M10.5.
+   *
+   * El score existe precisamente porque el funding no deriva del precio. Que dependiera del
+   * interruptor del macro era acoplar dos cosas que el hito separaba a propósito.
+   */
+  const fundingStore = new Map<string, number>();
+
+  async function refreshFunding(symbol: string): Promise<void> {
+    // Solo los perpetuos de Binance tienen funding. Pedírselo a una acción de Twelve Data sería
+    // una petición condenada a fallar cada hora.
+    if (providers.routeOf(symbol) !== 'binance') return;
+    try {
+      fundingStore.set(symbol, await fetchFundingRate(symbol));
+    } catch (err) {
+      // No se borra el valor anterior: un fallo puntual de Binance no convierte el funding en
+      // desconocido. Si nunca llegó a haberlo, el score sigue `stale`, que es lo correcto.
+      app.log.warn({ err: String(err), symbol }, 'no se pudo refrescar el funding');
+    }
+  }
+
   async function refreshMacro(symbol: string): Promise<void> {
     if (!macroEnabled || !ensemble.macro.enabled) return;
     try {
@@ -680,7 +712,8 @@ async function main(): Promise<void> {
       const weeklyEma = emaSeries[emaSeries.length - 1];
       const price = closes[closes.length - 1];
       if (weeklyEma === undefined || price === undefined) return;
-      const funding = await fetchFundingRate(symbol);
+      const funding = fundingStore.get(symbol);
+      if (funding === undefined) return;
       // `effectiveMacro` retira el funding de aquí SOLO cuando el Fundamental Score está
       // promocionado: mientras siga en sombra el sesgo se calcula exactamente igual que antes.
       macroStore.put(symbol, computeMacroBias({ funding, price, weeklyEma }, effectiveMacro(ensemble)));
@@ -718,9 +751,14 @@ async function main(): Promise<void> {
   await applyWatchlist().catch((err: unknown) =>
     app.log.warn({ err: String(err) }, 'no se pudo aplicar la lista de activos'),
   );
-  for (const symbol of activeSymbols) await refreshMacro(symbol);
+  for (const symbol of activeSymbols) {
+    await refreshFunding(symbol);
+    await refreshMacro(symbol);
+  }
   setInterval(() => {
-    for (const symbol of activeSymbols) void refreshMacro(symbol);
+    for (const symbol of activeSymbols) {
+      void refreshFunding(symbol).then(() => refreshMacro(symbol));
+    }
   }, MACRO_REFRESH_MS);
   app.log.info(
     {

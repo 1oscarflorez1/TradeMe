@@ -46,7 +46,8 @@ export interface Macro {
  * En sombra se calcula y se muestra, pero `applied` es false y no toca la decisión.
  */
 export interface Fundamental {
-  funding: number;
+  /** null cuando no se conoce el funding, que no es lo mismo que cero. */
+  funding: number | null;
   percentile: number;
   penalty: number;
   w_fund: number;

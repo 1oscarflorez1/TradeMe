@@ -127,7 +127,15 @@ function readArtifact(dir: string, symbol: string): FundamentalArtifact | null {
 // Cómputo del bloque `fundamental` de la señal.
 // ---------------------------------------------------------------------------------------------
 export interface FundamentalInput {
-  funding: number;
+  /**
+   * Funding del momento. `undefined` significa **no se sabe**, y eso NO es cero.
+   *
+   * Un cero por defecto se situaría en la distribución como cualquier otro valor y produciría un
+   * percentil con pinta de medición. Es el error que tuvo esta función en 0.38.0: con el sesgo
+   * macro apagado el funding nunca llegaba, se sustituía por 0, y el Panel enseñaba «percentil 1»
+   * como si fuera el estado del mercado.
+   */
+  funding?: number;
   artifact?: FundamentalArtifact | null;
   config: FundamentalConfig;
 }
@@ -144,12 +152,15 @@ export function computeFundamental(input: FundamentalInput): Fundamental | undef
   const cfg = input.config;
   if (cfg.mode === 'off') return undefined;
   const art = input.artifact ?? null;
-  const stale = !art || art.stale || art.knots.length === 0;
+  const funding = input.funding;
+  // Sin funding no hay nada que situar. Se declara `stale` igual que si faltara la distribución:
+  // «no lo sé» y «vale cero» no pueden acabar en el mismo sitio.
+  const stale = funding === undefined || !art || art.stale || art.knots.length === 0;
   const start = art?.start ?? cfg.start;
-  const percentile = stale ? 0 : percentileOf(art.knots, input.funding);
+  const percentile = stale ? 0 : percentileOf(art.knots, funding);
   const penalty = stale ? 0 : longPenalty(percentile, start);
   return {
-    funding: input.funding,
+    funding: funding ?? null,
     percentile,
     penalty,
     w_fund: cfg.wFund,

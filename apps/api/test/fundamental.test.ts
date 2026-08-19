@@ -118,6 +118,30 @@ describe('computeFundamental', () => {
     expect(fundamentalTerm(f)).toBe(0);
   });
 
+  it('sin funding conocido NO inventa un cero: se declara stale', () => {
+    // El fallo de 0.38.0. Con el sesgo macro apagado el funding nunca llegaba al score, se
+    // sustituía por 0, y ese 0 se situaba en la distribución produciendo un percentil con toda la
+    // pinta de ser una medición. La penalización era siempre 0 y no se registraba una sola decisión
+    // sombra: el score no podía promocionar jamás.
+    const f = computeFundamental({
+      funding: undefined,
+      artifact: artefacto(),
+      config: { ...CFG, mode: 'active' },
+    });
+    expect(f?.stale).toBe(true);
+    expect(f?.funding).toBeNull();
+    expect(f?.percentile).toBe(0);
+    expect(fundamentalTerm(f)).toBe(0);
+  });
+
+  it('un funding real sí se sitúa, aunque el cero también caiga en el rango', () => {
+    // Comprobación de que lo anterior no se arregló a base de tratar el 0 como caso especial: un
+    // funding de verdad igual a cero es un dato, y se sitúa como cualquier otro.
+    const conCero = computeFundamental({ funding: 0, artifact: artefacto(), config: CFG });
+    expect(conCero?.stale).toBe(false);
+    expect(conCero?.funding).toBe(0);
+  });
+
   it('apagado no produce bloque', () => {
     expect(
       computeFundamental({ funding: 0.0001, artifact: artefacto(), config: { ...CFG, mode: 'off' } }),
@@ -263,6 +287,25 @@ describe('buildSignal con el score en sombra', () => {
     expect(sig.fund_shadow_confidence).toBeGreaterThan(0);
   });
 
+  it('el score funciona con el sesgo macro apagado', () => {
+    // La razón de ser del fix: el Fundamental Score existe porque el funding NO deriva del precio.
+    // Acoplarlo al interruptor del macro era unir justo lo que el hito separaba.
+    const sig = buildSignal({
+      symbol: 'BTCUSDT',
+      price,
+      votes,
+      config: DEFAULT_ENSEMBLE,
+      equity: 10_000,
+      interval: '1m',
+      macro: undefined, // MACRO_ENABLED=false, como en producción
+      funding: 0.00009,
+      fundamentalArtifact: artefacto(),
+    });
+    expect(sig.fundamental?.stale).toBe(false);
+    expect(sig.fundamental?.funding).toBe(0.00009);
+    expect(sig.fundamental?.penalty).toBeGreaterThan(0);
+  });
+
   it('sin artefacto no hay sombra que registrar', () => {
     const sig = buildSignal({
       symbol: 'BTCUSDT',
@@ -274,6 +317,21 @@ describe('buildSignal con el score en sombra', () => {
       macro,
     });
     expect(sig.fundamental?.stale).toBe(true);
+    expect(sig.fund_shadow_action).toBeUndefined();
+  });
+
+  it('sin funding por ningún lado el score queda stale, no en percentil 0', () => {
+    const sig = buildSignal({
+      symbol: 'BTCUSDT',
+      price,
+      votes,
+      config: DEFAULT_ENSEMBLE,
+      equity: 10_000,
+      interval: '1m',
+      fundamentalArtifact: artefacto(),
+    });
+    expect(sig.fundamental?.stale).toBe(true);
+    expect(sig.fundamental?.funding).toBeNull();
     expect(sig.fund_shadow_action).toBeUndefined();
   });
 });
