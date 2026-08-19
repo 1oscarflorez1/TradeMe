@@ -16,6 +16,10 @@ from .metamodel import export_onnx, forest_to_dict, train_metamodel
 
 SNAPSHOT_COLUMNS = [
     "captured_at",
+    # `symbol` NO es una feature del modelo: se arrastra para poder validar cruzado entre activos
+    # (entrenar con unos y comprobar con otros) y para separar el modelo por símbolo si algún día la
+    # medición lo pide. Meterlo como feature enseñaría al bosque a memorizar el activo.
+    "symbol",
     "price",
     "net",
     "confidence",
@@ -44,13 +48,21 @@ def fetch_rows(dsn: str) -> list[dict[str, Any]]:
     cols = ", ".join(SNAPSHOT_COLUMNS)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
-            # Una decisión por vela: los duplicados de la captura antigua no son observaciones
-            # independientes y, sin deduplicar, el modelo memoriza las situaciones repetidas.
+            # Una decisión por vela **y por símbolo**: los duplicados de la captura antigua no
+            # son observaciones independientes y, sin deduplicar, el modelo memoriza las
+            # situaciones repetidas.
+            #
+            # `symbol` en el DISTINCT ON no es un detalle: esta consulta no filtra por activo, y las
+            # velas de todos los símbolos comparten los mismos `candle_open` porque son ventanas de
+            # tiempo alineadas. Sin él, cuatro activos colapsarían a una sola fila por vela y se
+            # perdería el 75 % de la muestra — justo lo contrario de lo que busca el multiactivo, y
+            # sin ningún error a la vista.
+            #
             # El envoltorio devuelve el orden cronológico, que es el que necesita la división
             # temporal del entrenamiento (si no, se entrenaría con el futuro).
-            f"SELECT * FROM (SELECT DISTINCT ON (interval, candle_open) {cols} "  # noqa: S608
+            f"SELECT * FROM (SELECT DISTINCT ON (symbol, interval, candle_open) {cols} "  # noqa: S608
             "FROM snapshots WHERE outcome_result IN ('tp','sl') "
-            "ORDER BY interval, candle_open, captured_at ASC) t ORDER BY captured_at ASC"
+            "ORDER BY symbol, interval, candle_open, captured_at ASC) t ORDER BY captured_at ASC"
         )
         return [dict(zip(SNAPSHOT_COLUMNS, r, strict=False)) for r in cur.fetchall()]
 

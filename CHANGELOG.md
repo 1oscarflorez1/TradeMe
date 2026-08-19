@@ -7,6 +7,72 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.39.0] — 2026-08-19
+
+> Cuatro activos cripto en lugar de uno. El objetivo no es «más mercados»: es que el proyecto pueda
+> **replicar sus propios hallazgos**, porque hasta ahora todos venían de la misma serie de precios.
+> De paso, pasar de uno a cuatro destapó tres piezas que asumían que solo existía BTCUSDT y que
+> fallaban en silencio.
+
+### Added — ETH, SOL y BNB por el streaming gratuito de Binance
+
+- Alta en la watchlist con `provider: binance`. **Coste 0** y sin tocar el cupo de Twelve Data, que
+  solo aplica a acciones: ARQQ sigue exactamente igual.
+- Relleno retroactivo de funding a 120 días para los tres, reutilizando el `backfill_funding` de
+  M11: **360 observaciones cada uno**, así que sus distribuciones son válidas desde el primer ciclo
+  en vez de dentro de 90 días.
+- Efecto inmediato en el Fundamental Score, que era el motivo del hito: con BTC solo, el funding
+  estaba en el tercil bajo y la penalización era 0, así que **no se registraba ni una decisión
+  sombra**. Con cuatro activos, **SOL entra en percentil 0,888 (penalización 0,832) y BNB en 0,557
+  (0,336)** desde el primer momento. El score empieza a acumular expediente de verdad.
+
+### Fixed — La Data Intelligence Layer solo pedía datos de BTCUSDT
+
+- El piloto llamaba a `run_once(dsn)` sin símbolos, que cae en `default_providers()` con
+  `["BTCUSDT"]` cableado. Cualquier activo añadido después quedaba **sin funding, sin interés
+  abierto y sin long/short**, y por tanto con el Fundamental Score `stale` para siempre.
+- Sin error a la vista: «sin datos» es un estado legítimo del score. Se veía solo en la base de
+  datos — `derivatives_metrics` tenía tres filas y todas eran de BTC.
+
+### Fixed — El dataset del meta-modelo habría perdido el 75 % de la muestra
+
+- Deduplicaba por `DISTINCT ON (interval, candle_open)` **sin el símbolo**, en una consulta que no
+  filtra por activo. Las velas de todos los símbolos comparten los mismos `candle_open` porque son
+  ventanas de tiempo alineadas: con cuatro activos, cuatro filas habrían colapsado en una.
+- Corregido a `(symbol, interval, candle_open)`. Habría sido el fallo más costoso del hito y el más
+  difícil de notar: el dataset simplemente no habría crecido.
+
+### Changed — Calibradores por símbolo
+
+- El artefacto era único y entrenado con un solo activo (su versión lo delataba: `cal-BTCUSDT-30m`).
+  Con varios activos habría mostrado la calibración de BTC en el panel de ETH.
+- Ahora `symbols['ETHUSDT']['rango']`, y **un activo sin calibración propia no hereda la de otro**:
+  se queda sin confianza calibrada. La calibración responde a «¿cuánto vale una confianza del 70 %
+  *en este mercado*?» y esa respuesta no se transfiere entre activos.
+- Transición cuidada: el artefacto en formato antiguo se sigue leyendo, pero **solo para el símbolo
+  que su versión declara**. Así el despliegue no deja a BTC sin calibración ni se la inventa a los
+  demás mientras el piloto no republica.
+
+### Changed — El dataset del meta-modelo arrastra el símbolo
+
+- `symbol` entra en el dataset pero **no como feature**: meterlo enseñaría al bosque a memorizar el
+  activo. Está para poder hacer la prueba que de verdad importa —entrenar con BTC y validar con
+  ETH/SOL/BNB— y para separar el modelo por símbolo si la medición lo pide.
+- El meta-modelo **sigue global y en sombra**, sin cambios de comportamiento. Su anti-correlación
+  medida (AUC 0,46; +0,195 R en el tercil de menor confianza frente a −0,168 R en el de mayor)
+  queda pendiente de diagnóstico, y ahora habrá con qué validarlo fuera de muestra. **No se invierte
+  nada a ojo.**
+
+### Verificado en producción
+
+- Impacto en base de datos despreciable: 26 MB totales y `candles` en 2,2 MB. Multiplicar por cuatro
+  no requiere política de retención todavía.
+- Los tres símbolos existen en Binance spot (velas) y en Futures (funding del perpetuo), comprobado
+  antes del alta.
+- Cuarentena de 4h **heredada** por los activos nuevos: es lo conservador, y desde M10.7 la
+  cuarentena registra decisión sombra, así que cada activo acumulará su propio expediente y saldrá
+  solo si lo merece.
+
 ## [0.38.2] — 2026-08-19
 
 > Un hito que se cierra sin entregar nada al motor, y que aun así deja algo importante: la métrica

@@ -15,7 +15,14 @@ from .run_backtest import run_and_save
 from .run_calibration import calibrate_and_publish
 from .run_metamodel import train_and_publish
 from .run_optimize import optimize_and_publish
-from .scheduler import automation_status, load_config, save_config_overrides, start_scheduler
+from .scheduler import (
+    _dsn,
+    automation_status,
+    load_config,
+    save_config_overrides,
+    start_scheduler,
+    watchlist_symbols,
+)
 
 app = FastAPI(title="TradeMe quant")
 start_scheduler()
@@ -56,8 +63,16 @@ def automation_config_endpoint(overrides: dict[str, Any]) -> dict[str, Any]:
 
 
 @app.post("/run-calibration")
-def run_calibration_endpoint(symbol: str = "BTCUSDT", interval: str = "5m") -> dict[str, Any]:
-    return calibrate_and_publish(symbol, interval)
+def run_calibration_endpoint(symbols: str = "", interval: str = "5m") -> dict[str, Any]:
+    """Calibra por símbolo. Sin `symbols`, toma la watchlist completa.
+
+    Deliberadamente **no** acepta un solo activo por defecto: el artefacto de calibradores es uno y
+    contiene a todos, así que publicarlo con un símbolo suelto borraría los demás.
+    """
+    lista = [x.strip().upper() for x in symbols.split(",") if x.strip()]
+    if not lista:
+        lista = watchlist_symbols(_dsn()) or ["BTCUSDT"]
+    return calibrate_and_publish(lista, interval)
 
 
 @app.post("/run-metamodel")

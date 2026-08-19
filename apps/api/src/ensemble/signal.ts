@@ -118,7 +118,7 @@ export function buildSignal(params: BuildSignalParams): Signal {
   }
   let direction = directionOf(action);
   const calibratedConfidence = params.calibrators
-    ? applyCalibrator(params.calibrators.forRegime(regime.label), confidence)
+    ? applyCalibrator(params.calibrators.forRegime(regime.label, params.symbol), confidence)
     : undefined;
 
   // ---- Meta-modelo (Módulo 2): filtro anti-falsos-positivos ----
