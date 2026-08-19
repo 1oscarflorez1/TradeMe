@@ -7,6 +7,57 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.39.1] — 2026-08-19
+
+> El asistente llevaba días respondiendo desde su base local y nadie se había enterado: Groq retiró
+> el modelo configurado y cada consulta devolvía 404 en silencio. Al ir a arreglarlo apareció que,
+> aun con el modelo bueno, tampoco habría podido responder.
+
+### Fixed — Un asistente caído se veía igual que uno sin configurar
+
+- Groq retiró `llama-3.3-70b-versatile`. El portal no tenía forma de distinguir «el modelo ya no
+  existe» de «no hay modelo configurado», así que el fallo solo salía a la luz cuando alguien
+  preguntaba algo y recibía la respuesta de la base local con un 404 pegado al final.
+- Ahora se comprueba el catálogo del proveedor **al arrancar** y cada 15 minutos, y el resultado
+  aparece en `/health` y en la pestaña Estado. Si el modelo no está, el panel **lista los que sí
+  ofrece la cuenta** para poder elegir uno.
+- Los estados distinguen lo que se sabe de lo que no: `modelo_ausente`, `clave_rechazada`,
+  `proveedor_caido` y `sin_catalogo`. Este último importa: hay proveedores compatibles con OpenAI
+  que no publican `/models`, y ahí **no se puede concluir que el modelo falte**. Decirlo sería
+  inventar un diagnóstico y mandar a cambiar algo que funciona.
+- La comprobación no cuelga de `/health`: se cachea y se refresca en segundo plano. El estado de la
+  plataforma no puede depender de la latencia de un tercero.
+
+### Added — `docs/cuarentena.md`
+
+- La cuarentena no tenía documento propio, a diferencia de la calibración, la independencia, el
+  meta-modelo y el fundamental. Estaba explicada solo en comentarios de código y en el Centro de
+  ayuda, y **el asistente no lee ninguno de los dos**.
+- Recoge lo que estaba disperso: por qué entró 4h (−0,485 R en 89 decisiones, 69 cortos con el
+  85,6 % al stop), los umbrales de entrada y salida y por qué son asimétricos, el modo sombra y el
+  fallo de diseño que lo hizo necesario —la cuarentena era irreversible por construcción—, y la
+  causa que se creyó durante meses y resultó falsa al medirla.
+
+### Fixed — El asistente no encontraba documentos por cómo se escriben
+
+- Preguntando «¿por qué las cuarentenas?», el modelo pide el tema `cuarentenas` y el fichero se
+  llama `cuarentena.md`: la respuesta era «no hay documentación» teniéndola delante. Lo mismo
+  habría pasado con `calibración` (tilde), `meta-modelo` (guion) o `datos externos` (espacio).
+- La resolución ahora tolera mayúsculas, tildes, guiones, espacios y singular/plural en sus dos
+  formas del castellano. Y compara **contra la lista de ficheros reales** en vez de construir una
+  ruta con lo que llega de fuera, así que de paso cierra la puerta a salirse del directorio.
+
+### Changed — El asistente ya no lee media explicación
+
+- El tope por documento sube de 6000 a 9000 caracteres. A 6000 se truncaban **7 de los 29**
+  documentos, y justamente los conceptuales —independencia, fundamental, cuarentena, asistente—,
+  que son los que alguien pregunta. El asistente recibía la mitad y respondía con ella.
+
+### Added — Artículo de cuarentena en el Centro de ayuda
+
+- Con la parte incómoda incluida: no se sabe por qué falla el 4 horas, y la explicación que se dio
+  por buena durante meses resultó falsa al poder medirla.
+
 ## [0.39.0] — 2026-08-19
 
 > Cuatro activos cripto en lugar de uno. El objetivo no es «más mercados»: es que el proyecto pueda

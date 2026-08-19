@@ -22,6 +22,7 @@ import type { PushSub } from './push/push.js';
 import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 import type { FundamentalArtifact } from './ensemble/fundamental.js';
+import type { ModelHealth } from './assistant/provider.js';
 import type { UserRow } from './db/users-repo.js';
 import { verifyPassword } from './auth/password.js';
 import { signJwt, verifyJwt } from './auth/jwt.js';
@@ -143,6 +144,7 @@ export interface AppDeps {
     model: string;
     host: string;
     busqueda?: { enabled: boolean; provider: string };
+    modelo?: ModelHealth;
   };
   tvSecret?: string;
   /** Callback para difundir en vivo una señal externa recién recibida. */
@@ -421,6 +423,37 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         ? `activa · ${deps.captureInfo!().intervals} · confianza ≥ ${Math.round(deps.captureInfo!().minConfidence * 100)}% · 1 cada ${deps.captureInfo!().cooldownMin} min`
         : 'desactivada (solo se registran los snapshots manuales del portal)',
     });
+
+    // Asistente: que esté configurado no significa que funcione.
+    //
+    // Groq retiró `llama-3.3-70b-versatile` y el asistente estuvo días respondiendo desde su base
+    // local sin que nadie lo supiera: cada consulta devolvía 404 y el portal no tenía forma de
+    // distinguir eso de un asistente sin configurar. Es el mismo principio que `data_sources` en
+    // M11 — una fuente caída y una fuente sin novedades tienen que verse distintas.
+    const salud = deps.assistantInfo?.();
+    if (salud?.enabled) {
+      const m = salud.modelo;
+      // `degradado`, no `caido`: el asistente sigue respondiendo con el estado en vivo desde su
+      // base local. Lo que se ha perdido es la parte que necesita el modelo.
+      const estado: 'ok' | 'degradado' | 'na' =
+        m?.status === 'ok' ? 'ok' : m?.status === 'sin_catalogo' || !m ? 'na' : 'degradado';
+      components.push({
+        key: 'assistant',
+        label: 'Asistente (modelo de lenguaje)',
+        status: estado,
+        detail:
+          m?.status === 'ok'
+            ? `${salud.model} · ${salud.host}`
+            : (m?.detail ?? `${salud.model} · ${salud.host} · sin comprobar todavía`),
+      });
+    } else {
+      components.push({
+        key: 'assistant',
+        label: 'Asistente (modelo de lenguaje)',
+        status: 'na',
+        detail: 'sin modelo configurado: responde con el estado en vivo desde su base local',
+      });
+    }
 
     // Meta-modelo (Módulo 2)
     components.push({

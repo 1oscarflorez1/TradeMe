@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { fetchProviders, fetchSystemStatus } from './api';
-import type { ProviderInfo, SystemStatus } from './api';
+import { fetchAssistantInfo, fetchProviders, fetchSystemStatus } from './api';
+import type { AssistantInfo, ProviderInfo, SystemStatus } from './api';
 
 const DOT: Record<string, string> = { ok: '🟢', degradado: '🟡', caido: '🔴', na: '⚪' };
 const LABEL: Record<string, string> = {
@@ -15,6 +15,7 @@ export function StatusView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [asistente, setAsistente] = useState<AssistantInfo | null>(null);
 
   const load = () =>
     fetchSystemStatus().then((r) => {
@@ -26,6 +27,7 @@ export function StatusView() {
   useEffect(() => {
     void load();
     void fetchProviders().then(setProviders);
+    void fetchAssistantInfo().then(setAsistente);
     const id = setInterval(() => void load(), 30000);
     return () => clearInterval(id);
   }, []);
@@ -100,6 +102,40 @@ export function StatusView() {
               </tbody>
             </table>
           </div>
+
+          {asistente?.modelo && asistente.modelo.status !== 'ok' && asistente.enabled ? (
+            <div className="panel error" style={{ maxWidth: 'none', marginTop: '1rem' }}>
+              <p>
+                🟡 <strong>El asistente no está usando su modelo.</strong>
+              </p>
+              <p className="hint">{asistente.modelo.detail}</p>
+              {asistente.modelo.available && asistente.modelo.available.length > 0 ? (
+                <>
+                  <p className="hint">
+                    Modelos que sí ofrece <strong>{asistente.host}</strong> para esta cuenta. Pon uno
+                    en <code>ASSISTANT_MODEL</code> (dentro de <code>infra/.env.prod</code>) y
+                    reinicia los contenedores:
+                  </p>
+                  <ul className="fund-meta" style={{ display: 'block', lineHeight: 1.7 }}>
+                    {asistente.modelo.available.map((m) => (
+                      <li key={m}>
+                        <code>{m}</code>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="hint">
+                    Ojo: el asistente necesita un modelo con <em>tool calling</em> para poder
+                    consultar la documentación y tus cifras. No todos lo soportan.
+                  </p>
+                </>
+              ) : null}
+              <p className="hint">
+                Mientras tanto responde desde su <strong>base local</strong>: el estado en vivo, tus
+                registros, el régimen y el sistema siguen funcionando. Lo que no puede es explicarte
+                conceptos leyendo la documentación.
+              </p>
+            </div>
+          ) : null}
 
           {providers.length > 0 && (
             <>
