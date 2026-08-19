@@ -36,6 +36,7 @@ artifacts/metamodel.json
 artifacts/optimization_report.json
 artifacts/ensemble.optimized.yaml
 artifacts/optimized/
+artifacts/fundamental/
 infra/.env.prod
 
 # Volcados de base de datos (datos, no código)

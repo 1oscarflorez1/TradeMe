@@ -18,7 +18,13 @@ import sys
 from datetime import UTC, datetime
 
 from .ensemble import artifacts_dir
-from .fundamental import DEFAULT_WINDOW_DAYS, MIN_OBSERVACIONES, refresh
+from .fundamental import (
+    DEFAULT_WINDOW_DAYS,
+    MIN_OBSERVACIONES,
+    build_artifact,
+    funding_window,
+    write_artifact,
+)
 
 
 def _dsn() -> str:
@@ -41,14 +47,22 @@ def publish(
     log: list[str] = []
     for symbol in symbols:
         try:
-            art = refresh(dsn, symbol.upper(), ahora, base, window_days)
+            sym = symbol.upper()
+            valores = funding_window(dsn, sym, ahora, window_days)
+            if not valores:
+                # Sin una sola observación no hay nada que publicar. Suele ser un activo que
+                # simplemente no tiene funding —una acción, un índice—, y escribirle un artefacto
+                # vacío dejaría un fichero muerto por cada uno de ellos.
+                log.append(f"{sym}: sin funding (no es un perpetuo), no se publica")
+                continue
+            art = build_artifact(sym, valores, ahora, window_days)
+            write_artifact(art, base)
             if art["stale"]:
                 log.append(
-                    f"{symbol}: sin muestra suficiente "
-                    f"({art['n']}/{MIN_OBSERVACIONES}), score en 0"
+                    f"{sym}: sin muestra suficiente ({art['n']}/{MIN_OBSERVACIONES}), score en 0"
                 )
             else:
-                log.append(f"{symbol}: distribución de {art['n']} observaciones ({art['version']})")
+                log.append(f"{sym}: distribución de {art['n']} observaciones ({art['version']})")
         except Exception as err:  # noqa: BLE001 - un símbolo caído no tumba el ciclo
             log.append(f"{symbol}: ERROR {err}")
     return log

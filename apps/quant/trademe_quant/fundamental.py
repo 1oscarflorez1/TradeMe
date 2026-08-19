@@ -172,17 +172,3 @@ def write_artifact(artifact: dict[str, Any], base_dir: str | Path) -> Path:
     ruta = destino / f"{artifact['symbol']}.json"
     ruta.write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf8")
     return ruta
-
-
-def refresh(
-    dsn: str,
-    symbol: str,
-    momento: datetime,
-    base_dir: str | Path,
-    window_days: int = DEFAULT_WINDOW_DAYS,
-) -> dict[str, Any]:
-    """Recalcula y publica la distribución de un símbolo."""
-    valores = funding_window(dsn, symbol, momento, window_days)
-    art = build_artifact(symbol, valores, momento, window_days)
-    write_artifact(art, base_dir)
-    return art

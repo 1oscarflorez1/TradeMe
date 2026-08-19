@@ -24,7 +24,10 @@ export interface BuildSignalParams {
   macro?: Macro;
   /** Distribución de referencia del funding publicada por quant (M12). */
   fundamentalArtifact?: FundamentalArtifact | null;
-  /** Funding del momento cuando no viene dentro de `macro` (p. ej. con el macro apagado). */
+  /**
+   * Funding del momento. **No depende del sesgo macro**: el score fundamental existe precisamente
+   * porque el funding no deriva del precio, así que apagar el macro no puede dejarlo ciego.
+   */
   funding?: number;
   ts?: string;
   calibrators?: Calibrators;
@@ -60,7 +63,9 @@ export function buildSignal(params: BuildSignalParams): Signal {
   // estas dos líneas no alteran ni un dígito de la decisión.
   const fundamental: Fundamental | undefined = params.config.fundamental
     ? computeFundamental({
-        funding: params.macro?.funding ?? params.funding ?? 0,
+        // Sin `?? 0`: si no hay funding conocido, el score se declara stale en vez de situar un
+        // cero inventado en la distribución.
+        funding: params.funding ?? params.macro?.funding,
         artifact: params.fundamentalArtifact,
         config: params.config.fundamental,
       })

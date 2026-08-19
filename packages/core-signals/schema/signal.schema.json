@@ -160,8 +160,8 @@
       "required": ["funding", "percentile", "penalty", "mode", "applied", "stale"],
       "properties": {
         "funding": {
-          "type": "number",
-          "description": "Funding rate del momento, tal cual lo dio el proveedor."
+          "type": ["number", "null"],
+          "description": "Funding rate del momento. null cuando no se conoce, que NO es lo mismo que cero: un cero por defecto se situaría en la distribución y produciría un percentil con pinta de medición."
         },
         "percentile": {
           "type": "number",
