@@ -7,6 +7,44 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.39.2] — 2026-08-21
+
+> El asistente volvía a responder desde su base local, esta vez por un motivo distinto: el modelo
+> nuevo existe y la clave vale, pero **una sola pregunta puede agotar la cuota del minuto**.
+
+### Fixed — Se rendía al primer 429 en lugar de esperar
+
+- Groq mide la cuota **por minuto** (8.000 tokens en esta cuenta). El código lanzaba un error
+  genérico ante el 429 y caía al instante a la base local, convirtiendo un tope temporal en una
+  caída.
+- Ahora reintenta hasta dos veces respetando la cabecera `retry-after`, con la espera **acotada a
+  8 s** por intento: un proveedor que pidiera esperar una hora no puede dejar colgada la petición
+  del usuario.
+- Error tipado `SinCupoError` y estado `sin_cupo`, para que quedarse sin cuota no se confunda con
+  un proveedor caído. El endpoint responde **429**, no 502.
+
+### Fixed — El mensaje de repuesto mandaba a revisar una configuración correcta
+
+- Decía *«sin un modelo de lenguaje configurado»* con el modelo perfectamente configurado. Ahora
+  distingue quedarse sin cupo —y dice que se vuelva a preguntar en un minuto— de una avería real.
+- La comprobación de salud también: un 429 al consultar el catálogo ya no se marca como «proveedor
+  caído». Importaba porque ese resultado **se cachea 15 minutos**, así que un diagnóstico inventado
+  se quedaba pegado un cuarto de hora.
+
+### Changed — Cada pregunta gasta bastante menos
+
+Medido contra la API: **cambiar de modelo no era una salida**. En esta cuenta, todos los que
+soportan herramientas tienen el mismo techo de 8.000 TPM (`gpt-oss-120b`, `gpt-oss-20b`,
+`qwen3.6-27b`), y los únicos con 70.000 —`groq/compound` y `compound-mini`— responden
+`tool calling is not supported`. Así que había que gastar menos:
+
+- **Dos vueltas de herramientas en vez de tres.** Cada vuelta reenvía el hilo completo, ya crecido
+  con los resultados anteriores; la tercera era la que solía reventar el cupo. Con dos, el modelo
+  consulta y responde, que es el caso real.
+- **El resultado de cada herramienta se recorta a 2.000 caracteres** en vez de 6.000. Eran ~1.500
+  tokens por llamada, reenviados íntegros en la vuelta siguiente: dos consultas se comían la mitad
+  del cupo del minuto antes de que el modelo escribiera una palabra.
+
 ## [0.39.1] — 2026-08-19
 
 > El asistente llevaba días respondiendo desde su base local y nadie se había enterado: Groq retiró
