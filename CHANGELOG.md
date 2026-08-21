@@ -7,6 +7,26 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.39.3] — 2026-08-21
+
+> La api no perdía la conexión con la base y reintentaba: **se moría**. Un despliegue que no
+> arrancaba lo destapó.
+
+### Fixed — Un reinicio de Postgres tumbaba la api entera
+
+- `pg.Pool` emite un evento `error` cuando el servidor cierra una conexión **inactiva** —un reinicio
+  de la base, mantenimiento, o apagar el contenedor—. `createPool` no tenía listener, y Node trata
+  un `error` sin escuchar como excepción no capturada: **mata el proceso**.
+- Ocurrió el 20 de agosto: al pararse Postgres, la api registró `terminating connection due to
+  administrator command`, después `Unhandled 'error' event`, y salió con código 1. No hubo
+  reconexión ni reintento; simplemente dejó de existir por un error en una conexión que ya nadie
+  usaba.
+- Con el listener, el pool descarta el cliente roto y sigue: la siguiente consulta abre una conexión
+  nueva. Es la diferencia entre una base que se reinicia y una plataforma que se cae.
+- Importa más de lo que parece porque al morir se pierde el estado en memoria —buffer de velas,
+  sesgo macro, funding— y al volver hay que resembrar histórico, lo que gasta cupo de proveedores
+  que sí lo tienen contado.
+
 ## [0.39.2] — 2026-08-21
 
 > El asistente volvía a responder desde su base local, esta vez por un motivo distinto: el modelo
