@@ -87,6 +87,44 @@ Los dos umbrales están escritos en la migración `019_fundamental_score.sql` **
 resultado**. Métrica adicional de juicio: *¿cuántos votos efectivos añade?* — es la prueba de que
 aporta un eje propio y no otra copia del precio (ver [independencia](independencia.md)).
 
+### El evaluador, y su primera lectura
+
+`fundamental_policy.py` mide el expediente sombra en cada ciclo del piloto y publica
+`artifacts/fundamental_policy.json`. La api lo lee, y el `mode` de `ensemble.yaml` actúa como
+**tope**: la automatización puede rebajar el modo, nunca subirlo. Si el artefacto falta o viene
+corrupto, el peor caso es que el score influya *menos* de lo previsto.
+
+El lift no se reconstruye: sale de `fund_shadow_action`, que ya guarda qué se habría decidido. Donde
+la sombra discrepa, esa operación no se habría abierto y su resultado habría sido 0.
+
+**Primera medición real (21 ago 2026)** — no promociona, y con motivo:
+
+| | |
+|---|---|
+| decisiones LONG cerradas | 75 (de 100 exigidas) |
+| discrepancias | 44 |
+| expectancy real | +1,08 R |
+| con el score aplicado | +0,55 R |
+| **lift** | **−0,53 R** |
+| **AUC** | **0,456** |
+
+La señal preliminar es **negativa**: aplicar el score habría empeorado el resultado. Pero antes de
+concluir nada hay que mirar de dónde salen esos 75 registros: **74 son de ETH y SOL dentro de las
+mismas 14 horas** del 19 al 20 de agosto, con 27 aciertos de 35 en ETH. El baseline de +1,08 R no
+describe la plataforma, describe ese rally — y contra un tramo así, cualquier filtro que quite
+compras parece desastroso.
+
+Es justo el escenario donde el funding alto **no** predice mal resultado: un rally sostenido con
+largos cargados que siguen ganando. Ni confirma ni refuta la medición original; simplemente todavía
+no hay contraste de régimen.
+
+### Limitación conocida: `n` cuenta decisiones, no evidencia
+
+Cien decisiones correlacionadas siguen siendo casi una sola apuesta observada cien veces.
+`MIN_SAMPLES` no protege de eso. Mientras no exista el **Gestor de Correlaciones**, conviene mirar
+el reparto por símbolo y por ventana temporal antes de dar peso a un veredicto — en las dos
+direcciones, tanto si el score sale bien parado como si sale mal.
+
 Mientras tanto se registra en columnas propias (`fund_percentile`, `fund_penalty`, `fund_mode`,
 `fund_version`, `fund_shadow_action`, `fund_shadow_confidence`), nunca en las de `outcome_*`. El
 aislamiento es **estructural**: una consulta que olvide filtrar no puede contaminar la expectancy.

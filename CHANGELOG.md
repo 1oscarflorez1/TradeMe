@@ -7,6 +7,52 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.40.0] — 2026-08-21
+
+> El Fundamental Score ya puede ser juzgado. Y su primera lectura es negativa —aunque por ahora eso
+> dice más del mercado de esta semana que del score.
+
+### Added — Gobierno automático del Fundamental Score
+
+- `fundamental_policy.py` mide el expediente sombra en cada ciclo y publica
+  `artifacts/fundamental_policy.json`. Asciende de `shadow` a `active` solo con lift ≥ 0,05 R y
+  AUC ≥ 0,55 —los umbrales escritos en la migración 019 antes de ver ningún resultado— y **retrocede
+  en cuanto deja de cumplirlos**. Permanencia simétrica, la lección que el meta-modelo aprendió
+  conservando poder con un AUC de 0,43.
+- **El lift no se reconstruye**: sale de `fund_shadow_action`, que ya guarda qué se habría decidido.
+  Donde la sombra discrepa, esa operación no se habría abierto y su resultado habría sido 0.
+  Reconstruirlo a posteriori invitaría a elegir el criterio mirando el desenlace.
+- **Solo LONG**, porque el score solo penaliza compras. Evaluarlo sobre cortos sería medir ruido y
+  diluir la señal con él.
+- **Mínimo de discrepancias, no solo de decisiones.** Un score que nunca cambia nada tiene lift 0
+  por construcción, y eso se leería como «no perjudica» en vez de como «no ha demostrado nada».
+- El `mode` de `ensemble.yaml` pasa a ser un **tope**: la automatización puede rebajar el modo, nunca
+  subirlo. Si el artefacto falta o viene corrupto, el peor caso es que el score influya *menos*.
+
+### Primera medición real: no promociona
+
+| | |
+|---|---|
+| decisiones LONG cerradas | 75 (de 100 exigidas) |
+| discrepancias | 44 |
+| expectancy real | +1,08 R |
+| con el score aplicado | +0,55 R |
+| **lift** | **−0,53 R** |
+| **AUC** | **0,456** |
+
+- Se queda en sombra por muestra insuficiente, que es lo correcto. Pero la señal preliminar apunta a
+  que el score **empeoraría** el resultado.
+- Antes de concluir nada: **74 de esos 75 registros son de ETH y SOL dentro de las mismas 14 horas**,
+  con 27 aciertos de 35 en ETH. El baseline de +1,08 R no describe la plataforma, describe ese rally.
+  Es justo el escenario donde el funding alto **no** predice mal resultado.
+
+### Documentado — `n` cuenta decisiones, no evidencia
+
+- Cien decisiones correlacionadas siguen siendo casi una sola apuesta observada cien veces, y
+  `MIN_SAMPLES` no protege de eso. Queda anotado en el módulo y en `docs/fundamental.md`: hasta que
+  exista el Gestor de Correlaciones, hay que mirar el reparto por símbolo y por ventana antes de dar
+  peso a un veredicto — tanto si favorece al score como si no.
+
 ## [0.39.3] — 2026-08-21
 
 > La api no perdía la conexión con la base y reintentaba: **se moría**. Un despliegue que no

@@ -291,6 +291,29 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin score el motor decide igual que hoy
         log.append(f"error fundamental: {err}")
 
+    # Gobierno del Fundamental Score: mide su expediente sombra y decide si ya se ha ganado el
+    # derecho a influir. Va después de publicar las distribuciones porque juzga lo que estas
+    # produjeron. Como todo lo demás aquí: asciende con evidencia y retrocede al perderla.
+    try:
+        from .fundamental_policy import publish as publish_fund_policy
+
+        fpol = publish_fund_policy(artifacts_dir(), dsn)
+        if fpol["changed"]:
+            log.append(f"fundamental: modo -> {fpol['mode']} ({fpol['reason']})")
+            insert_alert(
+                dsn,
+                "fundamental_policy",
+                "warning" if fpol["mode"] == "active" else "success",
+                f"Fundamental Score: modo {fpol['mode']}",
+                str(fpol["reason"]),
+                None,
+                None,
+            )
+        else:
+            log.append(f"fundamental: sigue en {fpol['mode']} ({fpol['reason']})")
+    except Exception as err:  # noqa: BLE001 - sin política, manda ensemble.yaml
+        log.append(f"error política fundamental: {err}")
+
     # Gobierno de la cuarentena: mide el expediente sombra de las temporalidades vetadas y el
     # rendimiento real de las que operan, y decide. Sin esto, `quarantine_intervals` sería una
     # lista fija que alguien tendría que acordarse de vaciar.

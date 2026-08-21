@@ -53,6 +53,7 @@ import { MetaModel } from './metamodel/apply.js';
 import { MetaPolicy } from './metamodel/policy.js';
 import { MacroStore } from './macro/store.js';
 import { Fundamentals } from './ensemble/fundamental.js';
+import { FundamentalPolicy } from './ensemble/fundamental-policy.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
 import { EMA } from 'technicalindicators';
@@ -95,6 +96,10 @@ async function main(): Promise<void> {
   const externalStore = new ExternalSignalStore();
   const ensemble = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
   const artifactsDir = dirname(env.ENSEMBLE_CONFIG);
+  // Gobierno del Fundamental Score: el piloto decide el modo midiendo el expediente sombra; el de
+  // `ensemble.yaml` queda como TOPE. Sin artefacto manda la configuración, que es el estado
+  // anterior a que existiera este gobierno.
+  const fundamentalPolicy = FundamentalPolicy.load(join(artifactsDir, 'fundamental_policy.json'));
   const ensembleCache = new Map<string, EnsembleConfig>();
   const independence = Independence.load(env.INDEPENDENCE_PATH);
   const quarantine = QuarantinePolicy.load(env.QUARANTINE_PATH);
@@ -121,6 +126,12 @@ async function main(): Promise<void> {
       independence.factorFor(symbol, interval),
       vetada,
     );
+    // El gobierno automático solo puede REBAJAR el modo del score respecto al configurado. Si el
+    // artefacto falta o viene corrupto, el peor caso es que influya menos de lo previsto.
+    cfg.fundamental = {
+      ...cfg.fundamental,
+      mode: fundamentalPolicy.effectiveMode(cfg.fundamental.mode),
+    };
     ensembleCache.set(key, cfg);
     return cfg;
   }
@@ -183,6 +194,7 @@ async function main(): Promise<void> {
     independence.reload();
     quarantine.reload();
     fundamentals.reload();
+    fundamentalPolicy.reload();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
