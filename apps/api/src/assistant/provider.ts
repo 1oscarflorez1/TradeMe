@@ -57,6 +57,7 @@ export type ModelStatus =
   | 'clave_rechazada' // 401/403: la clave no vale
   | 'proveedor_caido' // no responde, o error del servidor
   | 'sin_catalogo' // no publica /models: no se puede verificar, y no se inventa
+  | 'sin_cupo' // 429: el modelo existe y la clave vale; se agotó la cuota del minuto
   | 'sin_clave'
   | 'no_configurado';
 
@@ -71,6 +72,37 @@ export interface ModelHealth {
 
 /** Cada cuánto se recomprueba el catálogo. Un modelo no desaparece dos veces en una hora. */
 const HEALTH_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * Reintentos ante 429. La cuota de Groq se mide **por minuto**, así que esperar unos segundos suele
+ * bastar: rendirse al instante convierte un tope temporal en una caída, que es lo que hacía antes.
+ */
+const REINTENTOS_429 = 2;
+/** Tope de espera por reintento. Sin él, un `retry-after` largo bloquearía la petición del usuario. */
+const ESPERA_MAX_MS = 8000;
+const ESPERA_POR_DEFECTO_MS = 2000;
+
+/** El proveedor existe y la clave vale; simplemente no queda cuota en esta ventana. */
+export class SinCupoError extends Error {
+  constructor(
+    message: string,
+    readonly esperaMs: number,
+  ) {
+    super(message);
+    this.name = 'SinCupoError';
+  }
+}
+
+/** Segundos que pide esperar el proveedor, acotados. `Retry-After` es estándar en 429. */
+function esperaDe(res: { headers: { get(n: string): string | null } }): number {
+  const cabecera = res.headers.get('retry-after') ?? res.headers.get('x-ratelimit-reset-tokens');
+  if (!cabecera) return ESPERA_POR_DEFECTO_MS;
+  const segundos = Number.parseFloat(cabecera.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(segundos) || segundos <= 0) return ESPERA_POR_DEFECTO_MS;
+  return Math.min(ESPERA_MAX_MS, Math.ceil(segundos * 1000));
+}
+
+const dormir = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 export class AssistantProvider {
   constructor(private readonly cfg: AssistantConfig) {}
@@ -169,6 +201,19 @@ export class AssistantProvider {
         };
         return this.health;
       }
+      if (res.status === 429) {
+        // Sin cuota para consultar el catálogo. No dice nada malo del modelo ni de la clave, así
+        // que marcarlo como «proveedor caído» sería un diagnóstico inventado — y además pegajoso,
+        // porque este resultado se cachea 15 minutos.
+        this.health = {
+          status: 'sin_cupo',
+          detail:
+            'Sin cupo en el proveedor para comprobar el catálogo. El modelo puede estar bien; ' +
+            'se reintenta en la próxima comprobación.',
+          checkedAt: ahora(),
+        };
+        return this.health;
+      }
       if (!res.ok) {
         // Un 404 aquí es del *endpoint* de catálogo, no del modelo: hay proveedores que no lo
         // publican. Concluir que el modelo falta sería inventarse un diagnóstico.
@@ -232,7 +277,11 @@ export class AssistantProvider {
     messages: AssistantMessage[],
     tools: unknown[],
     ejecutar: (nombre: string, args: Record<string, unknown>) => Promise<unknown>,
-    maxVueltas = 3,
+    // Dos, no tres. Cada vuelta reenvía el hilo completo —que además ha crecido con los resultados
+    // de las herramientas—, así que la tercera es la que suele reventar un cupo de 8000 tokens por
+    // minuto. Con dos, el modelo consulta y responde, que es el caso real; la que se pierde es la
+    // de encadenar una herramienta tras otra.
+    maxVueltas = 2,
   ): Promise<AssistantReply> {
     if (!this.enabled) throw new Error('asistente sin proveedor configurado');
     const hilo = [...messages];
@@ -263,7 +312,10 @@ export class AssistantProvider {
         hilo.push({
           role: 'tool',
           tool_call_id: c.id,
-          content: JSON.stringify(salida).slice(0, 6000),
+          // 6000 caracteres eran ~1500 tokens por herramienta, y el hilo entero se reenvía en la
+          // vuelta siguiente: dos llamadas se comían la mitad del cupo del minuto antes de que el
+          // modelo hubiera escrito una palabra. 2000 sigue siendo holgado para una respuesta útil.
+          content: JSON.stringify(salida).slice(0, 2000),
         });
       }
     }
@@ -282,6 +334,7 @@ export class AssistantProvider {
   private async raw(
     messages: AssistantMessage[],
     tools?: unknown[],
+    intento = 0,
   ): Promise<{
     choices?: Array<{ message?: { content?: string; tool_calls?: ToolCall[] } }>;
     model?: string;
@@ -306,6 +359,21 @@ export class AssistantProvider {
           ...(tools && tools.length > 0 ? { tools, tool_choice: 'auto' } : {}),
         }),
       });
+      if (res.status === 429) {
+        // No es una avería: el modelo está y la clave vale. La cuota se repone en la ventana
+        // siguiente, así que se espera lo que pida el proveedor y se vuelve a intentar. Quien
+        // agota el `intento` acaba en `SinCupoError`, que el portal sabe explicar sin mentir.
+        const detalle = await res.text().catch(() => '');
+        const espera = esperaDe(res);
+        if (intento < REINTENTOS_429) {
+          await dormir(espera);
+          return this.raw(messages, tools, intento + 1);
+        }
+        throw new SinCupoError(
+          `sin cupo tras ${REINTENTOS_429 + 1} intentos: ${detalle.slice(0, 160)}`,
+          espera,
+        );
+      }
       if (!res.ok) {
         const detalle = await res.text().catch(() => '');
         throw new Error(`proveedor respondió ${res.status}: ${detalle.slice(0, 200)}`);

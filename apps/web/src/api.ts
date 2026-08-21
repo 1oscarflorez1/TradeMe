@@ -509,7 +509,9 @@ export async function askAssistant(
   historial: Array<{ role: 'user' | 'assistant'; content: string }>,
   symbol: string,
   interval: string,
-): Promise<{ texto: string; modelo: string; consultas?: string[] } | { error: string }> {
+): Promise<
+  { texto: string; modelo: string; consultas?: string[] } | { error: string; codigo?: string }
+> {
   try {
     const res = await apiFetch('/assistant/ask', {
       method: 'POST',
@@ -521,8 +523,11 @@ export async function askAssistant(
       modelo?: string;
       consultas?: string[];
       error?: string;
+      codigo?: string;
     };
-    if (!res.ok || !body.texto) return { error: body.error ?? `HTTP ${res.status}` };
+    if (!res.ok || !body.texto) {
+      return { error: body.error ?? `HTTP ${res.status}`, codigo: body.codigo };
+    }
     return { texto: body.texto, modelo: body.modelo ?? '', consultas: body.consultas };
   } catch (e) {
     return { error: String(e) };

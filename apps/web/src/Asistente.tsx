@@ -379,11 +379,21 @@ export function Asistente({ symbol, interval }: { symbol: string; interval: Inte
     if ('texto' in r) {
       setMensajes((m) => [...m, { de: 'bot', texto: r.texto, fuente: 'modelo', consultas: r.consultas }]);
     } else {
+      // Quedarse sin cuota del minuto y no tener modelo configurado son cosas distintas. Decirle al
+      // usuario la segunda cuando ocurre la primera le manda a revisar una configuración correcta,
+      // que es exactamente lo que pasó: «sin un modelo de lenguaje configurado» con el modelo bien
+      // configurado y solo sin cupo ese minuto.
+      const nota =
+        r.codigo === 'sin_cupo'
+          ? 'El modelo se ha quedado **sin cupo en este minuto**: el proveedor limita cuántos datos ' +
+            'admite por minuto y esta pregunta necesitaba consultar la plataforma. Vuelve a ' +
+            'preguntar en un minuto y responderá él. Mientras tanto, esto sale de la base local.'
+          : `El modelo no está disponible ahora mismo: ${r.error}. Esta respuesta viene de la base local.`;
       setMensajes((m) => [
         ...m,
         {
           de: 'bot',
-          texto: `${responder(pregunta, c)}\n\n_(El modelo no está disponible ahora mismo: ${r.error}. Esta respuesta viene de la base local.)_`,
+          texto: `${responder(pregunta, c)}\n\n_(${nota})_`,
           fuente: 'local',
         },
       ]);

@@ -23,6 +23,7 @@ import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 import type { FundamentalArtifact } from './ensemble/fundamental.js';
 import type { ModelHealth } from './assistant/provider.js';
+import { SinCupoError } from './assistant/provider.js';
 import type { UserRow } from './db/users-repo.js';
 import { verifyPassword } from './auth/password.js';
 import { signJwt, verifyJwt } from './auth/jwt.js';
@@ -636,6 +637,15 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       );
       return r;
     } catch (err) {
+      // Quedarse sin cuota del minuto no es una avería: el modelo está, la clave vale y en la
+      // ventana siguiente vuelve a responder. Devolverlo como 502 lo hacía indistinguible de un
+      // proveedor caído, y el portal acababa diciéndole al usuario que no había modelo configurado.
+      if (err instanceof SinCupoError) {
+        request.log.info({ esperaMs: err.esperaMs }, 'asistente sin cupo en esta ventana');
+        return reply
+          .status(429)
+          .send({ error: err.message, codigo: 'sin_cupo', esperaMs: err.esperaMs });
+      }
       request.log.warn({ err: String(err) }, 'el asistente no pudo responder');
       return reply.status(502).send({ error: String(err instanceof Error ? err.message : err) });
     }
