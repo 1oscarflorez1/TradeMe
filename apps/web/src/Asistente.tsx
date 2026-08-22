@@ -106,6 +106,7 @@ const TEMAS: Array<{
       'calibracion', 'calibrar', 'isotonica', 'platt',
       'independencia', 'desinflado', 'votos efectivos', 'correlacion',
       'cuarentena', 'no trade', 'documentacion', 'docs',
+      'nula', 'azar', 'permutacion', 'significancia', 'mal martes',
       'fundamental', 'funding', 'score fundamental', 'sombra', 'percentil',
     ],
     // Se cita el artículo EXACTO, no «el Centro de ayuda» a secas. Desde que el contenido salió del

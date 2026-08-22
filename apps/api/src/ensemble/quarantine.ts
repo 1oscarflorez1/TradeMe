@@ -14,12 +14,32 @@ export interface QuarantineEntry {
   was_quarantined?: boolean;
   changed?: boolean;
   reason: string;
-  evidence?: { n: number; expectancy: number; win_rate: number; source: 'sombra' | 'real' };
+  evidence?: {
+    n: number;
+    expectancy: number;
+    win_rate: number;
+    source: 'sombra' | 'real';
+    /**
+     * Expectancy que alcanza el azar con esa misma muestra (percentil 95), y con qué población se
+     * midió. Desde el Hito A la puerta de SALIDA exige `max(0,05 R, nula_p95)`: una temporalidad
+     * cuyas 30 decisiones caben en 9,8 horas puede estar describiendo un mal martes, no a sí misma.
+     *
+     * `umbral_salida` es `null` en las claves que operan: la puerta de ENTRADA no usa la nula a
+     * propósito, porque exigir significancia para entrar dejaría operando lo malo mientras no se
+     * demuestre que lo es.
+     */
+    nula_p95?: number;
+    n_poblacion?: number;
+    bloques_poblacion?: number;
+    umbral_salida?: number | null;
+  };
 }
 
 export interface QuarantineSet {
   version?: string;
   updated_at?: string | null;
+  /** Con qué se calculó la nula, para poder reproducir un veredicto sin leer el código. */
+  nula?: { dias_poblacion: number; permutaciones: number; aplica_a: string };
   intervals: Record<string, QuarantineEntry>;
 }
 

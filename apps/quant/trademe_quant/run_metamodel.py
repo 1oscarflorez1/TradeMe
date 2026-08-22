@@ -68,18 +68,27 @@ def fetch_rows(dsn: str) -> list[dict[str, Any]]:
 
 
 def fetch_shadow_rows(dsn: str, limit: int = 500) -> list[dict[str, Any]]:
-    """Decisiones cerradas que además guardaron la predicción del meta-modelo (modo sombra)."""
+    """Decisiones cerradas que además guardaron la predicción del meta-modelo (modo sombra).
+
+    `captured_at` viaja desde el Hito A: `meta_policy` agrupa por bloques de 24 h para su nula, y
+    sin fecha todas las filas caerían en el mismo bloque — lo que convertiría la nula por bloques en
+    la simple y subestimaría la varianza justo donde se quería medir.
+    """
     import psycopg
 
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
-            """SELECT meta_confidence, outcome_return_r FROM snapshots
+            """SELECT meta_confidence, outcome_return_r, captured_at FROM snapshots
                WHERE meta_confidence IS NOT NULL AND outcome_result IN ('tp','sl')
                ORDER BY captured_at DESC LIMIT %s""",
             (limit,),
         )
         return [
-            {"meta_confidence": float(r[0]), "outcome_return_r": float(r[1])}
+            {
+                "meta_confidence": float(r[0]),
+                "outcome_return_r": float(r[1]),
+                "captured_at": r[2],
+            }
             for r in cur.fetchall()
         ]
 

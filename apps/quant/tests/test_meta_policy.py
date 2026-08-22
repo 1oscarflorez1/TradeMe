@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from trademe_quant.meta_policy import decide_mode, evaluate_shadow
+import numpy as np
+
+from trademe_quant.fundamental_policy import _lift_descartando
+from trademe_quant.meta_policy import (
+    MIN_LIFT_R,
+    _lift_conservando,
+    decide_mode,
+    evaluate_shadow,
+)
 
 
 def _rows(n: int, good_pred: bool) -> list[dict[str, Any]]:
@@ -99,3 +107,77 @@ def test_no_retrocede_por_debajo_de_sombra() -> None:
 def test_permanece_mientras_cumple() -> None:
     mode, _ = decide_mode("veto", evaluate_shadow(_rows(140, True), 0.5))
     assert mode == "veto"
+
+
+# --- El lift se compara con el azar (Hito A, 22/08/2026) ---------------------------------------
+#
+# El umbral fijo de +0,05 R no distinguía mérito de suerte: un modelo entrenado con las etiquetas
+# barajadas produce +0,083 R de media, por encima del listón que se le exigía para promocionar.
+
+
+def test_la_evidencia_trae_el_liston_del_azar() -> None:
+    ev = evaluate_shadow(_rows(140, True), 0.5)
+    assert "lift_nulo_p95" in ev
+    assert ev["lift_nulo_p95"] > 0.0  # conservar operaciones al azar ya sube la media
+
+
+def test_un_lift_que_el_azar_alcanza_no_asciende() -> None:
+    """El caso que motiva el hito: mejora positiva, pero peor que conservar otras cualesquiera."""
+    ev = evaluate_shadow(_rows(140, False), 0.4)  # predicción de puro ruido
+    ev["lift"] = MIN_LIFT_R + 0.01  # supera el umbral fijo…
+    ev["auc"] = 0.60  # …y el de AUC
+    ev["lift_nulo_p95"] = 0.40  # pero el azar llega mucho más lejos
+    modo, motivo = decide_mode("shadow", ev)
+    assert modo == "shadow"
+    assert "el azar alcanza" in motivo
+
+
+def test_sin_liston_del_azar_decide_como_antes() -> None:
+    """Compatibilidad hacia atrás: una evidencia sin el campo se comporta igual que antes."""
+    ev = {
+        "n": 140,
+        "baseline": 0.0,
+        "filtered": 0.5,
+        "lift": 0.5,
+        "kept": 70,
+        "auc": 0.80,
+    }
+    assert decide_mode("shadow", ev)[0] == "modulate"
+
+
+def test_el_azar_tambien_endurece_la_permanencia() -> None:
+    """Un umbral que solo se comprueba al ascender es un peaje de entrada, no un umbral."""
+    ev = {
+        "n": 140,
+        "baseline": 0.0,
+        "filtered": 0.1,
+        "lift": 0.10,
+        "kept": 70,
+        "auc": 0.80,
+        "lift_nulo_p95": 0.40,
+    }
+    modo, motivo = decide_mode("veto", ev)
+    assert modo == "modulate"
+    assert "deja de cumplir" in motivo
+
+
+def test_el_liston_solo_endurece() -> None:
+    """Con el azar por debajo del fijo, manda el fijo: nunca se relaja el criterio."""
+    base = {"n": 140, "baseline": 0.0, "filtered": 0.06, "lift": 0.06, "kept": 70, "auc": 0.80}
+    assert decide_mode("shadow", {**base, "lift_nulo_p95": -0.30})[0] == "modulate"
+    assert decide_mode("shadow", {**base, "lift_nulo_p95": 0.0})[0] == "modulate"
+
+
+def test_el_estadistico_es_el_suyo_no_el_del_fundamental_score() -> None:
+    """Aquí el lift promedia SOLO las conservadas; en el Fundamental Score, las descartadas dan 0.
+
+    Los dos módulos llaman «lift» a cosas con distinto denominador. Cruzarlos daría un listón que no
+    mide lo que se compara, y es un error fácil de cometer porque los nombres coinciden.
+    """
+    arr = np.asarray([2.0] * 20 + [-1.0] * 20)
+    marcados = np.asarray([True] * 20 + [False] * 20)
+    assert _lift_conservando(arr, marcados) != _lift_descartando(arr, marcados)
+
+    # Y el contrato en la evidencia real: conservar las buenas sube la media sobre el baseline.
+    ev = evaluate_shadow(_rows(140, True), 0.5)
+    assert ev["filtered"] > ev["baseline"]

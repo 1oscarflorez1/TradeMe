@@ -2,25 +2,58 @@
 
 from __future__ import annotations
 
+import inspect
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from trademe_quant.nula import MIN_BLOQUES, MIN_POBLACION
 from trademe_quant.quarantine_policy import (
     MAX_EXPECTANCY_ENTRADA,
     MIN_EXPECTANCY_SALIDA,
     MIN_SAMPLES_ENTRADA,
     MIN_SAMPLES_SALIDA,
+    Poblacion,
     decide_quarantine,
     evaluate_real,
     evaluate_shadow,
 )
 
+INICIO = datetime(2026, 8, 1, tzinfo=UTC)
+#: Instante de las decisiones observadas: después de toda la población sintética de abajo.
+AHORA = INICIO + timedelta(days=19, hours=12)
+
 
 def _sombra(n: int, r: float) -> list[dict[str, Any]]:
-    return [{"shadow_outcome_return_r": r, "outcome_return_r": None} for _ in range(n)]
+    return [
+        {
+            "shadow_outcome_return_r": r,
+            "outcome_return_r": None,
+            "captured_at": AHORA - timedelta(minutes=i),
+        }
+        for i in range(n)
+    ]
 
 
 def _real(n: int, r: float) -> list[dict[str, Any]]:
-    return [{"outcome_return_r": r, "shadow_outcome_return_r": None} for _ in range(n)]
+    return [
+        {
+            "outcome_return_r": r,
+            "shadow_outcome_return_r": None,
+            "captured_at": AHORA - timedelta(minutes=i),
+        }
+        for i in range(n)
+    ]
+
+
+def _poblacion(valor_dia: list[float], dias: int = 20, por_dia: int = 30) -> Poblacion:
+    """Población sintética: cada día homogéneo, con su valor propio. `dias * por_dia` decisiones."""
+    rs: list[float] = []
+    fechas: list[datetime] = []
+    for d in range(dias):
+        for k in range(por_dia):
+            rs.append(valor_dia[d % len(valor_dia)])
+            fechas.append(INICIO + timedelta(days=d, minutes=k))
+    return Poblacion(rs, fechas)
 
 
 # --- Resúmenes -------------------------------------------------------------------------------
@@ -159,3 +192,124 @@ def test_se_respeta_el_orden_de_llegada() -> None:
     filas = _real(40, 1.0) + _real(40, -1.0)
     assert evaluate_real(filas)["expectancy"] == 1.0
     assert evaluate_real(list(reversed(filas)))["expectancy"] == -1.0
+
+
+# --- La nula de la puerta de salida (Hito A, 22/08/2026) --------------------------------------
+#
+# La cuarentena era el único módulo con poder de veto activo y el único sin control contra el azar.
+# Lo que se comprueba aquí es que el control **solo endurece**: sin nula calculable, o con una nula
+# plana, la decisión tiene que salir exactamente igual que antes de existir este bloque.
+
+
+def test_sin_poblacion_decide_igual_que_antes() -> None:
+    """La compatibilidad hacia atrás es el listón: sin población, comportamiento de siempre."""
+    ev = evaluate_shadow(_sombra(60, 0.30))
+    assert ev["nula_p95"] == 0.0
+    assert decide_quarantine(True, ev)[0] is False  # sale, como antes del Hito A
+
+
+def test_nula_plana_se_comporta_como_el_umbral_fijo() -> None:
+    """Extremo conocido: si el azar da siempre 0, el umbral efectivo es el fijo de 0,05."""
+    poblacion = _poblacion([0.0])
+    justo_debajo = evaluate_shadow(_sombra(60, MIN_EXPECTANCY_SALIDA - 0.01), poblacion=poblacion)
+    justo_encima = evaluate_shadow(_sombra(60, MIN_EXPECTANCY_SALIDA + 0.01), poblacion=poblacion)
+    assert justo_debajo["nula_p95"] == 0.0
+    assert decide_quarantine(True, justo_debajo)[0] is True
+    assert decide_quarantine(True, justo_encima)[0] is False
+
+
+def test_poblacion_insuficiente_no_inventa_listón() -> None:
+    """Sin bloques ni filas bastantes no hay percentil: se devuelve 0,0 y manda el fijo."""
+    pocas_filas = _poblacion([1.0], dias=20, por_dia=2)  # 40 < MIN_POBLACION
+    pocos_bloques = _poblacion([1.0, -1.0], dias=MIN_BLOQUES - 1, por_dia=60)
+    assert len(pocas_filas.rs) < MIN_POBLACION
+    for poblacion in (pocas_filas, pocos_bloques):
+        ev = evaluate_shadow(_sombra(60, 0.30), poblacion=poblacion)
+        assert ev["nula_p95"] == 0.0
+        assert decide_quarantine(True, ev)[0] is False  # sale: igual que sin nula
+
+
+def test_una_racha_buena_de_mercado_ya_no_basta_para_salir() -> None:
+    """El caso que motiva el Hito A.
+
+    La plataforma entera está en una racha de +1 R. Una temporalidad vetada cuya sombra da +0,30 R
+    superaba el umbral fijo de 0,05 y salía. Pero +0,30 es PEOR que lo que daba coger decisiones
+    cualesquiera de esos mismos días: no ha demostrado nada sobre sí misma, solo que hubo mercado.
+    """
+    poblacion = _poblacion([1.0, 0.8, 1.2, 0.9, 1.1])
+    ev = evaluate_shadow(_sombra(60, 0.30), poblacion=poblacion)
+
+    assert ev["expectancy"] >= MIN_EXPECTANCY_SALIDA  # antes del Hito A habría salido
+    assert ev["nula_p95"] > MIN_EXPECTANCY_SALIDA  # el azar da más que el umbral fijo
+    sigue, motivo = decide_quarantine(True, ev)
+    assert sigue is True
+    assert "lo que alcanza el azar" in motivo
+
+
+def test_la_nula_nunca_deja_salir_a_quien_el_umbral_fijo_retenia() -> None:
+    """Monotonía: la regla nueva solo puede endurecer, jamás relajar. En ningún caso.
+
+    Es la garantía que se prometió al aprobar el hito, y la única forma de comprobarla es barrer
+    combinaciones en vez de fiarse de un ejemplo favorable.
+    """
+    poblaciones = [
+        _poblacion([0.0]),
+        _poblacion([1.0, -1.0]),
+        _poblacion([-0.9, -1.0, -0.8]),
+        _poblacion([1.0, 0.8, 1.2, 0.9, 1.1]),
+    ]
+    for poblacion in poblaciones:
+        for exp in (-1.0, -0.2, 0.0, 0.049, 0.05, 0.3, 1.0, 3.0):
+            ev = evaluate_shadow(_sombra(60, exp), poblacion=poblacion)
+            salia_antes = exp >= MIN_EXPECTANCY_SALIDA
+            sale_ahora = decide_quarantine(True, ev)[0] is False
+            assert not (sale_ahora and not salia_antes), (exp, ev["nula_p95"])
+
+
+# --- La puerta de ENTRADA no lleva nula, y no puede llevarla por accidente ---------------------
+
+
+def test_la_entrada_no_admite_poblacion_ni_por_error() -> None:
+    """Aislamiento estructural, no de disciplina: la firma ni siquiera acepta el argumento.
+
+    Exigir significancia para ENTRAR dejaría operando temporalidades malas mientras no se demuestre
+    que lo son. Es el error contrario y el caro. Que no se pueda pasar la población hace imposible
+    ese fallo aunque alguien lo intente.
+    """
+    assert "poblacion" not in inspect.signature(evaluate_real).parameters
+    assert "poblacion" in inspect.signature(evaluate_shadow).parameters
+
+
+def test_la_entrada_decide_igual_aunque_le_metan_una_nula_altisima() -> None:
+    """Y si alguien construyera la evidencia a mano con `nula_p95`, la entrada la ignora."""
+    ev = evaluate_real(_real(50, -0.5))
+    ev["nula_p95"] = 5.0  # un listón absurdo que, de leerse, cambiaría el resultado
+    entra, motivo = decide_quarantine(False, ev)
+    assert entra is True
+    assert "entra en cuarentena" in motivo
+
+
+def test_la_entrada_sigue_siendo_barata_y_la_salida_cara() -> None:
+    """La asimetría original, ahora con la nula puesta: la distancia entre puertas solo crece."""
+    poblacion = _poblacion([1.0, 0.8, 1.2, 0.9, 1.1])
+    exp = 0.30
+    assert decide_quarantine(False, evaluate_real(_real(60, exp)))[0] is False  # no entra
+    ev = evaluate_shadow(_sombra(60, exp), poblacion=poblacion)
+    assert decide_quarantine(True, ev)[0] is True  # y tampoco sale
+
+
+def test_el_motivo_sigue_explicando_la_decision_con_nula() -> None:
+    poblacion = _poblacion([1.0, 0.8, 1.2, 0.9, 1.1])
+    for exp in (-0.5, 0.3, 2.0):
+        ev = evaluate_shadow(_sombra(60, exp), poblacion=poblacion)
+        _, motivo = decide_quarantine(True, ev)
+        assert isinstance(motivo, str) and len(motivo) > 10
+        assert "R" in motivo
+
+
+def test_la_evidencia_publica_los_dos_numeros() -> None:
+    """`n` y el listón del azar tienen que verse los dos, no esconderse tras el veredicto."""
+    ev = evaluate_shadow(_sombra(60, 0.3), poblacion=_poblacion([1.0, -1.0]))
+    assert ev["n_poblacion"] > 0
+    assert ev["bloques_poblacion"] >= MIN_BLOQUES
+    assert "nula_p95" in ev

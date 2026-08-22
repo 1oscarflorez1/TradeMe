@@ -398,6 +398,25 @@ export const KB: Article[] = [
           volver a operarlo no.
         </p>
         <p>
+          <strong>¿Y si fue solo un mal martes?</strong> Esa es la pregunta incómoda, porque las
+          decisiones de una temporalidad se amontonan en el tiempo: las 30 que condenaron a los 15
+          minutos de Bitcoin ocurrieron en <strong>menos de diez horas</strong>. Treinta operaciones
+          malas de una misma tarde no son treinta pruebas, son casi una.
+        </p>
+        <p>
+          Por eso, para volver a operar ya no basta con un resultado positivo. Se compara con lo que
+          habría dado coger ese mismo número de decisiones <strong>cualesquiera</strong> de la
+          plataforma, de días cualesquiera del mismo periodo. Si la temporalidad no supera a eso, lo
+          que demostró es que hubo mercado, no que ella sea buena. Y se le exige lo que sea más duro
+          de los dos: el listón de siempre o el del azar.
+        </p>
+        <p>
+          Para <strong>entrar</strong> en cuarentena, en cambio, no se pide esa prueba. Suena
+          incoherente y no lo es: exigir certeza estadística para dejar de operar algo que está
+          perdiendo dinero lo mantendría operando mientras se reúne. Retener es el lado barato del
+          error, así que la exigencia solo se pone donde protege.
+        </p>
+        <p>
           Una honestidad que conviene decir: <strong>no se sabe por qué falla el 4 horas</strong>. Se
           creyó durante meses que era por operar sin contexto de fondo, y al poder medirlo resultó
           falso — el contexto de aquel periodo habría reforzado esas ventas, no evitado ninguna. La
