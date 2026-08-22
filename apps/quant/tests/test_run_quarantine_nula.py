@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from trademe_quant.quarantine_policy import estado_previo
 from trademe_quant.run_quarantine_nula import claves_vetadas
 
 DATOS: dict[str, list[dict[str, Any]]] = {
@@ -56,3 +57,24 @@ def test_una_entrada_corrupta_no_veta_ni_revienta() -> None:
         "intervals_yaml": [],
     }
     assert claves_vetadas(DATOS, politica) == set()
+
+
+def test_informe_y_gobierno_no_pueden_discrepar() -> None:
+    """La duplicación era la causa del fallo, así que se comprueba que ya no existe.
+
+    Hasta v0.46.0 el informe sabía leer el artefacto por clave y `publish` no. Esa discrepancia
+    entre dos copias de la misma regla es lo que dejaba claves condenadas para siempre.
+    """
+    politica = {
+        "intervals": {
+            "BTCUSDT:15m": {"quarantined": True},
+            "SOLUSDT:30m": {"quarantined": False},
+            "ETHUSDT:4h": {"quarantined": False},
+        },
+        "intervals_yaml": ["4h"],
+    }
+    delegado = claves_vetadas(DATOS, politica)
+    directo = {c for c in DATOS if estado_previo(politica, c, c.split(":", 1)[1], ["4h"])}
+    assert delegado == directo
+    # Y el yaml sigue siendo suelo: ETHUSDT:4h está vetada pese a que el artefacto decía que no.
+    assert "ETHUSDT:4h" in delegado

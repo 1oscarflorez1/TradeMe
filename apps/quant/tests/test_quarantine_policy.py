@@ -14,6 +14,7 @@ from trademe_quant.quarantine_policy import (
     MIN_SAMPLES_SALIDA,
     Poblacion,
     decide_quarantine,
+    estado_previo,
     evaluate_real,
     evaluate_shadow,
 )
@@ -313,3 +314,95 @@ def test_la_evidencia_publica_los_dos_numeros() -> None:
     assert ev["n_poblacion"] > 0
     assert ev["bloques_poblacion"] >= MIN_BLOQUES
     assert "nula_p95" in ev
+
+
+# --- El destrabe: quién está vetado se lee del artefacto, no solo del yaml (22/08/2026) --------
+#
+# `publish` decidía a qué expediente mirar con `interval in quarantine_intervals` —la lista del
+# yaml, por temporalidad— cuando quien veta de verdad es `quarantine.json`, por clave. Una clave
+# vetada por rendimiento real dejaba de producir desenlaces reales, su expediente se congelaba, y se
+# la recondenaba cada ciclo con las mismas filas sin llegar jamás a la puerta de salida.
+
+
+def test_el_yaml_veta_por_temporalidad() -> None:
+    assert estado_previo({}, "BTCUSDT:4h", "4h", ["4h"]) is True
+    assert estado_previo({}, "BTCUSDT:15m", "15m", ["4h"]) is False
+
+
+def test_el_artefacto_veta_por_clave() -> None:
+    """Lo que arregla el destrabe: 15m vetada en BTC no dice nada de 15m en ETH."""
+    politica = {"intervals": {"BTCUSDT:15m": {"quarantined": True}}}
+    assert estado_previo(politica, "BTCUSDT:15m", "15m", []) is True
+    assert estado_previo(politica, "ETHUSDT:15m", "15m", []) is False
+
+
+def test_sin_artefacto_manda_el_yaml_y_nada_mas() -> None:
+    """Compatibilidad hacia atrás: es exactamente el comportamiento anterior al destrabe."""
+    vacias: list[dict[str, Any]] = [{}, {"intervals": {}}, {"intervals": None}]
+    for politica in vacias:
+        assert estado_previo(politica, "BTCUSDT:15m", "15m", []) is False
+        assert estado_previo(politica, "BTCUSDT:4h", "4h", ["4h"]) is True
+
+
+def test_un_artefacto_corrupto_no_veta_ni_revienta() -> None:
+    """Lo escribe otro proceso; una entrada rara cae al yaml en vez de tumbar el ciclo."""
+    politica: dict[str, Any] = {
+        "intervals": {"BTCUSDT:15m": None, "BTCUSDT:30m": "sí", "BTCUSDT:1h": []}
+    }
+    for clave, interval in (("BTCUSDT:15m", "15m"), ("BTCUSDT:30m", "30m"), ("BTCUSDT:1h", "1h")):
+        assert estado_previo(politica, clave, interval, []) is False
+
+
+def test_el_yaml_es_suelo_no_techo() -> None:
+    """El yaml puede vetar lo que el artefacto daba por operando; al revés, no."""
+    politica: dict[str, Any] = {"intervals": {"BTCUSDT:4h": {"quarantined": False}}}
+    assert estado_previo(politica, "BTCUSDT:4h", "4h", ["4h"]) is True
+
+    # Y quitar la temporalidad del yaml NO levanta un veto vigente: se sale con evidencia, no
+    # editando un fichero.
+    politica = {"intervals": {"BTCUSDT:4h": {"quarantined": True}}}
+    assert estado_previo(politica, "BTCUSDT:4h", "4h", []) is True
+
+
+def test_una_clave_atrapada_pasa_a_juzgarse_por_su_sombra(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """La prueba que importa, sobre el ciclo entero.
+
+    Antes: `BTCUSDT:15m` estaba vetada en el artefacto, su intervalo no figuraba en el yaml, y se la
+    juzgaba con un expediente real congelado en -0,940 R. Se recondenaba en cada pasada.
+    Ahora: se la juzga con su expediente sombra, que sí crece, y con la puerta de salida.
+    """
+    from trademe_quant import quarantine_policy as qp
+
+    filas = _sombra(20, 0.5) + _real(30, -0.94)
+    monkeypatch.setattr(qp, "fetch_expedientes", lambda dsn: ({"BTCUSDT:15m": filas}, None))
+
+    # Primera pasada sin artefacto: manda el yaml, que no incluye 15m -> se la juzga por lo real.
+    out = qp.publish(tmp_path, "dsn", [])
+    entrada = out["intervals"]["BTCUSDT:15m"]
+    assert entrada["quarantined"] is True
+    assert entrada["evidence"]["source"] == "real"
+    assert entrada["changed"] is True
+
+    # Segunda pasada: el artefacto ya la marca vetada, así que ahora mira su SOMBRA.
+    out = qp.publish(tmp_path, "dsn", [])
+    entrada = out["intervals"]["BTCUSDT:15m"]
+    assert entrada["evidence"]["source"] == "sombra"
+    assert entrada["evidence"]["n"] == 20
+    # Sigue vetada porque le faltan decisiones, no porque nadie la mire.
+    assert entrada["quarantined"] is True
+    assert "decisiones sombra evaluadas" in entrada["reason"]
+    # Y deja de anunciar un cambio que no ocurre: antes esto disparaba una alerta cada ciclo.
+    assert entrada["was_quarantined"] is True
+    assert entrada["changed"] is False
+
+
+def test_el_destrabe_no_libera_a_nadie_de_golpe(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Con muestra sombra insuficiente, pasar a juzgarla por sombra la deja vetada igual."""
+    from trademe_quant import quarantine_policy as qp
+
+    # Sombra corta pero excelente: el tipo de caso que podría soltar a alguien por accidente.
+    filas = _sombra(MIN_SAMPLES_SALIDA - 1, 2.0) + _real(30, -0.9)
+    monkeypatch.setattr(qp, "fetch_expedientes", lambda dsn: ({"BTCUSDT:30m": filas}, None))
+    qp.publish(tmp_path, "dsn", [])
+    out = qp.publish(tmp_path, "dsn", [])
+    assert out["intervals"]["BTCUSDT:30m"]["quarantined"] is True

@@ -170,19 +170,51 @@ Al ejecutarlo sobre las 1.302 decisiones cerradas de producción, con 10.000 per
   mientras se reúne la evidencia de que pierden dinero, que es el error caro. Pero conviene saber
   cuáles son las que de verdad han demostrado algo y cuáles no.
 
-### Lo que este cambio NO arregla
+### El destrabe: por qué una cuarentena podía ser una condena (v0.47.0)
 
-Hay un fallo aparte, detectado al medir esto: `publish` elige a qué expediente mirar con
-`interval in quarantine_intervals`, es decir con la lista del `ensemble.yaml`, **que es por
-temporalidad**; pero quien veta de verdad es `quarantine.json`, **que es por clave**.
+Al medir lo anterior salió un fallo aparte, y grave. `publish` elegía a qué expediente mirar con
+`interval in quarantine_intervals` —la lista del `ensemble.yaml`, **que es por temporalidad**—,
+pero quien veta de verdad es `quarantine.json`, **que es por clave**.
 
-Consecuencia: una clave vetada por su rendimiento real —`BTCUSDT:15m`, por ejemplo— deja de producir
-`outcome_return_r` y su expediente real se queda congelado en las decisiones de antes del veto. Como
-su temporalidad no figura en el yaml, el gobierno la sigue juzgando con ese expediente congelado y la
-recondena cada ciclo con las mismas filas. **Nunca llega a la puerta de salida.**
+Consecuencia: una clave que entraba en cuarentena por su rendimiento real dejaba de producir
+`outcome_return_r` —una temporalidad vetada solo genera sombra—, así que su expediente real se
+congelaba en las decisiones de antes del veto. Y como su temporalidad no figuraba en el yaml, el
+gobierno la seguía juzgando con **ese expediente congelado** y la recondenaba cada ciclo con las
+mismas filas. **Nunca llegaba a la puerta de salida.**
 
-Son **5 claves** hoy. Es el mismo fallo que la migración 017 arregló para 4h, reaparecido en el eje
-`SÍMBOLO:intervalo`, y está pendiente de decidir cómo se cierra.
+Es exactamente el fallo que la migración 017 arregló para 4h —«una medida temporal, irreversible
+por construcción»— reaparecido en el eje `SÍMBOLO:intervalo`.
+
+**Lo que se estaba viendo en producción el 22 de agosto de 2026:**
+
+| | |
+|---|---|
+| Claves vetadas | **11 de 21**, acumuladas en seis días |
+| De ellas, atrapadas | **6** |
+| Claves que habían salido alguna vez | **0** |
+| Ritmo de entrada | ~2 al día, sin frenar |
+| Actividad del 22 de agosto | 53 decisiones reales frente a **51 en sombra** |
+| Claves operando | 12 el día 19 → **5** el día 22 |
+
+Casi la mitad de lo que calculaba la plataforma ya no se emitía, y el trinquete solo giraba en un
+sentido. La cuarentena, que se diseñó como medida reversible, se había convertido en un apagado
+progresivo.
+
+**El arreglo** es que el estado de cada clave se lee del artefacto y no solo del yaml. El yaml pasa
+a ser un **suelo**: puede vetar una temporalidad entera, pero quitarla de la lista ya no levanta un
+veto vigente. Una cuarentena se levanta con evidencia, no editando un fichero; la vía manual, si
+hiciera falta, es borrar la entrada del artefacto.
+
+Medido sobre los datos reales antes de entregarlo: **ninguna clave cambia de estado** —nadie sale ni
+entra de golpe—, seis pasan a juzgarse por su expediente sombra, y las alertas falsas de «entra en
+cuarentena» que se disparaban en cada pasada del piloto caen **de 6 por ciclo a 0**.
+
+Dos de esas seis estaban a punto de tener muestra suficiente: `SOLUSDT:15m` con 35 de 40 decisiones
+sombra y `BTCUSDT:1h` con 31. Sin el destrabe habrían cruzado el mínimo y seguido condenadas igual.
+
+**Y la causa de fondo era una duplicación.** El informe sabía leer el artefacto por clave y el
+gobierno no: dos copias de la misma regla que discrepaban. Ahora el informe delega en la del
+gobierno, y su marca `⚠ ATRAPADA` se queda como **detector de regresión** — debe dar siempre 0.
 
 ## Estado actual
 
@@ -213,7 +245,8 @@ Nadie tocó una lista para que 1h entrara: la política lo decidió con sus prop
 Desde el multiactivo (v0.39.0), ETH, SOL y BNB **heredan la cuarentena de 4h** que estaba fijada como
 base en `ensemble.yaml`. Es la postura conservadora: de esos activos no se sabe nada todavía, y
 heredar el veto no cuesta nada porque **la sombra sigue registrándose**. Cada uno acumulará su propio
-expediente y saldrá solo cuando lo demuestre, con las mismas 40 decisiones y el mismo +0,05 R.
+expediente y saldrá solo cuando lo demuestre, con las mismas 40 decisiones y el mismo umbral —que
+desde v0.46.0 es `max(0,05 R, P95 de la nula)`, no el 0,05 fijo.
 
 Lo que **no** se hereda es el veredicto: `quarantine.json` tiene una entrada por símbolo y
 temporalidad, así que que 1h esté vetada en BTC no dice nada sobre 1h en ETH.
@@ -222,7 +255,15 @@ temporalidad, así que que 1h esté vetada en BTC no dice nada sobre 1h en ETH.
 
 **¿Por qué no se borra directamente la temporalidad?**
 Porque entonces no habría forma de saber si el problema era la temporalidad o el momento del mercado.
-La cuarentena es reversible por diseño; borrarla no.
+La cuarentena es reversible por diseño; borrarla no. (Y conviene decir que «por diseño» no bastó:
+entre el 17 y el 22 de agosto de 2026 seis claves quedaron vetadas sin vía de vuelta por el fallo que
+arregló la v0.47.0. Reversible en el papel y condena en la práctica.)
+
+**¿Cómo se levanta una cuarentena a mano?**
+Borrando su entrada de `quarantine.json`. Quitar la temporalidad de `quarantine_intervals` en el
+`ensemble.yaml` **no basta** desde v0.47.0: el yaml es un suelo, no un techo. Puede meter en
+cuarentena una temporalidad entera, pero no sacar de ella a quien ya está dentro — para eso está el
+expediente sombra.
 
 **¿Las decisiones en cuarentena cuentan para la expectancy?**
 No. Ni las reales (no hay ninguna: no se opera) ni las sombra (están en columnas separadas

@@ -7,6 +7,79 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.47.0] — 2026-08-22
+
+> Una cuarentena que no se puede levantar no es una cuarentena, es una condena. Había 11 claves
+> vetadas acumuladas en seis días, 6 de ellas incapaces de volver jamás, y ninguna había salido
+> nunca.
+
+### Fixed — El destrabe: las claves vetadas por su rendimiento vuelven a tener camino de vuelta
+
+- `publish` elegía a qué expediente mirar con `interval in quarantine_intervals` —la lista del
+  `ensemble.yaml`, **que es por temporalidad**— cuando quien veta de verdad es `quarantine.json`,
+  **que es por clave `SÍMBOLO:intervalo`**.
+- Una clave que entraba en cuarentena por su rendimiento real dejaba de producir
+  `outcome_return_r` —una temporalidad vetada solo genera sombra—, así que su expediente real se
+  congelaba en las decisiones de antes del veto. Como su temporalidad no figuraba en el yaml, se la
+  seguía juzgando con **ese expediente congelado** y se la recondenaba cada ciclo con las mismas
+  filas. **Nunca llegaba a la puerta de salida.**
+- Es el fallo de la migración 017 reaparecido en el eje `SÍMBOLO:intervalo`: *«una medida temporal,
+  irreversible por construcción»*.
+
+### Fixed — Lo que se estaba viendo en producción, y por qué corría prisa
+
+| | |
+|---|---|
+| Claves vetadas | **11 de 21**, acumuladas en seis días |
+| De ellas, atrapadas | **6** |
+| Claves que habían salido alguna vez | **0** |
+| Ritmo de entrada | ~2 al día, sin frenar |
+| Actividad del 22 de agosto | 53 decisiones reales frente a **51 en sombra** |
+| Claves operando | 12 el día 19 → **5** el día 22 |
+
+Casi la mitad de lo que calculaba la plataforma ya no se emitía, y el trinquete solo giraba en un
+sentido. Dos de las seis atrapadas estaban además a punto de tener muestra suficiente —`SOLUSDT:15m`
+con 35 de 40 decisiones sombra y `BTCUSDT:1h` con 31—, así que habrían cruzado el mínimo y seguido
+condenadas igual, dejando sin efecto el gobierno que se acababa de entregar en 0.46.0.
+
+### Changed — El yaml pasa a ser un suelo, no un techo
+
+- `quarantine_intervals` puede vetar una temporalidad entera, pero **quitarla de la lista ya no
+  levanta un veto vigente**: quien esté vetado sigue vetado hasta demostrar la salida con su
+  expediente sombra. Una cuarentena se levanta con evidencia, no editando un fichero.
+- La vía manual, si algún día hiciera falta, es borrar la entrada del artefacto.
+- Sin artefacto, o con uno ilegible, manda el yaml: exactamente el comportamiento anterior.
+
+### Changed — Se acaban las alertas falsas de cada ciclo
+
+Las 6 atrapadas publicaban `changed = true` en cada pasada, porque `was_quarantined` se leía del
+yaml y siempre salía `false`. Cada ejecución del piloto automático generaba 6 alertas de «entra en
+cuarentena» sobre claves que ya llevaban días vetadas. Medido antes de entregar: **de 6 por ciclo
+a 0**.
+
+### Verificado sobre los datos reales antes de entregar
+
+Simulado el ciclo completo con las 1.339 decisiones cerradas y el artefacto de producción:
+
+- **0 claves cambian de estado.** Nadie sale ni entra de golpe.
+- **6 pasan de juzgarse por su expediente real a su expediente sombra**, que sí crece.
+- Ninguna sale todavía, porque a todas les falta muestra: siguen vetadas por *«n/40 decisiones
+  sombra evaluadas»*, que es el motivo correcto en vez de una recondena con filas viejas.
+
+### Changed — La duplicación que causó el fallo, eliminada
+
+El informe `run_quarantine_nula` sabía leer el artefacto por clave y el gobierno no: dos copias de
+la misma regla que discrepaban, y esa discrepancia era exactamente el fallo. Ahora el informe delega
+en `quarantine_policy.estado_previo`, con un test que comprueba que no pueden divergir. La marca
+`⚠ ATRAPADA` se queda como **detector de regresión**: debe dar siempre 0.
+
+### Pendiente, medido y no tocado a propósito
+
+El umbral de **entrada** sigue en −0,15 R. El ritmo de 2 claves al día sugiere que es demasiado
+sensible con 30 decisiones que caben en horas: la última en entrar, `ETHUSDT:30m`, lo hizo con
+−0,200 R y **p = 0,471**, o sea indistinguible del azar. Cambiarlo a la vez que la semántica del
+estado mezclaría dos efectos y no se sabría cuál hizo qué.
+
 ## [0.46.0] — 2026-08-22
 
 > La cuarentena era el único módulo de gobierno con poder de veto activo sobre las decisiones, y el
