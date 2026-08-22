@@ -132,7 +132,13 @@ export class SnapshotsRepo {
         shadowLevels?.entry ?? null,
         shadowLevels?.stop ?? null,
         shadowLevels?.takeProfit ?? null,
-        signal.fundamental?.percentile ?? null,
+        // `stale` significa «no se sabe», y eso no es un percentil 0: un 0 es una lectura legítima
+        // (funding en el mínimo de la ventana). Guardarlo confundiría «sin datos» con «funding muy
+        // bajo» en cualquier análisis que agrupe por percentil — el mismo error que el funding a
+        // cero de 0.38.0, ahora en la capa de persistencia.
+        signal.fundamental && !signal.fundamental.stale ? signal.fundamental.percentile : null,
+        // La penalización SÍ es 0 de verdad cuando no hay datos: no se penaliza a nadie. Ese 0 es
+        // un hecho sobre la decisión, no una laguna.
         signal.fundamental?.penalty ?? null,
         signal.fundamental?.mode ?? null,
         signal.fundamental?.version ?? null,

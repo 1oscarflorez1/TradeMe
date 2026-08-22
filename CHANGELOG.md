@@ -7,6 +7,47 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.45.0] — 2026-08-22
+
+> Limpieza de deuda. Y el test que se escribió para vigilar el Centro de ayuda encontró tres enlaces
+> rotos al primer intento — uno de ellos lo había dejado la entrega de M12.
+
+### Fixed — Los activos sin funding guardaban `fund_percentile = 0` en vez de `NULL`
+
+- `stale` significa «no se sabe dónde cae este funding», y eso **no es un percentil 0**: el 0 es una
+  lectura legítima —funding en el mínimo de su ventana— y ocurre de verdad. Guardar el mismo valor
+  para las dos cosas mezclaba «sin datos» con «funding muy bajo» en cualquier análisis por percentil.
+- Es el mismo error conceptual que el funding a cero de 0.38.0, esta vez en la capa de persistencia:
+  convertir un «no lo sé» en un número con aspecto de medición.
+- Migración **020** que limpia el histórico. La penalización se deja como está: un 0 ahí es un hecho
+  sobre la decisión —no se penalizó a nadie—, no una laguna.
+
+### Changed — `HelpView.tsx` pasa de 1017 a 262 líneas
+
+- Las ~700 líneas de contenido salen a `help/contenido.tsx`. Escribir un artículo ya no obliga a
+  tocar el componente que lo pinta.
+- Y lo que de verdad importaba: el índice pasa a ser un **dato consultable**. El asistente cita ahora
+  el artículo exacto —«Lo tienes explicado en *«…»*»— en vez de remitir genéricamente al Centro de
+  ayuda.
+- Sigue **sin derivarse del CHANGELOG**, como estaba decidido: Ayuda es documentación conceptual, no
+  un registro de cambios. Tres registros con público distinto (CHANGELOG → Novedades y asistente;
+  `docs/` → asistente técnico; Ayuda → usuario), y mezclarlos empeoraría los tres.
+
+### Added — Tests de coherencia del Centro de ayuda, y lo que encontraron
+
+Las referencias entre `RESUMEN`, `RUTAS` y lo que cita el asistente son **cadenas de texto**:
+renombrar un artículo las rompe sin que nada falle. Los tests convierten esa disciplina en
+estructura — y al ejecutarlos por primera vez fallaron tres:
+
+- **`RESUMEN` huérfano**: «Análisis fundamental (en pausa)». Ese artículo se renombró al entregar
+  M12 y su resumen se quedó apuntando al título viejo. La ficha llevaba desde entonces sin resumen.
+- **El asistente citaba «correlación» y ningún artículo lo cubría** para la búsqueda, pese a existir
+  el artículo de exposición correlacionada.
+- **Cuatro términos duplicados en el glosario** (Expectancy, Win rate, Profit factor, Sharpe): un
+  bloque «Clave» con versiones abreviadas de definiciones que ya estaban más completas.
+
+Los tres arreglados.
+
 ## [0.44.0] — 2026-08-22
 
 > Se midió si al Fundamental Score le pasaba lo mismo que al meta-modelo. La respuesta fue distinta
