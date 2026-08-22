@@ -16,14 +16,48 @@ Es el mismo principio que gobierna al meta-modelo en `meta_policy.py`, y por las
 
 Una nota sobre el sesgo: los umbrales están escritos ANTES de que exista muestra suficiente, a
 propósito. Escribirlos después sería elegirlos mirando el resultado.
+
+Hito A (22 ago 2026) — el umbral de salida se compara con el azar
+------------------------------------------------------------------
+Auditando los tres módulos de gobierno apareció algo incómodo: la cuarentena era **el único con
+poder de veto activo** y **el único sin control contra el azar**. `fundamental_policy` tenía 8
+referencias a su distribución nula; este fichero, ninguna.
+
+Y aquí el problema muerde con fuerza, porque las decisiones que juzgan a una temporalidad se
+amontonan en el tiempo. Medido: las 30 que juzgan a `BTCUSDT:15m` caben en **9,8 horas**; las de
+`SOLUSDT:15m`, 15 decisiones en **2,8 horas**. `BTCUSDT:15m` entró en cuarentena con −0,940 R sobre
+30 decisiones de menos de un día. Puede ser una temporalidad mala o puede ser un mal martes: la
+medición anterior **no lo distinguía**.
+
+Desde aquí, la puerta de salida exige `max(0,05 R, P95 de la nula)`, donde la nula pregunta: *¿qué
+expectancy da coger `n` decisiones cualesquiera de la plataforma, en bloques de 24 h, del mismo
+periodo?* Ver `nula.py`.
+
+**La puerta de entrada NO lleva nula, y es deliberado.** Exigir significancia para *entrar* dejaría
+operando temporalidades malas mientras no se demuestre que lo son —el efecto contrario al que se
+busca—. La nula solo se usa donde endurece la seguridad, que es coherente con lo que este módulo ya
+decía: cuesta poco dejar de operar y cuesta mucho volver a hacerlo.
+
+Dos piezas de `fundamental_policy` que NO son trasplantables aquí, y por qué
+----------------------------------------------------------------------------
+1. **`observaciones_efectivas`** descuenta por correlación *entre activos* dentro de una ventana.
+   La cuarentena evalúa por clave `SÍMBOLO:intervalo`, o sea un solo símbolo por grupo, y
+   `correlaciones.factor_para` devuelve exactamente 1 con un símbolo. Sería una llamada que no hace
+   nada. El solapamiento que sí sufre esta medición es **temporal**, y de eso se encarga el
+   muestreo por bloques.
+2. **`lift_nulo_p95`** mide el efecto de *descartar* operaciones, con las descartadas aportando 0
+   sobre `n`. Aquí no se descarta nada: se mide **expectancy directa**. Otro estadístico, otra nula.
 """
 
 from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
+
+from .nula import DIAS_POBLACION, PERMUTACIONES_CICLO, agrupar, marcas_de, p95_expectancy_bloques
 
 # Decisiones sombra evaluadas que hacen falta para plantearse levantar la cuarentena. Con menos, una
 # racha buena de tres días bastaría para volver a operar una temporalidad que perdía dinero.
@@ -38,26 +72,97 @@ MAX_EXPECTANCY_ENTRADA = -0.15
 MIN_SAMPLES_ENTRADA = 30
 
 
+class Poblacion(NamedTuple):
+    """Todas las decisiones cerradas de la plataforma, para muestrear la nula.
+
+    De **todos** los activos y temporalidades, no solo de la clave juzgada: la pregunta es si esta
+    temporalidad se distingue del mercado que hubo, y ese mercado son las demás decisiones. Que la
+    propia clave forme parte de la población es correcto y, medido, irrelevante: la mayor aporta 31
+    filas de más de mil.
+
+    Se mezclan desenlaces reales y de sombra a propósito. La migración 017 dejó escrito que la
+    sombra se evalúa con las **mismas reglas** que el desenlace real —primer toque, horizonte por
+    temporalidad—, así que son la misma unidad. Lo que nunca se mezcla es *quién* se juzga con qué:
+    eso sigue separado en `evaluate_shadow` y `evaluate_real`.
+    """
+
+    rs: list[float]
+    instantes: list[datetime]
+
+
 def _resumen(rs: list[float]) -> dict[str, Any]:
     n = len(rs)
+    base = {"nula_p95": 0.0, "n_poblacion": 0, "bloques_poblacion": 0}
     if n == 0:
-        return {"n": 0, "expectancy": 0.0, "aciertos": 0, "win_rate": 0.0}
+        return {"n": 0, "expectancy": 0.0, "aciertos": 0, "win_rate": 0.0, **base}
     aciertos = sum(1 for r in rs if r > 0)
-    return {"n": n, "expectancy": sum(rs) / n, "aciertos": aciertos, "win_rate": aciertos / n}
+    return {
+        "n": n,
+        "expectancy": sum(rs) / n,
+        "aciertos": aciertos,
+        "win_rate": aciertos / n,
+        **base,
+    }
 
 
-def evaluate_shadow(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_SALIDA) -> dict[str, Any]:
+def _nula(
+    poblacion: Poblacion | None,
+    instantes: list[Any],
+    n: int,
+    permutaciones: int = PERMUTACIONES_CICLO,
+) -> dict[str, Any]:
+    """Expectancy que alcanza el azar con `n` decisiones del mismo periodo.
+
+    El periodo se toma como los `DIAS_POBLACION` días que terminan en la decisión más reciente de la
+    ventana juzgada, ampliado si esa ventana fuera aún más larga. No se recorta al span exacto de lo
+    observado porque medido eso deja **1 a 4 bloques** de 24 h, y con cuatro días el «percentil 95»
+    es el mejor de los cuatro: no estima variabilidad ninguna.
+
+    Sin población, sin fechas o sin bloques suficientes devuelve 0,0, que deja gobernando al umbral
+    fijo — es decir, el comportamiento anterior al Hito A. Nunca relaja.
+    """
+    vacio = {"nula_p95": 0.0, "n_poblacion": 0, "bloques_poblacion": 0}
+    fechas = [t for t in instantes if isinstance(t, datetime)]
+    if poblacion is None or n <= 0 or not fechas or not poblacion.rs:
+        return vacio
+
+    fin = max(fechas)
+    inicio = min(min(fechas), fin - timedelta(days=DIAS_POBLACION))
+    pares = [
+        (r, t) for r, t in zip(poblacion.rs, poblacion.instantes, strict=True) if inicio <= t <= fin
+    ]
+    if not pares:
+        return vacio
+
+    marcas = marcas_de([t for _, t in pares])
+    return {
+        "nula_p95": p95_expectancy_bloques(
+            [r for r, _ in pares], marcas, n, permutaciones=permutaciones
+        ),
+        "n_poblacion": len(pares),
+        "bloques_poblacion": len(agrupar(marcas)),
+    }
+
+
+def evaluate_shadow(
+    rows: list[dict[str, Any]],
+    limite: int = MIN_SAMPLES_SALIDA,
+    poblacion: Poblacion | None = None,
+    permutaciones: int = PERMUTACIONES_CICLO,
+) -> dict[str, Any]:
     """Resume el expediente sombra: qué habría pasado si la temporalidad hubiera operado.
 
     `rows` llega ordenado de la decisión más reciente a la más antigua, y solo se miran las
     `limite` primeras. Ver `evaluate_real` para el porqué.
+
+    Con `poblacion` se calcula además la nula que gobierna la puerta de salida. Sin ella el resumen
+    lleva `nula_p95 = 0.0` y la decisión sale igual que antes del Hito A.
     """
-    rs = [
-        float(r["shadow_outcome_return_r"])
-        for r in rows
-        if r.get("shadow_outcome_return_r") is not None
-    ][:limite]
-    return _resumen(rs)
+    usable = [r for r in rows if r.get("shadow_outcome_return_r") is not None][:limite]
+    rs = [float(r["shadow_outcome_return_r"]) for r in usable]
+    ev = _resumen(rs)
+    ev.update(_nula(poblacion, [r.get("captured_at") for r in usable], len(rs), permutaciones))
+    return ev
 
 
 def evaluate_real(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_ENTRADA) -> dict[str, Any]:
@@ -81,6 +186,12 @@ def evaluate_real(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_ENTRADA)
     No se filtra por `model_version` exacta porque Optuna publica una nueva cada una o dos semanas
     y el expediente se reiniciaría con ella, dejando el gobierno paralizado justo después de cada
     reoptimización. La recencia consigue lo mismo sin ese efecto.
+
+    **No recibe población y no calcula nula, a propósito.** La entrada en cuarentena se decide con
+    el umbral fijo de siempre. Pedirle significancia estadística dejaría operando temporalidades
+    malas mientras no se demuestre que lo son, que es el error contrario y el más caro de los dos.
+    Que la firma ni siquiera admita el argumento lo hace estructuralmente imposible, no cuestión de
+    acordarse.
     """
     rs = [float(r["outcome_return_r"]) for r in rows if r.get("outcome_return_r") is not None][
         :limite
@@ -93,6 +204,9 @@ def decide_quarantine(en_cuarentena: bool, ev: dict[str, Any]) -> tuple[bool, st
 
     Devuelve `(en_cuarentena, motivo)`. El motivo se muestra en la interfaz y se guarda en el
     artefacto: una decisión automática que no se puede explicar no es auditable.
+
+    La regla es **asimétrica** desde el Hito A: la salida se compara además con el azar; la entrada,
+    no. Ver la cabecera del módulo.
     """
     n, exp = int(ev["n"]), float(ev["expectancy"])
 
@@ -101,17 +215,28 @@ def decide_quarantine(en_cuarentena: bool, ev: dict[str, Any]) -> tuple[bool, st
             return True, (
                 f"sigue en cuarentena: {n}/{MIN_SAMPLES_SALIDA} decisiones sombra evaluadas"
             )
-        if exp < MIN_EXPECTANCY_SALIDA:
+        # Umbral efectivo = el más exigente entre el fijo y lo que alcanza el azar con esta muestra.
+        # Tomar el máximo **solo endurece**: sin nula calculada vale 0,0 y manda el fijo de siempre.
+        exigido = max(MIN_EXPECTANCY_SALIDA, float(ev.get("nula_p95", 0.0)))
+        if exp < exigido:
+            detalle = f"se exige ≥{exigido:+.3f} R"
+            if exigido > MIN_EXPECTANCY_SALIDA:
+                detalle += (
+                    f", que es lo que alcanza el azar con {n} decisiones de este periodo"
+                    f" (por encima del fijo {MIN_EXPECTANCY_SALIDA})"
+                )
             return True, (
                 f"sigue en cuarentena: en sombra habría dado {exp:+.3f} R en {n} decisiones "
-                f"(se exige ≥{MIN_EXPECTANCY_SALIDA})"
+                f"({detalle})"
             )
         return False, (
             f"sale de cuarentena: en sombra habría dado {exp:+.3f} R en {n} decisiones, "
-            f"con {ev['win_rate']:.0%} de aciertos"
+            f"con {ev['win_rate']:.0%} de aciertos, por encima del {exigido:+.3f} R exigido"
         )
 
-    # No está en cuarentena: se vigila su rendimiento real.
+    # No está en cuarentena: se vigila su rendimiento real. Aquí NO se lee `nula_p95` —ni siquiera
+    # cuando viene calculado—, por lo dicho en la cabecera: la significancia solo se exige donde
+    # endurece la seguridad, y en la entrada la endurecería al revés.
     if n < MIN_SAMPLES_ENTRADA:
         return False, f"opera con normalidad ({n}/{MIN_SAMPLES_ENTRADA} decisiones evaluadas)"
     if exp <= MAX_EXPECTANCY_ENTRADA:
@@ -140,6 +265,13 @@ def save_policy(artifacts: Path, decisiones: dict[str, dict[str, Any]]) -> dict[
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "min_samples_salida": MIN_SAMPLES_SALIDA,
         "min_expectancy_salida": MIN_EXPECTANCY_SALIDA,
+        # Con qué se calculó la nula de la puerta de salida. Va en el artefacto para que el
+        # veredicto se pueda reproducir sin leer el código de la versión que lo escribió.
+        "nula": {
+            "dias_poblacion": DIAS_POBLACION,
+            "permutaciones": PERMUTACIONES_CICLO,
+            "aplica_a": "salida",
+        },
         "intervals": decisiones,
     }
     (artifacts / "quarantine.json").write_text(
@@ -148,24 +280,37 @@ def save_policy(artifacts: Path, decisiones: dict[str, dict[str, Any]]) -> dict[
     return data
 
 
-def _fetch(dsn: str) -> dict[str, list[dict[str, Any]]]:
+def fetch_expedientes(dsn: str) -> tuple[dict[str, list[dict[str, Any]]], Poblacion]:
+    """Expedientes por clave y, de la misma consulta, la población para la nula."""
     import psycopg
 
     agrupado: dict[str, list[dict[str, Any]]] = {}
+    pob_rs: list[float] = []
+    pob_ts: list[datetime] = []
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         # De la más reciente a la más antigua: el expediente se queda con las primeras, porque lo
         # que describe al sistema de hoy es lo que ha hecho últimamente, no su historia entera.
         cur.execute("""
-            SELECT symbol, interval, outcome_return_r, shadow_outcome_return_r
+            SELECT symbol, interval, captured_at, outcome_return_r, shadow_outcome_return_r
               FROM snapshots
              WHERE outcome_return_r IS NOT NULL OR shadow_outcome_return_r IS NOT NULL
              ORDER BY captured_at DESC
             """)
-        for symbol, interval, real, sombra in cur.fetchall():
+        for symbol, interval, capturada, real, sombra in cur.fetchall():
             agrupado.setdefault(f"{symbol}:{interval}", []).append(
-                {"outcome_return_r": real, "shadow_outcome_return_r": sombra}
+                {
+                    "outcome_return_r": real,
+                    "shadow_outcome_return_r": sombra,
+                    "captured_at": capturada,
+                }
             )
-    return agrupado
+            # Cada decisión cerrada aporta una R a la población, venga del desenlace real o del de
+            # sombra. Nunca las dos: una fila concreta es una cosa o la otra.
+            valor = real if real is not None else sombra
+            if valor is not None and isinstance(capturada, datetime):
+                pob_rs.append(float(valor))
+                pob_ts.append(capturada)
+    return agrupado, Poblacion(pob_rs, pob_ts)
 
 
 def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
@@ -175,15 +320,16 @@ def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
     una depende de a qué expediente mira: si está vetada, al sombra (lo que habría hecho); si opera,
     al real (lo que hizo).
     """
-    datos = _fetch(dsn)
+    datos, poblacion = fetch_expedientes(dsn)
     decisiones: dict[str, dict[str, Any]] = {}
     for clave, filas in datos.items():
         interval = clave.split(":", 1)[1]
         vetada = interval in actuales
         # Cada caso mira su propio expediente y su propia ventana: la de salida es más larga porque
-        # volver a operar exige más pruebas que dejar de hacerlo.
+        # volver a operar exige más pruebas que dejar de hacerlo. Y solo la de salida recibe la
+        # población: la nula no puede afectar a la entrada ni por accidente.
         ev = (
-            evaluate_shadow(filas, MIN_SAMPLES_SALIDA)
+            evaluate_shadow(filas, MIN_SAMPLES_SALIDA, poblacion)
             if vetada
             else evaluate_real(filas, MIN_SAMPLES_ENTRADA)
         )
@@ -199,6 +345,17 @@ def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
                 "expectancy": round(float(ev["expectancy"]), 4),
                 "win_rate": round(float(ev["win_rate"]), 4),
                 "source": "sombra" if vetada else "real",
+                # Los tres se guardan aunque la entrada no los use: la diferencia entre «el azar da
+                # esto» y «se exigía esto» tiene que poder auditarse desde el artefacto, no
+                # reconstruirse. En la entrada salen a 0 y el umbral efectivo coincide con el fijo.
+                "nula_p95": round(float(ev.get("nula_p95", 0.0)), 4),
+                "n_poblacion": int(ev.get("n_poblacion", 0)),
+                "bloques_poblacion": int(ev.get("bloques_poblacion", 0)),
+                "umbral_salida": (
+                    round(max(MIN_EXPECTANCY_SALIDA, float(ev.get("nula_p95", 0.0))), 4)
+                    if vetada
+                    else None
+                ),
             },
         }
     return save_policy(artifacts, decisiones)
