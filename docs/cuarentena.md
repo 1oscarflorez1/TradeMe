@@ -97,7 +97,7 @@ No es una opinión que se pueda compensar con confianza alta: es una retirada de
 se calcula entera —los votos, el net y las probabilidades quedan registrados— pero no sale de ahí
 como operable. En el registro aparece con `hold_reason = 'cuarentena'`.
 
-## El umbral de salida se compara con el azar (v0.46.0)
+## El umbral de salida se compara con el mercado que hubo (v0.46.0, corregido en v0.48.0)
 
 Hasta aquí la cuarentena tenía un problema que compartía con nadie: era **el único módulo de
 gobierno con poder de veto activo sobre las decisiones** y **el único sin control contra el azar**.
@@ -135,17 +135,50 @@ el mejor de los cuatro: no estima variabilidad ninguna.
 
 | Puerta | Regla | Efecto |
 |---|---|---|
-| **Salir** de cuarentena | `expectancy ≥ max(0,05 R, P95 de la nula)` | Más difícil volver a operar |
+| **Salir** de cuarentena | `expectancy ≥ max(0,05 R, mediana de la nula + 0,05 R)` | Ajustado al régimen |
 | **Entrar** en cuarentena | `expectancy ≤ −0,15 R` (sin cambios) | Igual de fácil dejar de operar |
 
-**La nula solo se usa donde endurece la seguridad.** Aplicarla también a la entrada dejaría operando
-temporalidades malas mientras no se demuestre que lo son —el efecto contrario al que se busca—.
-Y no es cuestión de acordarse: `evaluate_real`, que es quien juzga la entrada, ni siquiera acepta el
-argumento de la población. El fallo es estructuralmente imposible.
+**La nula solo se usa en la salida.** Aplicarla también a la entrada dejaría operando temporalidades
+malas mientras no se demuestre que lo son —el efecto contrario al que se busca—. Y no es cuestión de
+acordarse: `evaluate_real`, que es quien juzga la entrada, ni siquiera acepta el argumento de la
+población. El fallo es estructuralmente imposible.
 
-Que el umbral efectivo sea el **máximo** entre el fijo y el del azar significa que este cambio
-**nunca puede relajar** el criterio: cuando la nula no se puede estimar —población corta, menos de 5
-bloques— vale 0,0 y manda el 0,05 R de siempre.
+Cuando la nula no se puede estimar —población corta, menos de 5 bloques— el listón vuelve al 0,05 R
+de siempre. Y por muy malo que sea el mercado, ese 0,05 R es un **suelo**: salir con 0,00 R sigue sin
+valer.
+
+### La corrección del día siguiente: un listón no es un cupo (v0.48.0)
+
+La v0.46.0 exigía `max(0,05 R, **P95** de la nula)`, y eso estaba mal por una razón que no se vio al
+diseñarlo: **la nula se muestrea de la propia plataforma**, así que pedir su percentil 95 para
+readmitir es un **cupo del 5 %**, no un listón de calidad. Si todas las temporalidades fueran buenas
+e idénticas, el 95 % seguiría vetado.
+
+Medido al día siguiente, con la relación 2:1 traducida a tasa de acierto (`E = 3w − 1`):
+
+| | Entra en cuarentena | Vuelve a operar (v0.46.0) |
+|---|---|---|
+| Umbral | −0,15 R | ~0,70 R |
+| Aciertos | ≤ 28 % | ≥ 57 % |
+
+Una banda muerta del 28 % al 55 %, con el punto de equilibrio del sistema en el 33 %: ahí dentro
+caben temporalidades **rentables**. Y la comprobación que lo dejó claro: de las claves que operaban
+ese día, **la mitad no habría podido volver** si hubiera caído en cuarentena. `BTCUSDT:1m` operaba
+sin objeción con +0,267 R y para regresar habría necesitado +0,735 R.
+
+Es el defecto espejo del que `meta_policy` ya documentaba: allí, un umbral que solo se comprueba al
+ascender es un peaje de entrada; aquí, un umbral de readmisión mucho más alto que el de permanencia
+es un cupo. El arreglo es el mismo — que readmitir y permanecer se midan con la misma vara, más la
+asimetría que se haya decidido a conciencia y no de rebote.
+
+**Contra la mediana**, la pregunta es *«¿eres algo mejor que un tramo típico del mercado que hubo?»*.
+Eso sí es lo que se buscaba desde el principio: **neutral al régimen**, subiendo en las rachas buenas
+y bajando en las malas. El P95 no lo hacía neutral, lo hacía extremo.
+
+Y no es incoherente que `meta_policy` y `fundamental_policy` **sigan usando el P95**: allí la
+pregunta es «¿este mecanismo aporta algo o es azar?», con un solo candidato al que se le exige
+evidencia fuerte. Aquí es «¿esta temporalidad merece volver?», con muchos competidores homogéneos.
+Preguntas distintas, percentiles distintos.
 
 ### Qué dijeron los datos reales
 
@@ -246,7 +279,7 @@ Desde el multiactivo (v0.39.0), ETH, SOL y BNB **heredan la cuarentena de 4h** q
 base en `ensemble.yaml`. Es la postura conservadora: de esos activos no se sabe nada todavía, y
 heredar el veto no cuesta nada porque **la sombra sigue registrándose**. Cada uno acumulará su propio
 expediente y saldrá solo cuando lo demuestre, con las mismas 40 decisiones y el mismo umbral —que
-desde v0.46.0 es `max(0,05 R, P95 de la nula)`, no el 0,05 fijo.
+desde v0.48.0 es `max(0,05 R, mediana de la nula + 0,05 R)`, no el 0,05 fijo.
 
 Lo que **no** se hereda es el veredicto: `quarantine.json` tiene una entrada por símbolo y
 temporalidad, así que que 1h esté vetada en BTC no dice nada sobre 1h en ETH.

@@ -7,6 +7,63 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.48.0] — 2026-08-22
+
+> Un listón no es un cupo. El umbral de salida que se entregó en 0.46.0 exigía el percentil 95 de
+> una nula muestreada de la propia plataforma, y eso, por construcción, solo lo cruza el 5 %.
+
+### Fixed — La puerta de salida pasa a ser no-inferioridad al mercado, no el percentil 95
+
+- El error estaba en el propio diseño del Hito A, no en su ejecución: **la nula se muestrea de la
+  plataforma misma**, así que pedir su P95 para readmitir es un cupo del 5 %. Si todas las
+  temporalidades fueran buenas e idénticas, el 95 % seguiría vetado.
+- Con la relación 2:1 traducida a tasa de acierto (`E = 3w − 1`), lo que se estaba exigiendo:
+
+  | | Entra en cuarentena | Volvía a operar (0.46.0) |
+  |---|---|---|
+  | Umbral | −0,15 R | ~0,70 R |
+  | Aciertos | ≤ 28 % | ≥ 57 % |
+
+- Una banda muerta del 28 % al 55 % con el punto de equilibrio del sistema en el 33 %: ahí dentro
+  caben temporalidades **rentables**.
+- La comprobación que lo dejó claro: de las claves que operaban ese día, **la mitad no habría podido
+  volver** si hubiera caído en cuarentena. `BTCUSDT:1m` operaba sin objeción con +0,267 R y para
+  regresar habría necesitado +0,735 R.
+- El criterio pasa a `max(0,05 R, mediana de la nula + 0,05 R)`: *sé algo mejor que un tramo típico
+  del mercado que hubo*. El 0,05 R sigue siendo un **suelo**, así que por muy malo que vaya el
+  mercado no se sale con 0,00 R.
+
+### Changed — Lo que se conserva del Hito A, y lo que se corrige
+
+- **Se conserva la neutralidad respecto al régimen**, que era el objetivo declarado: el listón sube
+  en las rachas buenas y baja en las malas. El P95 no lo hacía neutral, lo hacía extremo.
+- **Se conserva el caso que motivó el hito**: con la plataforma en una racha de +1 R, una
+  temporalidad cuya sombra dé +0,30 R sigue sin salir. Hay un test que lo fija.
+- `meta_policy` y `fundamental_policy` **siguen con el P95**, y no es incoherencia: allí la pregunta
+  es «¿este mecanismo aporta algo o es azar?», con un solo candidato al que se exige evidencia
+  fuerte. Aquí es «¿esta temporalidad merece volver?», con muchos competidores homogéneos. Preguntas
+  distintas, percentiles distintos. Queda escrito en `nula.PERCENTIL_REFERENCIA`.
+- Es el defecto espejo del que `meta_policy` ya documentaba: allí un umbral que solo se comprueba al
+  ascender es un peaje de entrada; aquí un umbral de readmisión mucho más alto que el de permanencia
+  es un cupo.
+
+### Verificado sobre los datos reales antes de entregar
+
+Con las 1.339 decisiones cerradas y el artefacto de producción: **ninguna clave sale hoy**, porque a
+todas les falta muestra. La corrección no libera a nadie de golpe; cambia hacia dónde tiende la
+plataforma. La candidata más cercana es `BNBUSDT:4h` (+1,062 R en 16 de 40), y con el criterio nuevo
+se le sumaría `BTCUSDT:1h` (+0,355 R en 31 de 40), que con el P95 no habría vuelto nunca.
+
+### Changed — El percentil deja de estar en el nombre de la función
+
+`p95_expectancy_bloques` pasa a `percentil_expectancy_bloques`, con el percentil explícito en la
+llamada. Cuál es el correcto depende de la pregunta, y confundirlos ya salió caro una vez.
+
+### Sin cambios — La puerta de entrada
+
+Sigue en −0,15 R. Cambiar las dos a la vez mezclaría efectos y no se sabría cuál hizo qué. Con la
+salida arreglada, el desequilibrio deja de ser urgente y se podrá medir con datos limpios.
+
 ## [0.47.0] — 2026-08-22
 
 > Una cuarentena que no se puede levantar no es una cuarentena, es una condena. Había 11 claves
