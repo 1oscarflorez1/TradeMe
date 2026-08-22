@@ -57,6 +57,55 @@ MIN_LIFT_R = 0.05
 MIN_AUC = 0.55
 
 
+#: Permutaciones para la nula que se calcula en cada ciclo. Menos que en el estudio (10.000),
+#: suficiente para un percentil 95 estable y barato de ejecutar cada pocas horas.
+PERMUTACIONES_NULA = 1_000
+
+
+def lift_nulo_p95(
+    rs: list[float], descartadas: list[bool], marcas: list[int], semilla: int = 20260822
+) -> float:
+    """Lift que alcanza el AZAR en el percentil 95, descartando la misma cantidad de operaciones.
+
+    Por qué hace falta y por qué el umbral fijo no basta: el lift de descartar operaciones **depende
+    del signo del baseline**. Con expectancy positiva, quitar operaciones al azar la reduce hacia
+    cero y da lift negativo; con expectancy negativa, la sube y da lift positivo. Un listón fijo de
+    0,05 R es entonces exigente en las rachas buenas y regalado en las malas — justo al revés de lo
+    que conviene.
+
+    Medido el 22 de agosto de 2026 con 114 decisiones y baseline +1,395 R: el azar alcanzaba
+    −0,149 R en el percentil 95. Con un baseline negativo ese número habría sido positivo, y por
+    encima del umbral fijo de 0,05.
+
+    La permutación es **por bloques**: se reparten entre ventanas los conteos de descartes en vez de
+    elegir filas sueltas. Los cuatro activos cripto valen 1,52 efectivos, así que una permutación
+    simple subestimaría la varianza — sería tratar `n` como evidencia otra vez.
+    """
+    import numpy as np
+
+    n = len(rs)
+    if n == 0 or not any(descartadas):
+        return 0.0
+    arr = np.asarray(rs, dtype=float)
+    base = float(arr.mean())
+    bloques: dict[int, list[int]] = {}
+    for i, m in enumerate(marcas):
+        bloques.setdefault(m, []).append(i)
+    grupos = [np.asarray(v) for _, v in sorted(bloques.items())]
+    conteos = np.asarray([int(sum(descartadas[i] for i in g)) for g in grupos])
+
+    rng = np.random.default_rng(semilla)
+    lifts = np.empty(PERMUTACIONES_NULA, dtype=float)
+    for k in range(PERMUTACIONES_NULA):
+        elegidas = np.zeros(n, dtype=bool)
+        for grupo, cuantas in zip(grupos, rng.permutation(conteos), strict=True):
+            c = min(int(cuantas), grupo.size)
+            if c > 0:
+                elegidas[rng.choice(grupo, size=c, replace=False)] = True
+        lifts[k] = float(np.where(elegidas, 0.0, arr).mean()) - base
+    return float(np.percentile(lifts, 95))
+
+
 def evaluate_shadow(
     rows: list[dict[str, Any]], correlaciones: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -83,6 +132,7 @@ def evaluate_shadow(
         return {
             "n": 0,
             "n_efectivo": 0.0,
+            "lift_nulo_p95": 0.0,
             "baseline": 0.0,
             "con_score": 0.0,
             "lift": 0.0,
@@ -109,11 +159,18 @@ def evaluate_shadow(
     else:
         auc = 0.5
 
+    marcas = [
+        int(r["captured_at"].timestamp() // (24 * 3600)) if r.get("captured_at") else 0
+        for r in usable
+    ]
+    nula_p95 = lift_nulo_p95(rs, discrepa, marcas)
+
     return {
         "n": n,
         # Se guardan LOS DOS a propósito: la diferencia entre decisiones y evidencia tiene que
         # verse en el artefacto, no esconderse detrás de un solo número.
         "n_efectivo": observaciones_efectivas(usable, correlaciones),
+        "lift_nulo_p95": nula_p95,
         "baseline": baseline,
         "con_score": con_score,
         "lift": con_score - baseline,
@@ -133,15 +190,21 @@ def decide_mode(current: str, ev: dict[str, Any], max_mode: str = "active") -> t
     lift = float(ev["lift"])
     auc = float(ev["auc"])
     disc = int(ev["discrepancias"])
+    # Umbral efectivo = el más exigente entre el fijo y lo que alcanza el azar.
+    #
+    # `MIN_LIFT_R` solo no basta: el lift de descartar operaciones depende del signo del baseline,
+    # así que 0,05 R es exigente en las rachas buenas y regalado en las malas. Tomar el máximo hace
+    # el criterio neutral al régimen y **solo endurece**: nunca deja pasar algo que antes no pasaba.
+    exigido = max(MIN_LIFT_R, float(ev.get("lift_nulo_p95", 0.0)))
 
     # Permanencia simétrica. Quien ya influye en las decisiones sigue cumpliendo lo que se le exigió
     # para llegar ahí: un umbral que solo se comprueba al ascender es un peaje de entrada, no un
     # umbral. El meta-modelo aprendió esto conservando poder con AUC 0,43.
     if cur >= 2 and n_ef >= MIN_SAMPLES:
-        if lift < MIN_LIFT_R or auc < MIN_AUC:
+        if lift < exigido or auc < MIN_AUC:
             return "shadow", (
                 f"deja de cumplir lo exigido para influir (mejora {lift:+.3f} R, AUC {auc:.2f}; "
-                f"se exige >={MIN_LIFT_R} R y AUC >={MIN_AUC} en {n} decisiones): vuelve a sombra"
+                f"se exige >={exigido:+.3f} R y AUC >={MIN_AUC} en {n} decisiones): vuelve a sombra"
             )
 
     if n_ef < MIN_SAMPLES:
@@ -156,15 +219,21 @@ def decide_mode(current: str, ev: dict[str, Any], max_mode: str = "active") -> t
             f"el score apenas cambia decisiones ({disc}/{MIN_DISCREPANCIAS} discrepancias): "
             "no hay nada que medir todavía"
         )
-    if lift < MIN_LIFT_R or auc < MIN_AUC:
+    if lift < exigido or auc < MIN_AUC:
+        detalle = f"se exige >={exigido:+.3f} R"
+        if exigido > MIN_LIFT_R:
+            detalle += (
+                f" (el azar alcanza {exigido:+.3f} con esta muestra,"
+                f" por encima del fijo {MIN_LIFT_R})"
+            )
         return current, (
             f"aún no demuestra ventaja (mejora {lift:+.3f} R, AUC {auc:.2f}; "
-            f"se exige >={MIN_LIFT_R} R y AUC >={MIN_AUC})"
+            f"{detalle} y AUC >={MIN_AUC})"
         )
     if cur < 2 <= cap:
         return "active", (
-            f"demuestra ventaja ({lift:+.3f} R, AUC {auc:.2f} en {n} decisiones LONG, "
-            f"{disc} de ellas cambiadas): pasa a penalizar de verdad"
+            f"demuestra ventaja ({lift:+.3f} R sobre un azar de {exigido:+.3f}, AUC {auc:.2f} "
+            f"en {n} decisiones LONG, {disc} de ellas cambiadas): pasa a penalizar de verdad"
         )
     return current, "sin cambios"
 

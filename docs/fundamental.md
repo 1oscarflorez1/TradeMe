@@ -118,6 +118,53 @@ Es justo el escenario donde el funding alto **no** predice mal resultado: un ral
 largos cargados que siguen ganando. Ni confirma ni refuta la medición original; simplemente todavía
 no hay contraste de régimen.
 
+### El umbral se compara con el azar, no con un número fijo
+
+Al diagnosticar el meta-modelo apareció que su umbral de promoción lo superaba el azar. La pregunta
+obvia era si al Fundamental Score le pasaba lo mismo — y la respuesta resultó ser **distinta y más
+interesante**.
+
+Medido el 22 de agosto de 2026 sobre 114 decisiones LONG cerradas (10.000 permutaciones):
+
+| | |
+|---|---|
+| expectancy base | +1,395 R |
+| descartadas por el score | 79 de 114 (69 %) |
+| **lift observado** | **−0,965 R** |
+| nula simple | media −0,967 · [−1,044, −0,886] |
+| nula por bloques de 24 h | media −0,570 · [−1,018, −0,149] |
+| AUC observado | 0,511 (nula [0,408, 0,587]) |
+
+Dos lecturas:
+
+**El score descarta como si eligiera al azar.** El lift observado coincide casi exactamente con el
+nulo simple, y el AUC es 0,511. Con esta muestra no distingue buenas de malas compras.
+
+**Y el lift nulo aquí es negativo, no positivo como en el meta-modelo.** La razón es aritmética: con
+un baseline de +1,395 R, descartar el 69 % de las operaciones al azar arrastra la media hacia cero.
+En el meta-modelo la nula salía positiva porque `pick_threshold` **optimizaba** el corte; aquí no
+hay nada que optimizar, la fórmula es fija.
+
+De ahí la consecuencia que importa: **un umbral fijo no es neutral respecto al régimen**. Los mismos
+0,05 R son exigentes cuando el baseline es positivo y regalados cuando es negativo — en una racha
+mala, cualquier filtro que quite operaciones parecería bueno.
+
+Por eso el gobierno usa ahora:
+
+```
+umbral_efectivo = max(0,05 R, percentil 95 de la nula)
+```
+
+Tomar el máximo hace el criterio neutral al régimen y **solo endurece**: nunca deja pasar algo que
+antes no pasaba. La nula se recalcula en cada ciclo (1.000 permutaciones por bloques) y se publica
+como `lift_nulo_p95` en la evidencia del artefacto.
+
+Reproducible con:
+
+```bash
+python -m trademe_quant.run_fundamental_nula <sombra.csv>
+```
+
 ### Limitación conocida: `n` cuenta decisiones, no evidencia
 
 Cien decisiones correlacionadas siguen siendo casi una sola apuesta observada cien veces.

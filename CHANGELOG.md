@@ -7,6 +7,50 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.44.0] — 2026-08-22
+
+> Se midió si al Fundamental Score le pasaba lo mismo que al meta-modelo. La respuesta fue distinta
+> y más útil: **su umbral no falla por selección, falla por régimen**.
+
+### Added — Distribución nula del Fundamental Score
+
+- Medido sobre 114 decisiones LONG cerradas con 10.000 permutaciones. La hipótesis nula correcta no
+  es barajar resultados —eso cambiaría el baseline— sino: *¿descartar estas d compras es mejor que
+  descartar d cualesquiera?*
+- **Dos nulas**, porque las observaciones están correlacionadas (1,52 activos efectivos): simple y
+  **por bloques de 24 h**. El veredicto usa la más conservadora. Una permutación simple habría
+  subestimado la varianza — sería tratar `n` como evidencia otra vez.
+
+| | |
+|---|---|
+| expectancy base | +1,395 R |
+| descartadas | 79 de 114 (69 %) |
+| **lift observado** | **−0,965 R** |
+| nula simple | [−1,044, −0,886] |
+| nula por bloques | [−1,018, −0,149] |
+| AUC | 0,511 (nula [0,408, 0,587]) |
+
+- **El score descarta como si eligiera al azar**: el lift coincide casi exactamente con el nulo
+  simple y el AUC es 0,511. Con esta muestra no distingue buenas de malas compras.
+
+### Changed — El umbral se compara con el azar, no con un número fijo
+
+- El lift nulo del Fundamental Score es **negativo**, al revés que el del meta-modelo. Es aritmética:
+  con baseline +1,395 R, descartar el 69 % al azar arrastra la media hacia cero. En el meta-modelo la
+  nula salía positiva porque `pick_threshold` optimizaba el corte; aquí la fórmula es fija y no hay
+  nada que optimizar.
+- Consecuencia: **un umbral fijo no es neutral respecto al régimen**. Los mismos 0,05 R son exigentes
+  en rachas buenas y regalados en las malas — cuando el baseline es negativo, cualquier filtro que
+  quite operaciones parece bueno.
+- El gobierno usa ahora `umbral_efectivo = max(0,05 R, percentil 95 de la nula)`. Neutral al régimen
+  y **solo endurece**: nunca deja pasar algo que antes no pasaba. Se recalcula en cada ciclo (1.000
+  permutaciones por bloques) y se publica como `lift_nulo_p95` en la evidencia.
+
+### Estado
+
+El score sigue en **sombra**, y ahora por dos motivos independientes: muestra insuficiente en
+observaciones efectivas, y un lift que no se distingue del azar.
+
 ## [0.43.0] — 2026-08-22
 
 > El meta-modelo no estaba invertido: **no aprende**. Y al comprobarlo apareció algo mayor — el
