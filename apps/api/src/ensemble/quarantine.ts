@@ -20,14 +20,18 @@ export interface QuarantineEntry {
     win_rate: number;
     source: 'sombra' | 'real';
     /**
-     * Expectancy que alcanza el azar con esa misma muestra (percentil 95), y con qué población se
-     * midió. Desde el Hito A la puerta de SALIDA exige `max(0,05 R, nula_p95)`: una temporalidad
-     * cuyas 30 decisiones caben en 9,8 horas puede estar describiendo un mal martes, no a sí misma.
+     * Qué daba el mercado en ese periodo, y con qué población se midió. Una temporalidad cuyas 30
+     * decisiones caben en 9,8 horas puede estar describiendo un mal martes, no a sí misma.
+     *
+     * La puerta de SALIDA exige `max(0,05 R, nula_mediana + 0,05 R)` — no-inferioridad: sé algo
+     * mejor que un tramo típico del mercado que hubo. `nula_p95` se publica solo como referencia
+     * de cuán extremo era el criterio de la v0.46.0, que resultó ser un cupo del 5 % y no un listón.
      *
      * `umbral_salida` es `null` en las claves que operan: la puerta de ENTRADA no usa la nula a
      * propósito, porque exigir significancia para entrar dejaría operando lo malo mientras no se
      * demuestre que lo es.
      */
+    nula_mediana?: number;
     nula_p95?: number;
     n_poblacion?: number;
     bloques_poblacion?: number;
