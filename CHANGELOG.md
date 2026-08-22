@@ -7,6 +7,59 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.41.0] — 2026-08-21
+
+> Cuatro activos cripto son, en información, **poco más de uno y medio**. El mismo hallazgo que el de
+> los seis votos que valían 1,41, en otro eje — y esta vez corrige cuánta evidencia cree tener el
+> sistema al juzgar a sus propios componentes.
+
+### Added — Gestor de Correlaciones (fase de medición)
+
+- Medido sobre 500 velas de 1h, los cuatro activos correlacionan entre **0,69 y 0,81**. Aplicando la
+  participación de autovalores —la misma medida que `independence.py` usa para los votos—: **4
+  activos nominales → 1,52 efectivos**.
+- El gobierno del Fundamental Score pasa a comparar `MIN_SAMPLES` contra **observaciones efectivas**,
+  no contra el recuento de filas. Sobre los datos actuales: **75 decisiones → 38,2 efectivas**.
+- Publica `artifacts/correlaciones.json` en cada ciclo del piloto. **No toca ninguna decisión de
+  trading**: solo corrige cuánta evidencia cree tener el sistema.
+
+### Por qué el descuento no es `n × 0,38`
+
+- Dos decisiones de ETH separadas por una semana **sí** son bastante independientes, aunque ETH y BTC
+  se muevan juntos: la correlación entre activos solo resta cuando las decisiones son **simultáneas**.
+- Por eso se agrupa en ventanas de **24 h** y dentro de cada una los activos presentes cuentan como
+  sus efectivos. El descuento castiga la **concentración**, que es el problema real, y no la
+  diversidad temporal, que es justo lo que se quiere premiar.
+- Se correlacionan **retornos logarítmicos**, no precios: dos series con tendencia siempre parecen ir
+  juntas aunque suban por motivos distintos.
+
+### Verificado contra extremos conocidos
+
+Aprendida la lección del Analista de Niveles —una métrica puede parecer rigurosa y no medir lo que se
+cree—, hay tests contra los dos casos cuya respuesta se conoce de antemano: cuatro series aleatorias
+independientes dan **> 3,3** efectivos, y cuatro copias de la misma serie dan **< 1,2**.
+
+### Corregido — «multiplica la muestra por 4» era optimista
+
+- Al entregar el multiactivo se dijo eso. La multiplicó por **~1,5** en evidencia real. Sigue
+  mereciendo la pena —más regímenes, replicación entre activos, más decisiones por hora— pero el
+  número era ingenuo, y cambia cuándo podrá juzgarse el Fundamental Score: hará falta del orden de
+  250-270 decisiones brutas, no 100.
+
+### Salvaguardas
+
+- Suelo de 0,35: por muy correlacionados que estén, la muestra no se anula.
+- Sin medición suficiente (menos de 100 velas, un solo activo, una serie plana), factor 1: no se
+  descuenta nada.
+- El descuento **solo endurece** el criterio; nunca puede provocar una promoción que sin él no
+  ocurriría.
+- Se publican **los dos números** (`n` y `n_efectivo`): la diferencia tiene que verse.
+
+### Lo que no captura
+
+La correlación entre **temporalidades del mismo activo**: una decisión de ETH en 15m y otra en 1h a
+la misma hora son casi la misma observación y aquí cuentan como dos. Queda anotado.
+
 ## [0.40.0] — 2026-08-21
 
 > El Fundamental Score ya puede ser juzgado. Y su primera lectura es negativa —aunque por ahora eso

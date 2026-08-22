@@ -37,6 +37,8 @@ artifacts/optimization_report.json
 artifacts/ensemble.optimized.yaml
 artifacts/optimized/
 artifacts/fundamental/
+artifacts/correlaciones.json
+artifacts/fundamental_policy.json
 infra/.env.prod
 
 # Volcados de base de datos (datos, no código)

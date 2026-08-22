@@ -43,6 +43,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .correlaciones import observaciones_efectivas
+
 MODES = ["off", "shadow", "active"]
 
 #: Decisiones LONG cerradas mínimas para juzgar.
@@ -55,12 +57,19 @@ MIN_LIFT_R = 0.05
 MIN_AUC = 0.55
 
 
-def evaluate_shadow(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def evaluate_shadow(
+    rows: list[dict[str, Any]], correlaciones: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Compara lo que pasó con lo que habría pasado aplicando la penalización.
 
     `rows` son decisiones **LONG ya cerradas** con su `fund_shadow_action` registrado. Cada una
     aporta su R real al escenario base; al escenario con score aporta 0 si la sombra discrepaba
     (no se habría operado) y su R real si coincidía.
+
+    `correlaciones` es el artefacto del Gestor de Correlaciones. Con él se calcula `n_efectivo`:
+    cuántas observaciones **independientes** representan esas decisiones. Cuatro activos cripto
+    correlacionados a 0,7-0,8 valen 1,52 efectivos, así que un `n` de 134 puede ser evidencia de
+    unas 50. Sin artefacto, `n_efectivo == n` y no se descuenta nada.
     """
     usable = [
         r
@@ -73,6 +82,7 @@ def evaluate_shadow(rows: list[dict[str, Any]]) -> dict[str, Any]:
     if n == 0:
         return {
             "n": 0,
+            "n_efectivo": 0.0,
             "baseline": 0.0,
             "con_score": 0.0,
             "lift": 0.0,
@@ -101,6 +111,9 @@ def evaluate_shadow(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
     return {
         "n": n,
+        # Se guardan LOS DOS a propósito: la diferencia entre decisiones y evidencia tiene que
+        # verse en el artefacto, no esconderse detrás de un solo número.
+        "n_efectivo": observaciones_efectivas(usable, correlaciones),
         "baseline": baseline,
         "con_score": con_score,
         "lift": con_score - baseline,
@@ -114,6 +127,9 @@ def decide_mode(current: str, ev: dict[str, Any], max_mode: str = "active") -> t
     cap = MODES.index(max_mode) if max_mode in MODES else len(MODES) - 1
     cur = MODES.index(current) if current in MODES else 1
     n = int(ev["n"])
+    # El umbral se compara contra la evidencia, no contra el recuento de filas. Sin medición de
+    # correlaciones son el mismo número, así que esto nunca relaja el criterio: solo lo endurece.
+    n_ef = float(ev.get("n_efectivo", n))
     lift = float(ev["lift"])
     auc = float(ev["auc"])
     disc = int(ev["discrepancias"])
@@ -121,15 +137,18 @@ def decide_mode(current: str, ev: dict[str, Any], max_mode: str = "active") -> t
     # Permanencia simétrica. Quien ya influye en las decisiones sigue cumpliendo lo que se le exigió
     # para llegar ahí: un umbral que solo se comprueba al ascender es un peaje de entrada, no un
     # umbral. El meta-modelo aprendió esto conservando poder con AUC 0,43.
-    if cur >= 2 and n >= MIN_SAMPLES:
+    if cur >= 2 and n_ef >= MIN_SAMPLES:
         if lift < MIN_LIFT_R or auc < MIN_AUC:
             return "shadow", (
                 f"deja de cumplir lo exigido para influir (mejora {lift:+.3f} R, AUC {auc:.2f}; "
                 f"se exige >={MIN_LIFT_R} R y AUC >={MIN_AUC} en {n} decisiones): vuelve a sombra"
             )
 
-    if n < MIN_SAMPLES:
-        return current, f"evidencia insuficiente ({n}/{MIN_SAMPLES} decisiones LONG cerradas)"
+    if n_ef < MIN_SAMPLES:
+        detalle = f"{n_ef:.0f}/{MIN_SAMPLES} observaciones efectivas"
+        if abs(n_ef - n) >= 1:
+            detalle += f" ({n} decisiones LONG cerradas, descontadas por correlación entre activos)"
+        return current, f"evidencia insuficiente: {detalle}"
     if disc < MIN_DISCREPANCIAS:
         # Sin discrepancias el lift es 0 por construcción, y un 0 así no significa «inofensivo»:
         # significa que el score no ha llegado a opinar distinto ni una vez.
@@ -204,8 +223,10 @@ def save_policy(artifacts: Path, mode: str, reason: str, ev: dict[str, Any]) -> 
 
 def publish(artifacts: Path, dsn: str, max_mode: str = "active") -> dict[str, Any]:
     """Mide el expediente sombra y publica el modo que corresponda."""
+    from .correlaciones import load as load_correlaciones
+
     actual = str(load_policy(artifacts).get("mode", "shadow"))
-    ev = evaluate_shadow(fetch_rows(dsn))
+    ev = evaluate_shadow(fetch_rows(dsn), load_correlaciones(artifacts))
     modo, razon = decide_mode(actual, ev, max_mode)
     data = save_policy(artifacts, modo, razon, ev)
     data["changed"] = modo != actual

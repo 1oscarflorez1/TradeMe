@@ -291,6 +291,25 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin score el motor decide igual que hoy
         log.append(f"error fundamental: {err}")
 
+    # Gestor de Correlaciones: mide cuántos activos INDEPENDIENTES hay de verdad. Va antes del
+    # gobierno porque este lo usa para descontar la muestra: cuatro activos cripto correlacionados
+    # a 0,7-0,8 valen 1,52 efectivos, así que 134 decisiones pueden ser evidencia de unas 50.
+    try:
+        from .correlaciones import publish as publish_correlaciones
+
+        corr = publish_correlaciones(artifacts_dir(), symbols)
+        if corr.get("matrix"):
+            log.append(
+                f"correlaciones: {corr['nominales']} activos -> "
+                f"{corr['efectivos']:.2f} efectivos (factor {corr['factor']:.3f})"
+            )
+        else:
+            log.append("correlaciones: sin muestra suficiente, no se descuenta nada")
+    except (
+        Exception
+    ) as err:  # noqa: BLE001 - sin medición no se descuenta; nunca relaja el criterio
+        log.append(f"error correlaciones: {err}")
+
     # Gobierno del Fundamental Score: mide su expediente sombra y decide si ya se ha ganado el
     # derecho a influir. Va después de publicar las distribuciones porque juzga lo que estas
     # produjeron. Como todo lo demás aquí: asciende con evidencia y retrocede al perderla.

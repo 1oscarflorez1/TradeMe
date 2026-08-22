@@ -150,3 +150,12 @@ Está implementado en `run_levels_study.py` y el caso completo, en
 Y el corolario incómodo: superar el ruido demuestra que la fuente **es distinta**, no que **sirva**.
 Para eso sigue haciendo falta la otra mitad, la de siempre: que prediga algo sobre decisiones reales
 cerradas.
+
+## La misma idea, aplicada a las observaciones
+
+Este documento mide la independencia de los **votos**. Existe su hermana para las **observaciones**:
+cuatro activos cripto correlacionados a 0,7-0,8 valen **1,52 efectivos**, así que 134 decisiones
+pueden ser evidencia de unas 50. Ver [correlaciones.md](correlaciones.md).
+
+Las dos responden a la misma pregunta —¿cuánta información hay aquí de verdad?— en ejes distintos, y
+las dos usan la participación de autovalores.
