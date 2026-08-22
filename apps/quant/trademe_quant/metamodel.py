@@ -125,12 +125,19 @@ def train_metamodel(rows: list[dict[str, Any]], test_ratio: float = 0.3) -> dict
 
     x_all = np.asarray([row_to_features(r) for r in usable], dtype=np.float64)
     r_all = np.asarray([float(r["outcome_return_r"]) for r in usable], dtype=np.float64)
-    split = int(len(usable) * (1 - test_ratio))
-    x_tr, x_te = x_all[:split], x_all[split:]
-    y_tr, y_te = y_all[:split], y_all[split:]
-    r_te = r_all[split:]
 
-    if len(np.unique(y_tr)) < 2 or len(y_te) < 10:
+    # TRES tramos, no dos. El umbral se elige en el del medio y se juzga en el último.
+    #
+    # Antes era `pick_threshold(probs_te, r_te)` seguido de medir la expectancy filtrada sobre ese
+    # mismo `r_te`: el umbral se optimizaba en los datos que después lo juzgaban, así que la mejora
+    # salía inflada por construcción y el `threshold` publicado venía ajustado a datos ya vistos.
+    split = int(len(usable) * (1 - test_ratio))
+    corte_sel = split + max(1, int(len(usable) * test_ratio / 2))
+    x_tr, y_tr = x_all[:split], y_all[:split]
+    x_sel, r_sel = x_all[split:corte_sel], r_all[split:corte_sel]
+    x_te, y_te, r_te = x_all[corte_sel:], y_all[corte_sel:], r_all[corte_sel:]
+
+    if len(np.unique(y_tr)) < 2 or len(y_te) < 10 or len(r_sel) < 10:
         return {"trained": False, "reason": "tramo de validación insuficiente", "n": len(usable)}
 
     model = RandomForestClassifier(
@@ -142,9 +149,11 @@ def train_metamodel(rows: list[dict[str, Any]], test_ratio: float = 0.3) -> dict
     )
     model.fit(x_tr, y_tr)
     probs_te = model.predict_proba(x_te)[:, 1].astype(np.float64)
+    probs_sel = model.predict_proba(x_sel)[:, 1].astype(np.float64)
 
     baseline = float(np.mean(r_te))
-    threshold = pick_threshold(probs_te, r_te)
+    # El umbral sale del tramo de SELECCIÓN. El de prueba solo juzga.
+    threshold = pick_threshold(probs_sel, r_sel)
     filtered, kept = expectancy_with_filter(probs_te, r_te, threshold)
     improves = filtered > baseline and kept >= max(5, int(0.3 * len(r_te)))
 
@@ -161,6 +170,7 @@ def train_metamodel(rows: list[dict[str, Any]], test_ratio: float = 0.3) -> dict
         "model": model,
         "n": len(usable),
         "n_train": int(split),
+        "n_select": int(len(r_sel)),
         "n_test": int(len(y_te)),
         "auc": auc,
         "threshold": threshold,

@@ -7,6 +7,51 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.43.0] — 2026-08-22
+
+> El meta-modelo no estaba invertido: **no aprende**. Y al comprobarlo apareció algo mayor — el
+> umbral que exigimos para promocionarlo lo supera el azar de media.
+
+### Added — Diagnóstico del meta-modelo (Fase A): resultado **negativo**
+
+- Parecía anti-correlacionado: AUC 0,46 y, en BTCUSDT, +0,195 R en el tercil de menor confianza
+  frente a −0,168 R en el de mayor, con la dirección repetida en las cuatro temporalidades.
+- Antes de buscar causas, se descartó la más simple. Con 785 decisiones evaluadas y el reparto
+  correcto, el **AUC es 0,4967** y el nulo de 10.000 barajadas es [0,4216 – 0,5796]: **dentro**,
+  p = **0,942**. Azar puro.
+- Segunda prueba, permutando **y reentrenando** 300 veces para juzgar el procedimiento entero: AUC
+  observado 0,497 sobre un nulo [0,163 – 0,842], y lift +0,260 sobre un nulo [−0,469 – +0,816]. Los
+  dos dentro.
+- **No hay un modelo invertido que arreglar: hay un modelo que no aprende.** Lo que falta no es
+  afinar el bosque, son features que no deriven todas del mismo precio — las 15 actuales salen de
+  seis votos que valen 1,41 efectivos.
+
+### El hallazgo que va más allá del meta-modelo
+
+- El nulo del lift tiene **media +0,083 R** y llega a **+0,816 R** en el percentil 95. El umbral para
+  promocionar es **0,05 R**: un modelo entrenado con etiquetas barajadas lo supera de media.
+- La causa es mecánica: el filtro conserva pocas señales (32 de 157) y con muestras pequeñas
+  quedarse con un subconjunto produce mejoras aparentes. Con el AUC pasa igual: exigir ≥ 0,55 no
+  protege cuando el percentil 95 del azar llega a 0,84.
+- Es el mismo tipo de fallo que el control de ruido destapó en los votos efectivos: un criterio que
+  parece riguroso y que el azar supera. **Van dos veces en este proyecto.**
+- Esos umbrales gobiernan el meta-modelo **y** el Fundamental Score. Ninguno ha promocionado nunca,
+  así que no ha habido consecuencia práctica — pero el listón no distingue mérito de suerte.
+  **No se han tocado aquí**: cambiarlos afecta a dos componentes y merece su propia medición.
+
+### Fixed — El umbral del meta-modelo se elegía mirando el conjunto de prueba
+
+- `pick_threshold(probs_te, r_te)` seguido de medir la expectancy filtrada sobre ese mismo `r_te`:
+  el umbral se optimizaba en los datos que después lo juzgaban, así que la mejora salía inflada por
+  construcción y el `threshold` publicado venía ajustado a datos ya vistos.
+- Ahora hay **tres tramos** —entrenamiento · selección · prueba—: el umbral se elige en el del medio
+  y solo se juzga en el último.
+
+### No se invirtió el modelo, a propósito
+
+Era la tentación obvia. Habría sido el ajuste post-hoc que este proyecto evita desde M10.5 — y la
+medición dice que tampoco habría funcionado: no hay señal que invertir.
+
 ## [0.42.0] — 2026-08-22
 
 > El dato que faltaba en pantalla: cuando el sistema marca comprar en tres criptos a la vez, eso no
