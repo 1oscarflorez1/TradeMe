@@ -121,16 +121,29 @@ def _ficha(
 
 
 def _contra_el_azar(f: dict[str, Any]) -> str:
-    """Dónde cae lo observado dentro del [P5, P95] del azar."""
+    """Dónde cae lo observado respecto del azar, con p-valor bilateral.
+
+    Se cuenta la proporción de la nula que iguala o supera lo observado, **empates incluidos**, en
+    vez de compararlo con el percentil 5. No es lo mismo, y la diferencia se vio en los datos
+    reales: `BNBUSDT:1h` y `SOLUSDT:15m` dan una expectancy de exactamente −0,700 R y el percentil 5
+    de su nula cae **también** en −0,700. Comparar con `<` los declaraba «distintas del azar» por un
+    residuo de coma flotante, cuando lo que hay ahí es un empate.
+
+    Los desenlaces son casi discretos —casi todo es −1 R o +2 R—, así que los empates no son un caso
+    raro de laboratorio: son el caso normal. Un informe que los resuelve por el lado favorable dice
+    justo lo que este proyecto no puede permitirse decir.
+    """
     dist = f["dist"]
     if dist is None:
         return f"nula no estimable ({f['n_pob']} filas, {f['bloques_pob']} bloques)"
+    obs = f["exp"]
+    p_bajo = float((dist <= obs).mean())
+    p_alto = float((dist >= obs).mean())
+    p = min(1.0, 2.0 * min(p_bajo, p_alto))
     p5, p95 = (float(x) for x in np.percentile(dist, [5, 95]))
-    fuera = f["exp"] < p5 or f["exp"] > p95
-    # Cuatro decimales y no tres: varias claves rozan el P5 por milésimas, y con tres el intervalo
-    # se imprimía idéntico a lo observado mientras el veredicto decía «distinta». Parecía un fallo.
     return (
-        f"azar [{p5:+.4f}, {p95:+.4f}] · " f"{'DISTINTA del azar' if fuera else 'dentro del azar '}"
+        f"azar [{p5:+.4f}, {p95:+.4f}] · p={p:.3f} · "
+        f"{'DISTINTA del azar' if p < 0.05 else 'dentro del azar '}"
     )
 
 

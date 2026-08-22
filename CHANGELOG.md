@@ -59,9 +59,18 @@ Ejecutado sobre las 1.302 decisiones cerradas de producción, con 10.000 permuta
 - **Ninguna temporalidad sale ni entra por este cambio.** Ninguna clave vetada tiene todavía las 40
   decisiones sombra para plantearse salir; la que más lleva va por 31. Es una regla para cuando
   llegue la muestra.
-- **Los vetos vigentes se sostienen.** Las cinco claves condenadas por rendimiento real caen por
-  debajo del percentil 5 del azar: −0,940 R, −0,900, −0,769, −0,700 y −0,700, contra un suelo del
-  azar en −0,70. No fue un mal martes.
+- **De los cinco vetos por rendimiento real, dos se sostienen y tres no.** `BTCUSDT:15m`
+  (−0,940 R, p=0,005) y `BTCUSDT:30m` (−0,900 R, p=0,010) se distinguen del azar; `BTCUSDT:1h`
+  (p=0,073), `SOLUSDT:15m` (p=0,089) y `BNBUSDT:1h` (p=0,093), **no**. Esas tres podrían estar
+  teniendo un mal martes.
+- Siguen vetadas, y es lo correcto: la puerta de entrada no usa la nula precisamente para esto. Si
+  la usara, seguirían operando mientras se reúne la evidencia de que pierden dinero. El dato sirve
+  para saber cuáles han demostrado algo y cuáles no, no para levantarles el veto.
+- El p-valor se calcula **bilateral y contando los empates**, no comparando con el percentil 5. No
+  es un detalle: `SOLUSDT:15m` y `BNBUSDT:1h` dan exactamente −0,700 R y el percentil 5 de su nula
+  cae también en −0,700. Comparar con `<` las declaraba «distintas del azar» por un residuo de coma
+  flotante. Con desenlaces casi discretos —casi todo es −1 R o +2 R— los empates son el caso normal,
+  no una rareza de laboratorio.
 
 ### Fixed — Un fallo aparte, encontrado al medir: 5 claves atrapadas en cuarentena
 

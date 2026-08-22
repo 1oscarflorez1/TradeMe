@@ -154,10 +154,21 @@ Al ejecutarlo sobre las 1.302 decisiones cerradas de producción, con 10.000 per
 - **Ninguna temporalidad sale ni entra por este cambio.** Ninguna clave vetada tiene aún las 40
   decisiones sombra que hacen falta para plantearse salir (la que más lleva, `BTCUSDT:1h`, va por 31).
   Es una regla para cuando llegue la muestra, no un arreglo de algo que estuviera pasando.
-- **Los vetos vigentes se sostienen.** Las cinco claves condenadas por rendimiento real quedan
-  **por debajo del percentil 5** del azar: −0,940 R (`BTCUSDT:15m`), −0,900 (`BTCUSDT:30m`), −0,769
-  (`BTCUSDT:1h`), −0,700 (`SOLUSDT:15m` y `BNBUSDT:1h`), contra un suelo del azar en −0,70. No fue un
-  mal martes.
+- **De los cinco vetos por rendimiento real, dos se sostienen con holgura y tres no.** Contra la
+  nula bilateral, con los empates contados:
+
+  | Clave | Expectancy | p | Veredicto |
+  |---|---|---|---|
+  | `BTCUSDT:15m` | −0,940 R | 0,005 | distinta del azar |
+  | `BTCUSDT:30m` | −0,900 R | 0,010 | distinta del azar |
+  | `BTCUSDT:1h` | −0,769 R | 0,073 | **dentro del azar** |
+  | `SOLUSDT:15m` | −0,700 R | 0,089 | **dentro del azar** |
+  | `BNBUSDT:1h` | −0,700 R | 0,093 | **dentro del azar** |
+
+  Tres de las cinco **podrían estar teniendo un mal martes**. Siguen vetadas, y es lo correcto: la
+  puerta de entrada no usa la nula justamente para esto. Si la usara, esas tres seguirían operando
+  mientras se reúne la evidencia de que pierden dinero, que es el error caro. Pero conviene saber
+  cuáles son las que de verdad han demostrado algo y cuáles no.
 
 ### Lo que este cambio NO arregla
 
@@ -191,8 +202,9 @@ Por símbolo y temporalidad (claves `SÍMBOLO:intervalo` en `quarantine.json`), 
 | `BTCUSDT:1m` | no | opera con normalidad (+0,267 R en 30) |
 | `BTCUSDT:5m` | no | opera con normalidad (+0,044 R en 30) |
 
-Las cinco que entraron solas se distinguen del azar (por debajo de su percentil 5); las tres primeras
-que operan, también, por arriba. Datos del 22 de agosto de 2026.
+De las cinco que entraron solas, solo `BTCUSDT:15m` y `BTCUSDT:30m` se distinguen del azar; las otras
+tres podrían ser un mal martes (ver arriba). De las que operan, `BTCUSDT:1d`, `SOLUSDT:30m` y
+`ETHUSDT:15m` sí se distinguen, por arriba. Datos del 22 de agosto de 2026.
 
 Nadie tocó una lista para que 1h entrara: la política lo decidió con sus propios umbrales.
 
