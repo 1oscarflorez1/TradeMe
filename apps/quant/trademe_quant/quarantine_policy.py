@@ -313,18 +313,55 @@ def fetch_expedientes(dsn: str) -> tuple[dict[str, list[dict[str, Any]]], Poblac
     return agrupado, Poblacion(pob_rs, pob_ts)
 
 
+def estado_previo(politica: dict[str, Any], clave: str, interval: str, actuales: list[str]) -> bool:
+    """¿Está vetada esta clave AHORA MISMO? Yaml (por temporalidad) ∪ artefacto (por clave).
+
+    El fallo que esto corrige (22 ago 2026)
+    ----------------------------------------
+    `publish` decidía a qué expediente mirar con `interval in actuales`, es decir con la lista del
+    `ensemble.yaml`, **que es por temporalidad**. Pero quien veta de verdad en la plataforma es
+    `quarantine.json`, **que es por clave `SÍMBOLO:intervalo`** — así lo lee `quarantine.ts`.
+
+    Consecuencia, medida: una clave que entraba en cuarentena por su rendimiento real dejaba de
+    generar `outcome_return_r` —una temporalidad vetada solo produce sombra—, así que su expediente
+    real se congelaba en las decisiones de antes del veto. Y como su temporalidad no figuraba en el
+    yaml, el gobierno la seguía juzgando con ESE expediente congelado y la recondenaba cada ciclo
+    con las mismas filas. **Jamás llegaba a la puerta de salida.**
+
+    Es exactamente el fallo que la migración 017 arregló para 4h, reaparecido en el eje
+    `SÍMBOLO:intervalo`: «una medida temporal, irreversible por construcción». El 22 de agosto de
+    2026 había 11 claves vetadas acumuladas en seis días, 6 de ellas atrapadas así, y ninguna había
+    salido nunca. La plataforma se estaba apagando sola.
+
+    El yaml es un SUELO, no un techo
+    ---------------------------------
+    Quitar una temporalidad de `quarantine_intervals` ya no levanta su cuarentena: quien esté vetado
+    en el artefacto sigue vetado hasta demostrar la salida con su expediente sombra. Es deliberado
+    —una cuarentena se levanta con evidencia, no editando un fichero— y la vía manual, si algún día
+    hiciera falta, es borrar la entrada del artefacto.
+
+    Sin artefacto, o con uno ilegible, manda el yaml: exactamente el comportamiento anterior.
+    """
+    if interval in actuales:
+        return True
+    entrada = (politica.get("intervals") or {}).get(clave)
+    return bool(entrada.get("quarantined")) if isinstance(entrada, dict) else False
+
+
 def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
     """Revisa cada temporalidad y publica `quarantine.json`.
 
-    `actuales` son las temporalidades hoy en cuarentena, según `ensemble.yaml`. La decisión de cada
-    una depende de a qué expediente mira: si está vetada, al sombra (lo que habría hecho); si opera,
-    al real (lo que hizo).
+    `actuales` son las temporalidades vetadas según `ensemble.yaml`, pero el estado real de cada
+    clave sale de `estado_previo`: el yaml es el suelo y el artefacto manda por encima. De eso
+    depende a qué expediente se mira — si está vetada, al sombra (lo que habría hecho); si opera, al
+    real (lo que hizo)— y equivocarse ahí deja claves condenadas para siempre.
     """
     datos, poblacion = fetch_expedientes(dsn)
+    politica = load_policy(artifacts)
     decisiones: dict[str, dict[str, Any]] = {}
     for clave, filas in datos.items():
         interval = clave.split(":", 1)[1]
-        vetada = interval in actuales
+        vetada = estado_previo(politica, clave, interval, actuales)
         # Cada caso mira su propio expediente y su propia ventana: la de salida es más larga porque
         # volver a operar exige más pruebas que dejar de hacerlo. Y solo la de salida recibe la
         # población: la nula no puede afectar a la entrada ni por accidente.
