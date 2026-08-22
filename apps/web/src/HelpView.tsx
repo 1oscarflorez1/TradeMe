@@ -395,6 +395,39 @@ const KB: Article[] = [
     ),
   },
   {
+    title: 'Cuando hay varias señales a la vez: ¿son varias oportunidades?',
+    body: (
+      <>
+        <p>
+          Si el sistema marca <strong>comprar</strong> en tres criptomonedas a la vez, parece que hay
+          tres oportunidades. Casi nunca es así: las criptomonedas grandes se mueven juntas. Medido
+          sobre las últimas tres semanas, BTC, ETH, SOL y BNB se parecen entre sí{' '}
+          <strong>entre un 69 % y un 81 %</strong>.
+        </p>
+        <p>
+          Traducido: esos cuatro activos, juntos, equivalen a{' '}
+          <strong>algo más de un activo y medio</strong>. Si abres posición en los cuatro creyendo
+          que repartes el riesgo, en realidad estás haciendo <em>una apuesta grande</em> con cuatro
+          nombres distintos. Y si el mercado gira, giran todos a la vez.
+        </p>
+        <p>
+          Por eso, cuando coinciden varias señales en la misma dirección, debajo de la decisión
+          aparece un aviso: <strong>«3 señales de compra · ≈ 1,4 apuestas»</strong>, con los activos
+          implicados y cuáles son los más parecidos entre sí.
+        </p>
+        <p>
+          <strong>No bloquea nada.</strong> Las señales siguen ahí y tú decides. Lo único que hace es
+          poner delante un número que antes no estaba en ninguna pantalla y que cambia bastante la
+          respuesta a «¿cuánto arriesgo en esto?».
+        </p>
+        <p>
+          Cuando los activos <em>sí</em> se mueven por su cuenta, el aviso lo dice también: entonces
+          varias señales sí son diversificación real.
+        </p>
+      </>
+    ),
+  },
+  {
     title: 'Miedo y codicia, tipos del BCE: por qué se registran y no deciden',
     body: (
       <p>
@@ -672,6 +705,8 @@ const GLOSARIO: Array<[string, string, string]> = [
   ['Sesgo macro', 'Fundamental', 'Inclinación de fondo (funding + tendencia semanal), inyectada en los logits.'],
   ['Fundamental Score', 'Fundamental', 'Percentil del funding a 90 días. Solo penaliza compras; hoy en sombra, sin influir.'],
   ['Modo sombra', 'Método', 'Se calcula y se registra sin influir, para poder demostrar que merece influir.'],
+  ['Apuestas efectivas', 'Riesgo', 'Cuántas apuestas independientes son varias señales que se mueven juntas.'],
+  ['Correlación', 'Riesgo', 'Cuánto se parecen los movimientos de dos activos: 1 es idéntico, 0 es sin relación.'],
   ['Cuarentena', 'Método', 'Temporalidad retirada de la operativa: se sigue calculando y midiendo, pero no opera.'],
 ];
 

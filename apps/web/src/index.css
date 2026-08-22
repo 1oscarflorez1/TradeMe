@@ -534,6 +534,81 @@ body {
   font-size: 0.72rem;
 }
 
+/* ---- Gestor de Correlaciones: exposición correlacionada (aviso, no veto) ---- */
+.exposicion {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.exp-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.exp-simbolos {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* La barra compara de un vistazo señales nominales (huecos) con apuestas reales (relleno). */
+.exp-barra {
+  position: relative;
+  height: 8px;
+}
+
+.exp-barra-fondo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 2px;
+}
+
+.exp-hueco {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.exp-barra-real {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 3px;
+  opacity: 0.85;
+}
+
+.exp-alta .exp-barra-real {
+  background: var(--sell);
+}
+
+.exp-media .exp-barra-real {
+  background: color-mix(in srgb, var(--sell) 55%, var(--muted));
+}
+
+.exp-baja .exp-barra-real {
+  background: var(--buy);
+}
+
+.exp-explica {
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.exp-nota,
+.exp-neutra p {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 0;
+}
+
 /* ---- M12: Fundamental Score (funding asimétrico, en sombra) ---- */
 .fundamental {
   margin-top: 0.75rem;

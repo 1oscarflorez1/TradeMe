@@ -77,6 +77,30 @@ de antemano:
 | 4 copias de la misma serie | ≈ 1 efectivo | < 1,2 ✔ |
 | 4 series con factor común | entre medias | 1,2–3,5 ✔ |
 
+## La capa visible: el aviso del Panel
+
+Debajo de la decisión, cuando hay **varias señales operables alineadas** en distintos activos, el
+Panel dice cuántas apuestas independientes son de verdad:
+
+> **3 señales de compra · ≈ 1,4 apuestas** — BTCUSDT · ETHUSDT · SOLUSDT
+> Estas 3 señales no son 3 oportunidades independientes: estos activos se mueven juntos, así que
+> arriesgar en todas equivale a una apuesta de tamaño 1,4, no de tamaño 3. Los más parecidos son
+> BTCUSDT y ETHUSDT (correlación 0,81).
+
+Detalles que importan:
+
+- **Es un aviso, no un veto.** Las señales se muestran igual y la plataforma no ejecuta órdenes.
+  Decidir cuánto arriesgar sigue siendo del usuario; esto solo pone el número que faltaba.
+- Se toma el **lado cargado**: dos largos y un corto no se compensan, porque el riesgo está en el
+  lado donde se acumulan.
+- **Sin medición no se inventa un descuento**: se dice que no se sabe. Enseñar «1,4 apuestas» sin
+  haberlo medido sería peor que no decir nada, porque el usuario decidiría con un número falso.
+- Los activos efectivos de cada combinación vienen **precalculados** en el artefacto. Obtenerlos
+  exige autovalores de la submatriz, y reimplementar álgebra lineal en TypeScript para un dato
+  informativo arriesgaría que la pantalla y el gobierno dieran números distintos.
+
+Endpoint: `GET /exposicion?interval=15m`.
+
 ## Lo que NO captura
 
 La correlación **entre temporalidades del mismo activo**. Una decisión de ETH en 15m y otra de ETH
