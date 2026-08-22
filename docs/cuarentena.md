@@ -97,18 +97,102 @@ No es una opinión que se pueda compensar con confianza alta: es una retirada de
 se calcula entera —los votos, el net y las probabilidades quedan registrados— pero no sale de ahí
 como operable. En el registro aparece con `hold_reason = 'cuarentena'`.
 
+## El umbral de salida se compara con el azar (v0.46.0)
+
+Hasta aquí la cuarentena tenía un problema que compartía con nadie: era **el único módulo de
+gobierno con poder de veto activo sobre las decisiones** y **el único sin control contra el azar**.
+El Fundamental Score tenía su distribución nula; el meta-modelo iba a tenerla; la cuarentena, que es
+la que de verdad manda hoy, no.
+
+Y aquí el problema muerde con fuerza, porque las decisiones que juzgan a una temporalidad se
+amontonan en el tiempo. Medido el 22 de agosto de 2026:
+
+| Clave | Decisiones | Caben en |
+|---|---|---|
+| `BTCUSDT:15m` | 30 | **9,8 horas** |
+| `BTCUSDT:30m` | 30 | 26,5 horas |
+| `SOLUSDT:15m` | 30 | 49,4 horas |
+
+`BTCUSDT:15m` entró en cuarentena con −0,940 R sobre 30 decisiones de menos de un día. Eso puede ser
+una temporalidad mala o puede ser **un mal martes**, y la medición anterior no lo distinguía.
+
+### La pregunta que se le hace ahora al azar
+
+> ¿Qué expectancy sale de coger `n` decisiones **cualesquiera** de la plataforma, en bloques de
+> 24 horas, del mismo periodo?
+
+Se muestrean bloques enteros y no filas sueltas, y esa es la parte que importa: muestrear bloques
+hace que la nula **incorpore sola** el solapamiento temporal, sin inventar ningún factor de
+descuento. Si una temporalidad concentra sus decisiones en un día, la pregunta correcta no es «¿30
+decisiones cualesquiera darían esto?» sino «¿un día cualquiera de la plataforma daría esto?». Son
+preguntas con respuestas muy distintas.
+
+La población son los **14 días** anteriores a la decisión más reciente juzgada. No el periodo exacto
+de lo observado, porque medido eso deja entre 1 y 4 bloques, y con cuatro días el «percentil 95» es
+el mejor de los cuatro: no estima variabilidad ninguna.
+
+### La regla es asimétrica, y es lo delicado
+
+| Puerta | Regla | Efecto |
+|---|---|---|
+| **Salir** de cuarentena | `expectancy ≥ max(0,05 R, P95 de la nula)` | Más difícil volver a operar |
+| **Entrar** en cuarentena | `expectancy ≤ −0,15 R` (sin cambios) | Igual de fácil dejar de operar |
+
+**La nula solo se usa donde endurece la seguridad.** Aplicarla también a la entrada dejaría operando
+temporalidades malas mientras no se demuestre que lo son —el efecto contrario al que se busca—.
+Y no es cuestión de acordarse: `evaluate_real`, que es quien juzga la entrada, ni siquiera acepta el
+argumento de la población. El fallo es estructuralmente imposible.
+
+Que el umbral efectivo sea el **máximo** entre el fijo y el del azar significa que este cambio
+**nunca puede relajar** el criterio: cuando la nula no se puede estimar —población corta, menos de 5
+bloques— vale 0,0 y manda el 0,05 R de siempre.
+
+### Qué dijeron los datos reales
+
+Al ejecutarlo sobre las 1.302 decisiones cerradas de producción, con 10.000 permutaciones:
+
+- **Ninguna temporalidad sale ni entra por este cambio.** Ninguna clave vetada tiene aún las 40
+  decisiones sombra que hacen falta para plantearse salir (la que más lleva, `BTCUSDT:1h`, va por 31).
+  Es una regla para cuando llegue la muestra, no un arreglo de algo que estuviera pasando.
+- **Los vetos vigentes se sostienen.** Las cinco claves condenadas por rendimiento real quedan
+  **por debajo del percentil 5** del azar: −0,940 R (`BTCUSDT:15m`), −0,900 (`BTCUSDT:30m`), −0,769
+  (`BTCUSDT:1h`), −0,700 (`SOLUSDT:15m` y `BNBUSDT:1h`), contra un suelo del azar en −0,70. No fue un
+  mal martes.
+
+### Lo que este cambio NO arregla
+
+Hay un fallo aparte, detectado al medir esto: `publish` elige a qué expediente mirar con
+`interval in quarantine_intervals`, es decir con la lista del `ensemble.yaml`, **que es por
+temporalidad**; pero quien veta de verdad es `quarantine.json`, **que es por clave**.
+
+Consecuencia: una clave vetada por su rendimiento real —`BTCUSDT:15m`, por ejemplo— deja de producir
+`outcome_return_r` y su expediente real se queda congelado en las decisiones de antes del veto. Como
+su temporalidad no figura en el yaml, el gobierno la sigue juzgando con ese expediente congelado y la
+recondena cada ciclo con las mismas filas. **Nunca llega a la puerta de salida.**
+
+Son **5 claves** hoy. Es el mismo fallo que la migración 017 arregló para 4h, reaparecido en el eje
+`SÍMBOLO:intervalo`, y está pendiente de decidir cómo se cierra.
+
 ## Estado actual
 
 Por símbolo y temporalidad (claves `SÍMBOLO:intervalo` en `quarantine.json`), no global:
 
 | Clave | En cuarentena | Motivo |
 |---|---|---|
-| `BTCUSDT:4h` | sí | sigue en cuarentena: 6/40 decisiones sombra evaluadas |
-| `BTCUSDT:1h` | sí | entró sola: −0,769 R en 30 decisiones (el límite está en −0,15) |
-| `BTCUSDT:15m` | no | opera con normalidad (−0,063 R en 30) |
-| `BTCUSDT:30m` | no | opera con normalidad (+0,796 R en 30) |
+| `BTCUSDT:4h` · `ETHUSDT:4h` · `SOLUSDT:4h` · `BNBUSDT:4h` · `ARQQ:4h` | sí | base del `ensemble.yaml`; acumulando sombra (de 1 a 22 de 40) |
+| `BTCUSDT:15m` | sí | entró sola: −0,940 R en 30 decisiones (el límite está en −0,15) |
+| `BTCUSDT:30m` | sí | entró sola: −0,900 R en 30 |
+| `BTCUSDT:1h` | sí | entró sola: −0,769 R en 30 |
+| `SOLUSDT:15m` | sí | entró sola: −0,700 R en 30 |
+| `BNBUSDT:1h` | sí | entró sola: −0,700 R en 30 |
+| `BTCUSDT:1d` | no | opera con normalidad (+1,500 R en 30) |
+| `SOLUSDT:30m` | no | opera con normalidad (+1,100 R en 30) |
+| `ETHUSDT:30m` | no | opera con normalidad (+0,400 R en 30) |
 | `BTCUSDT:1m` | no | opera con normalidad (+0,267 R en 30) |
 | `BTCUSDT:5m` | no | opera con normalidad (+0,044 R en 30) |
+
+Las cinco que entraron solas se distinguen del azar (por debajo de su percentil 5); las tres primeras
+que operan, también, por arriba. Datos del 22 de agosto de 2026.
 
 Nadie tocó una lista para que 1h entrara: la política lo decidió con sus propios umbrales.
 

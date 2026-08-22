@@ -7,6 +7,74 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.46.0] — 2026-08-22
+
+> La cuarentena era el único módulo de gobierno con poder de veto activo sobre las decisiones, y el
+> único que no comparaba su umbral con lo que consigue el azar. Ya no.
+
+### Added — La puerta de salida de la cuarentena se compara con una distribución nula
+
+- **El problema, medido**: las decisiones que juzgan a una temporalidad se amontonan en el tiempo.
+  `BTCUSDT:15m` entró en cuarentena con −0,940 R sobre 30 decisiones que caben en **9,8 horas**.
+  Eso puede ser una temporalidad mala o puede ser un mal martes, y la medición no lo distinguía.
+- La nula pregunta: *¿qué expectancy sale de coger `n` decisiones cualesquiera de la plataforma, en
+  bloques de 24 h, del mismo periodo?* Se muestrean **bloques enteros**, y ahí está la gracia: eso
+  hace que la nula incorpore sola el solapamiento temporal, sin inventar ningún factor de descuento.
+- La puerta de salida exige ahora `max(0,05 R, P95 de la nula)`.
+
+### Changed — La regla es asimétrica, y a propósito
+
+- **Salir** de cuarentena: se compara con el azar. **Entrar**: sin cambios, umbral fijo de −0,15 R.
+- Exigir significancia para *entrar* dejaría operando temporalidades malas mientras no se demuestre
+  que lo son, que es el error contrario y el caro. La nula solo se usa donde endurece la seguridad.
+- No es cuestión de acordarse: `evaluate_real`, que juzga la entrada, **ni siquiera acepta** el
+  argumento de la población. Aislamiento estructural, no de disciplina.
+- Como el umbral efectivo es el máximo entre el fijo y el del azar, el cambio **nunca puede
+  relajar** el criterio. Sin nula estimable vale 0,0 y manda el 0,05 R de siempre.
+
+### Changed — El meta-modelo también compara su lift con el azar
+
+- El umbral de +0,05 R no distinguía mérito de suerte: un modelo entrenado con **etiquetas
+  barajadas** produce un lift medio de +0,083 R. El azar lo superaba de media.
+- Nula sin reentrenar, sobre las probabilidades ya guardadas. Se exige `max(0,05 R, P95)` tanto para
+  ascender como para permanecer.
+- **Ojo con el estadístico**: el Fundamental Score reparte los descartes sobre `n` (una operación
+  evitada aporta 0 y sigue contando) y el meta-modelo promedia **solo las conservadas**. Se llaman
+  igual y son cosas distintas, así que `nula.py` recibe el estadístico desde fuera.
+
+### Added — `nula.py`, y el patrón que ya iba por la tercera vez
+
+Fijar un listón sin preguntarle antes al azar ha fallado tres veces seguidas en este proyecto: con
+los votos efectivos, con el lift del meta-modelo y con el del Fundamental Score. El bucle de
+permutación por bloques vivía duplicado; ahora es un módulo con dos nulas —selección y expectancy— y
+sus guardias. Cuando no se puede estimar devuelve 0,0 y manda el umbral fijo.
+
+Se verificó que trasladar el bucle **no mueve un solo dígito** del percentil que ya calculaba
+`fundamental_policy`, con la misma semilla y en doce repartos distintos.
+
+### Added — Informe `run_quarantine_nula` y lo que dijo sobre los datos reales
+
+Ejecutado sobre las 1.302 decisiones cerradas de producción, con 10.000 permutaciones:
+
+- **Ninguna temporalidad sale ni entra por este cambio.** Ninguna clave vetada tiene todavía las 40
+  decisiones sombra para plantearse salir; la que más lleva va por 31. Es una regla para cuando
+  llegue la muestra.
+- **Los vetos vigentes se sostienen.** Las cinco claves condenadas por rendimiento real caen por
+  debajo del percentil 5 del azar: −0,940 R, −0,900, −0,769, −0,700 y −0,700, contra un suelo del
+  azar en −0,70. No fue un mal martes.
+
+### Fixed — Un fallo aparte, encontrado al medir: 5 claves atrapadas en cuarentena
+
+`publish` elige a qué expediente mirar con `interval in quarantine_intervals` —la lista del
+`ensemble.yaml`, **que es por temporalidad**—, pero quien veta de verdad es `quarantine.json`, **que
+es por clave**. Una clave vetada por su rendimiento real deja de producir `outcome_return_r`, su
+expediente real se queda congelado en las decisiones de antes del veto, y como su temporalidad no
+figura en el yaml se la recondena cada ciclo con las mismas filas. Nunca llega a la puerta de salida.
+
+Es el fallo de la migración 017 reaparecido en el eje `SÍMBOLO:intervalo`. **Queda documentado y
+medido, no corregido**: cerrarlo cambia la semántica del estado de cuarentena y merece su propia
+decisión. El informe lo marca con `⚠ ATRAPADA`.
+
 ## [0.45.0] — 2026-08-22
 
 > Limpieza de deuda. Y el test que se escribió para vigilar el Centro de ayuda encontró tres enlaces
