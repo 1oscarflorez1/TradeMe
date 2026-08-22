@@ -19,9 +19,10 @@ from trademe_quant.nula import (
     MIN_BLOQUES,
     MIN_POBLACION,
     agrupar,
+    distribucion_expectancy_bloques,
     marcas_de,
-    p95_expectancy_bloques,
     p95_seleccion,
+    percentil_expectancy_bloques,
 )
 
 INICIO = datetime(2026, 8, 1, tzinfo=UTC)
@@ -64,19 +65,19 @@ def test_agrupar_ordena_por_marca() -> None:
 def test_poblacion_pequena_no_produce_nula() -> None:
     rs, marcas = _poblacion(dias=10, por_dia=5, valor_dia=[1.0])  # 50 < MIN_POBLACION
     assert len(rs) < MIN_POBLACION
-    assert p95_expectancy_bloques(rs, marcas, 10) == 0.0
+    assert percentil_expectancy_bloques(rs, marcas, 10) == 0.0
 
 
 def test_pocos_bloques_no_producen_nula() -> None:
     """Con cuatro días, el «percentil 95» sería el mejor de los cuatro: no mide variabilidad."""
     rs, marcas = _poblacion(dias=MIN_BLOQUES - 1, por_dia=50, valor_dia=[1.0, -1.0])
     assert len(agrupar(marcas)) < MIN_BLOQUES
-    assert p95_expectancy_bloques(rs, marcas, 10) == 0.0
+    assert percentil_expectancy_bloques(rs, marcas, 10) == 0.0
 
 
 def test_muestra_vacia_no_produce_nula() -> None:
     rs, marcas = _poblacion(dias=20, por_dia=30, valor_dia=[1.0, -1.0])
-    assert p95_expectancy_bloques(rs, marcas, 0) == 0.0
+    assert percentil_expectancy_bloques(rs, marcas, 0) == 0.0
 
 
 def test_sin_seleccionadas_no_hay_nada_que_comparar() -> None:
@@ -89,14 +90,14 @@ def test_sin_seleccionadas_no_hay_nada_que_comparar() -> None:
 
 def test_poblacion_plana_da_exactamente_la_constante() -> None:
     rs, marcas = _poblacion(dias=20, por_dia=30, valor_dia=[0.42])
-    assert abs(p95_expectancy_bloques(rs, marcas, 30, permutaciones=200) - 0.42) < 1e-12
+    assert abs(percentil_expectancy_bloques(rs, marcas, 30, permutaciones=200) - 0.42) < 1e-12
 
 
 def test_es_determinista() -> None:
     """Dos ejecuciones sobre los mismos datos deben dar el mismo veredicto."""
     rs, marcas = _poblacion(dias=20, por_dia=30, valor_dia=[1.0, -0.5, 0.3, -1.0])
-    a = p95_expectancy_bloques(rs, marcas, 30, permutaciones=300)
-    b = p95_expectancy_bloques(rs, marcas, 30, permutaciones=300)
+    a = percentil_expectancy_bloques(rs, marcas, 30, permutaciones=300)
+    b = percentil_expectancy_bloques(rs, marcas, 30, permutaciones=300)
     assert a == b
 
 
@@ -113,7 +114,7 @@ def test_los_bloques_capturan_la_varianza_que_las_filas_sueltas_esconden() -> No
     rs, marcas = _poblacion(dias=20, por_dia=40, valor_dia=[1.0, -1.0])
     assert abs(float(np.mean(rs))) < 1e-9  # la población está centrada en 0
 
-    p95_bloques = p95_expectancy_bloques(rs, marcas, 30, permutaciones=2_000)
+    p95_bloques = percentil_expectancy_bloques(rs, marcas, 30, permutaciones=2_000, percentil=95)
 
     # Muestreo por filas sueltas, para contrastar: la varianza casi desaparece.
     rng = np.random.default_rng(1)
@@ -142,3 +143,36 @@ def test_el_estadistico_lo_pone_quien_llama() -> None:
     a = p95_seleccion(rs, marcas, seleccionadas, descartando, permutaciones=200)
     b = p95_seleccion(rs, marcas, seleccionadas, conservando, permutaciones=200)
     assert a != b
+
+
+def test_el_percentil_lo_elige_quien_pregunta() -> None:
+    """La mediana y el P95 responden a preguntas distintas, y confundirlos costó un despliegue.
+
+    En v0.46.0 la puerta de salida de la cuarentena usó el P95 de una nula muestreada de la propia
+    plataforma. Eso no es un listón de calidad: **es un cupo**. Lo que se comprueba aquí es
+    exactamente eso — qué fracción de la propia distribución deja pasar cada percentil— porque es
+    la parte que engaña: un P95 suena a «exigente» y significa «solo el 5 % lo cumple».
+    """
+    # Población continua a propósito: con días homogéneos la nula sale discreta, el P95 empata
+    # consigo mismo y la fracción que lo «cruza» se dispara. Es el mismo problema de empates que
+    # obligó a que el informe use p-valor en vez de percentil.
+    rng = np.random.default_rng(11)
+    rs: list[float] = []
+    fechas: list[datetime] = []
+    for d in range(20):
+        centro = float(rng.normal(0.1, 0.6))
+        for k in range(40):
+            rs.append(centro + float(rng.normal(0, 0.4)))
+            fechas.append(INICIO + timedelta(days=d, minutes=k))
+    marcas = marcas_de(fechas)
+
+    dist = distribucion_expectancy_bloques(rs, marcas, 30, permutaciones=4_000)
+    assert dist is not None
+
+    mediana = percentil_expectancy_bloques(rs, marcas, 30, permutaciones=4_000, percentil=50)
+    p95 = percentil_expectancy_bloques(rs, marcas, 30, permutaciones=4_000, percentil=95)
+    assert p95 > mediana
+
+    # Un umbral puesto en el P95 solo lo cruza ~1 de cada 20; en la mediana, ~1 de cada 2.
+    assert float((dist >= p95).mean()) <= 0.08
+    assert 0.42 <= float((dist >= mediana).mean()) <= 0.58
