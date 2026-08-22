@@ -772,3 +772,25 @@ export function streamUrl(symbol: string, interval: Interval): string {
   const qs = token ? `?interval=${interval}&token=${encodeURIComponent(token)}` : `?interval=${interval}`;
   return `${proto}//${url.host}/stream/${symbol}${qs}`;
 }
+
+
+/** Exposición correlacionada: de las señales operables ahora, cuántas apuestas distintas son. */
+export interface Exposicion {
+  interval: string;
+  alineadas: { LONG: string[]; SHORT: string[] };
+  apuestasEfectivas: number;
+  simbolos: string[];
+  direccion: 'LONG' | 'SHORT' | null;
+  parMasRedundante: { a: string; b: string; correlacion: number } | null;
+  medido: boolean;
+}
+
+export async function fetchExposicion(interval: string): Promise<Exposicion | null> {
+  try {
+    const res = await apiFetch(`/exposicion?interval=${encodeURIComponent(interval)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as Exposicion;
+  } catch {
+    return null;
+  }
+}

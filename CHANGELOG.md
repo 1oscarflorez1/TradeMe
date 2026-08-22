@@ -7,6 +7,46 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.42.0] — 2026-08-22
+
+> El dato que faltaba en pantalla: cuando el sistema marca comprar en tres criptos a la vez, eso no
+> son tres oportunidades. Son **una y media**.
+
+### Added — Aviso de exposición correlacionada en el Panel
+
+- Debajo de la decisión, cuando hay varias señales operables alineadas en distintos activos:
+  **«3 señales de compra · ≈ 1,4 apuestas»**, con los símbolos implicados y el par más parecido
+  entre sí.
+- **Es un aviso, no un veto.** Las señales se muestran igual y la plataforma no ejecuta órdenes.
+  Decidir cuánto arriesgar sigue siendo del usuario; esto solo pone delante un número que no estaba
+  en ninguna pantalla y que cambia la respuesta a «¿cuánto arriesgo en esto?».
+- Se toma el **lado cargado**: dos largos y un corto no se compensan, porque el riesgo está donde se
+  acumulan.
+- Nuevo endpoint `GET /exposicion?interval=15m`, que resuelve las señales de todos los activos de la
+  lista y devuelve el resumen.
+
+### Added — Los activos efectivos de cada combinación se precalculan en quant
+
+- El artefacto de correlaciones incluye ahora `subconjuntos`: los efectivos de **cada** combinación
+  de dos o más activos (11 con cuatro símbolos).
+- Se hace ahí y no en la api a propósito: calcularlo exige autovalores de la submatriz, y
+  reimplementar álgebra lineal en TypeScript para un dato **informativo** arriesgaría que la pantalla
+  y el gobierno del Fundamental Score dieran números distintos. Con tope de 12 símbolos para que la
+  combinatoria no se dispare.
+- Medido en producción: BTC+ETH = **1,21** apuestas · BTC+ETH+SOL = **1,40** · los cuatro = **1,52**.
+
+### Sin medición no se inventa un descuento
+
+Si no hay correlación medida, el aviso dice que **no se sabe** en vez de enseñar un número. Mostrar
+«1,4 apuestas» sin haberlo medido sería peor que callar: el usuario decidiría cuánto arriesgar con
+una cifra falsa. Hay tests para las dos mitades.
+
+### Added — Artículo en el Centro de ayuda
+
+- Explica en lenguaje llano por qué tres señales pueden ser una sola apuesta, con los porcentajes
+  reales, y deja claro que no bloquea nada. Más dos entradas de glosario: *apuestas efectivas* y
+  *correlación*.
+
 ## [0.41.0] — 2026-08-21
 
 > Cuatro activos cripto son, en información, **poco más de uno y medio**. El mismo hallazgo que el de

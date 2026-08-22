@@ -8,6 +8,7 @@ import { TradingViewChart } from './TradingViewChart';
 import { WebhookStatus } from './WebhookStatus';
 import { MacroPanel } from './MacroPanel';
 import { FundamentalPanel } from './FundamentalPanel';
+import { ExposicionPanel } from './ExposicionPanel';
 import { SnapshotButton } from './SnapshotButton';
 import { SnapshotsView } from './SnapshotsView';
 import { BacktestView } from './BacktestView';
@@ -807,6 +808,7 @@ export function App() {
                         action={signal.action}
                         shadowAction={signal.fund_shadow_action}
                       />
+                      <ExposicionPanel interval={tf} />
                     </>
                   ) : (
                     <p className="muted">Calculando la señal…</p>

@@ -150,6 +150,30 @@ def observaciones_efectivas(
     return total
 
 
+#: Tope de símbolos para precalcular todos los subconjuntos (2^12 = 4096 combinaciones).
+MAX_SIMBOLOS_SUBCONJUNTOS = 12
+
+
+def subconjuntos_efectivos(simbolos: list[str], corr: np.ndarray | None) -> dict[str, float]:
+    """Activos efectivos de **cada** combinación posible de dos o más símbolos.
+
+    Se precalcula aquí, y no en la api, por una razón concreta: calcular esto exige autovalores de
+    la submatriz, y reimplementar álgebra lineal en TypeScript para un dato **informativo** sería
+    arriesgar que la pantalla y el gobierno den números distintos. Con pocos activos son unas pocas
+    entradas; el tope evita que la combinatoria se dispare si algún día son muchos.
+    """
+    if corr is None or len(simbolos) < 2 or len(simbolos) > MAX_SIMBOLOS_SUBCONJUNTOS:
+        return {}
+    from itertools import combinations
+
+    out: dict[str, float] = {}
+    for k in range(2, len(simbolos) + 1):
+        for combo in combinations(range(len(simbolos)), k):
+            sub = corr[np.ix_(list(combo), list(combo))]
+            out[",".join(simbolos[i] for i in combo)] = efectivos(sub)
+    return out
+
+
 def publish(artifacts: Path, symbols: list[str]) -> dict[str, Any]:
     """Mide y publica `artifacts/correlaciones.json`."""
     from .market.binance import fetch_klines
@@ -174,6 +198,8 @@ def publish(artifacts: Path, symbols: list[str]) -> dict[str, Any]:
         "velas": LIMITE,
         "ventana_h": VENTANA_H,
         "min_velas": MIN_VELAS,
+        # Para que el Panel pueda decir «3 señales = 1,4 apuestas» sin recalcular autovalores.
+        "subconjuntos": subconjuntos_efectivos(simbolos, corr),
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     artifacts.mkdir(parents=True, exist_ok=True)

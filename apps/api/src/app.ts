@@ -22,6 +22,7 @@ import type { PushSub } from './push/push.js';
 import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 import type { FundamentalArtifact } from './ensemble/fundamental.js';
+import { resumirExposicion, type Correlaciones } from './ensemble/correlaciones.js';
 import type { ModelHealth } from './assistant/provider.js';
 import { SinCupoError } from './assistant/provider.js';
 import type { UserRow } from './db/users-repo.js';
@@ -104,6 +105,7 @@ export interface AppDeps {
   getMacro?: (symbol: string) => Macro | undefined;
   getFundamental?: (symbol: string) => FundamentalArtifact | undefined;
   getFunding?: (symbol: string) => number | undefined;
+  correlaciones?: Correlaciones;
   recordSnapshot?: (
     signal: Signal,
     interval: string,
@@ -591,6 +593,57 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   app.get('/symbols', async () => ({ symbols: deps.symbols, intervals: INTERVALS }));
+
+  /**
+   * Exposición correlacionada: de las señales operables ahora, cuántas apuestas distintas son.
+   *
+   * Enseñar COMPRAR en ETH, SOL y BNB a la vez parece tres oportunidades; medido, son una y media.
+   * Es un **aviso**, no un veto: la plataforma no ejecuta órdenes y quien decide cuánto arriesgar
+   * es el usuario. Lo que faltaba era el dato.
+   */
+  app.get('/exposicion', async (request, reply) => {
+    const parsed = z
+      .object({ interval: z.string().default('15m') })
+      .safeParse(request.query ?? {});
+    if (!parsed.success || !isInterval(parsed.data.interval)) {
+      return reply.status(400).send({ error: 'interval no soportado' });
+    }
+    const interval = parsed.data.interval;
+    const corr = deps.correlaciones;
+    if (!corr) return reply.status(503).send({ error: 'sin medición de correlaciones' });
+
+    const senales: Array<{ symbol: string; direction: string }> = [];
+    for (const sym of deps.symbols) {
+      try {
+        // Solo con lo que ya está en memoria: este endpoint lo consulta el Panel de forma
+        // periódica y no puede disparar una petición por activo a los proveedores.
+        const candles = await deps.getHistory(sym, interval, 200);
+        if (candles.length < 30) continue;
+        const votes = [...deps.registry.computeVotes(candles), ...deps.externalStore.active(sym)];
+        const signal = buildSignal({
+          symbol: sym,
+          price: candles[candles.length - 1]!.close,
+          votes,
+          config: deps.getEnsembleFor?.(sym, interval) ?? deps.ensemble,
+          equity: deps.equity,
+          interval,
+          macro: deps.getMacro?.(sym),
+          fundamentalArtifact: deps.getFundamental?.(sym),
+          funding: deps.getFunding?.(sym),
+          calibrators: deps.calibrators,
+        });
+        if (signal.direction !== 'FLAT') {
+          senales.push({ symbol: sym, direction: signal.direction });
+        }
+      } catch {
+        continue; // un activo sin datos no impide resumir los demás
+      }
+    }
+    return {
+      ...resumirExposicion(interval, senales, corr),
+      medicion: corr.meta(),
+    };
+  });
 
   /**
    * En qué procesos participa cada temporalidad. Sirve para que la barra superior deje de ser una

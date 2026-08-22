@@ -54,6 +54,7 @@ import { MetaPolicy } from './metamodel/policy.js';
 import { MacroStore } from './macro/store.js';
 import { Fundamentals } from './ensemble/fundamental.js';
 import { FundamentalPolicy } from './ensemble/fundamental-policy.js';
+import { Correlaciones } from './ensemble/correlaciones.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
 import { EMA } from 'technicalindicators';
@@ -100,6 +101,8 @@ async function main(): Promise<void> {
   // `ensemble.yaml` queda como TOPE. Sin artefacto manda la configuración, que es el estado
   // anterior a que existiera este gobierno.
   const fundamentalPolicy = FundamentalPolicy.load(join(artifactsDir, 'fundamental_policy.json'));
+  // Medición del Gestor de Correlaciones. Solo informa: no toca ninguna decisión.
+  const correlaciones = Correlaciones.load(join(artifactsDir, 'correlaciones.json'));
   const ensembleCache = new Map<string, EnsembleConfig>();
   const independence = Independence.load(env.INDEPENDENCE_PATH);
   const quarantine = QuarantinePolicy.load(env.QUARANTINE_PATH);
@@ -195,6 +198,7 @@ async function main(): Promise<void> {
     quarantine.reload();
     fundamentals.reload();
     fundamentalPolicy.reload();
+    correlaciones.reload();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
@@ -247,6 +251,7 @@ async function main(): Promise<void> {
     getMacro: macroEnabled ? (symbol: string) => macroStore.get(symbol) : undefined,
     getFundamental: (symbol: string) => fundamentals.get(symbol),
     getFunding: (symbol: string) => fundingStore.get(symbol),
+    correlaciones,
     recordSnapshot: snapshotsRepo
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
