@@ -35,7 +35,8 @@ Las dos nulas que hacen falta, y por qué no son la misma
   porque cada módulo define el suyo: el Fundamental Score reparte los descartes sobre `n`
   (aportan 0), y el meta-modelo promedia **solo las conservadas**. Mismo nombre, distinto
   denominador; usar el ajeno daría un número sin sentido.
-- `p95_expectancy_bloques` — para la cuarentena, que no descarta nada: mide **expectancy directa**.
+- `percentil_expectancy_bloques` — para la cuarentena, que no descarta nada: mide **expectancy
+  directa**. Ojo al percentil que se le pide: ver `PERCENTIL_REFERENCIA`.
   Su nula es un bootstrap por bloques sobre la población de decisiones cerradas.
 
 Cuando no se puede calcular, devuelve 0,0
@@ -61,8 +62,25 @@ from .correlaciones import VENTANA_H
 PERMUTACIONES_CICLO = 1_000
 #: Permutaciones en los informes puntuales, donde el coste da igual.
 PERMUTACIONES_ESTUDIO = 10_000
-#: Percentil del listón. Alfa 0,05 por un lado: al azar se le concede el 5 %.
+#: Percentil del listón cuando la pregunta es **«¿esto aporta algo o es azar?»** — un mecanismo
+#: nuevo que quiere ganar poder sobre las decisiones: el meta-modelo, el Fundamental Score. Hay un
+#: solo candidato y se le exige evidencia fuerte. Alfa 0,05 por un lado.
 PERCENTIL = 95.0
+
+#: Percentil de referencia cuando la pregunta es **«¿esto es al menos tan bueno como lo normal?»**
+#: — readmitir a uno de muchos competidores homogéneos, como una temporalidad en cuarentena.
+#:
+#: La distinción costó un despliegue y conviene dejarla escrita. En v0.46.0 se usó el P95 también
+#: para la puerta de salida de la cuarentena, y el resultado fue perverso: como la nula se muestrea
+#: de la **propia plataforma**, exigir su percentil 95 para readmitir es un **cupo del 5 %**, no un
+#: listón de calidad. Si todas las temporalidades fueran buenas e idénticas, el 95 % seguiría
+#: vetado. Medido el 22 de agosto de 2026: exigía un 57 % de aciertos para volver cuando para
+#: seguir operando bastaba un 28 %, y la mitad de las claves que operaban en ese momento no habrían
+#: podido regresar con el rendimiento que tenían.
+#:
+#: Contra la mediana, en cambio, la comparación es «sé algo mejor que un tramo típico del mercado
+#: que hubo», que es lo que se quería desde el principio: neutral al régimen, no extremo.
+PERCENTIL_REFERENCIA = 50.0
 #: Semilla fija: dos ejecuciones sobre los mismos datos deben dar el mismo veredicto.
 SEMILLA = 20260822
 
@@ -195,15 +213,19 @@ def distribucion_expectancy_bloques(
     return medias
 
 
-def p95_expectancy_bloques(
+def percentil_expectancy_bloques(
     poblacion_rs: Sequence[float],
     poblacion_marcas: Sequence[int],
     n: int,
     permutaciones: int = PERMUTACIONES_CICLO,
     semilla: int = SEMILLA,
-    percentil: float = PERCENTIL,
+    percentil: float = PERCENTIL_REFERENCIA,
 ) -> float:
-    """Percentil de `distribucion_expectancy_bloques`, o 0,0 si no se puede estimar."""
+    """Percentil de `distribucion_expectancy_bloques`, o 0,0 si no se puede estimar.
+
+    El percentil va explícito en la llamada y no en el nombre a propósito: cuál es el correcto
+    depende de la pregunta, y confundirlos ya salió caro una vez. Ver `PERCENTIL_REFERENCIA`.
+    """
     dist = distribucion_expectancy_bloques(
         poblacion_rs, poblacion_marcas, n, permutaciones, semilla
     )

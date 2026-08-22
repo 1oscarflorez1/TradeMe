@@ -406,9 +406,11 @@ export const KB: Article[] = [
         <p>
           Por eso, para volver a operar ya no basta con un resultado positivo. Se compara con lo que
           habría dado coger ese mismo número de decisiones <strong>cualesquiera</strong> de la
-          plataforma, de días cualesquiera del mismo periodo. Si la temporalidad no supera a eso, lo
-          que demostró es que hubo mercado, no que ella sea buena. Y se le exige lo que sea más duro
-          de los dos: el listón de siempre o el del azar.
+          plataforma, de días cualesquiera del mismo periodo. Si la temporalidad no supera a un tramo
+          normal de mercado, lo que demostró es que hubo mercado, no que ella sea buena. Y se le pide
+          quedar algo por encima de ese tramo normal — no arrasarlo: exigir estar entre las mejores
+          de la plataforma no sería un listón de calidad, sería un cupo, y dejaría fuera a
+          temporalidades perfectamente rentables.
         </p>
         <p>
           Para <strong>entrar</strong> en cuarentena, en cambio, no se pide esa prueba. Suena

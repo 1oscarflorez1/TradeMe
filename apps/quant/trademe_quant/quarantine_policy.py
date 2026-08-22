@@ -29,9 +29,13 @@ amontonan en el tiempo. Medido: las 30 que juzgan a `BTCUSDT:15m` caben en **9,8
 30 decisiones de menos de un día. Puede ser una temporalidad mala o puede ser un mal martes: la
 medición anterior **no lo distinguía**.
 
-Desde aquí, la puerta de salida exige `max(0,05 R, P95 de la nula)`, donde la nula pregunta: *¿qué
-expectancy da coger `n` decisiones cualesquiera de la plataforma, en bloques de 24 h, del mismo
-periodo?* Ver `nula.py`.
+Desde aquí, la puerta de salida se compara con esa nula, que pregunta: *¿qué expectancy da coger `n`
+decisiones cualesquiera de la plataforma, en bloques de 24 h, del mismo periodo?* Ver `nula.py`.
+
+El criterio exacto es **no-inferioridad al mercado** —`mediana de la nula + 0,05 R`— y no el
+percentil 95, que fue lo que se entregó en v0.46.0 y hubo que corregir un día después: exigir el
+P95 de una nula muestreada de la propia plataforma es un cupo del 5 %, no un listón. Ver
+`umbral_salida`.
 
 **La puerta de entrada NO lleva nula, y es deliberado.** Exigir significancia para *entrar* dejaría
 operando temporalidades malas mientras no se demuestre que lo son —el efecto contrario al que se
@@ -57,7 +61,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from .nula import DIAS_POBLACION, PERMUTACIONES_CICLO, agrupar, marcas_de, p95_expectancy_bloques
+import numpy as np
+
+from .nula import (
+    DIAS_POBLACION,
+    PERCENTIL,
+    PERCENTIL_REFERENCIA,
+    PERMUTACIONES_CICLO,
+    agrupar,
+    distribucion_expectancy_bloques,
+    marcas_de,
+)
 
 # Decisiones sombra evaluadas que hacen falta para plantearse levantar la cuarentena. Con menos, una
 # racha buena de tres días bastaría para volver a operar una temporalidad que perdía dinero.
@@ -92,7 +106,7 @@ class Poblacion(NamedTuple):
 
 def _resumen(rs: list[float]) -> dict[str, Any]:
     n = len(rs)
-    base = {"nula_p95": 0.0, "n_poblacion": 0, "bloques_poblacion": 0}
+    base = {"nula_mediana": 0.0, "nula_p95": 0.0, "n_poblacion": 0, "bloques_poblacion": 0}
     if n == 0:
         return {"n": 0, "expectancy": 0.0, "aciertos": 0, "win_rate": 0.0, **base}
     aciertos = sum(1 for r in rs if r > 0)
@@ -121,7 +135,7 @@ def _nula(
     Sin población, sin fechas o sin bloques suficientes devuelve 0,0, que deja gobernando al umbral
     fijo — es decir, el comportamiento anterior al Hito A. Nunca relaja.
     """
-    vacio = {"nula_p95": 0.0, "n_poblacion": 0, "bloques_poblacion": 0}
+    vacio = {"nula_mediana": 0.0, "nula_p95": 0.0, "n_poblacion": 0, "bloques_poblacion": 0}
     fechas = [t for t in instantes if isinstance(t, datetime)]
     if poblacion is None or n <= 0 or not fechas or not poblacion.rs:
         return vacio
@@ -135,10 +149,17 @@ def _nula(
         return vacio
 
     marcas = marcas_de([t for _, t in pares])
+    dist = distribucion_expectancy_bloques(
+        [r for r, _ in pares], marcas, n, permutaciones=permutaciones
+    )
+    if dist is None:
+        return vacio
+    # Se guardan los dos percentiles: la **mediana gobierna** y el P95 queda como referencia de cuán
+    # extremo habría sido el criterio anterior. Auditar un veredicto no debería obligar a
+    # recalcularlo.
     return {
-        "nula_p95": p95_expectancy_bloques(
-            [r for r, _ in pares], marcas, n, permutaciones=permutaciones
-        ),
+        "nula_mediana": float(np.percentile(dist, PERCENTIL_REFERENCIA)),
+        "nula_p95": float(np.percentile(dist, PERCENTIL)),
         "n_poblacion": len(pares),
         "bloques_poblacion": len(agrupar(marcas)),
     }
@@ -199,6 +220,43 @@ def evaluate_real(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_ENTRADA)
     return _resumen(rs)
 
 
+def umbral_salida(ev: dict[str, Any]) -> float:
+    """Expectancy que hay que demostrar para volver a operar.
+
+    **No-inferioridad al mercado**: `mediana de la nula + MIN_EXPECTANCY_SALIDA`, con el fijo como
+    suelo. En castellano: *sé algo mejor que un tramo típico del mercado que hubo en ese periodo*.
+
+    Por qué la mediana y no el percentil 95, que es lo que hacía la v0.46.0
+    -----------------------------------------------------------------------
+    Porque la nula se muestrea de la **propia plataforma**, así que exigir su P95 para readmitir es
+    un **cupo del 5 %**, no un listón de calidad: si todas las temporalidades fueran buenas e
+    idénticas, el 95 % seguiría vetado. Medido el 22 de agosto de 2026, el P95 pedía un 57 % de
+    aciertos para volver cuando para **seguir operando** bastaba un 28 %, y esa banda muerta dejaba
+    fuera a temporalidades rentables — el punto de equilibrio del sistema está en el 33 %. La mitad
+    de las claves que operaban ese día no habrían podido regresar con el rendimiento que tenían.
+
+    Es el defecto espejo del que `meta_policy` documenta: allí un umbral que solo se comprueba al
+    ascender es un peaje de entrada; aquí un umbral de readmisión mucho más alto que el de
+    permanencia es un cupo. En los dos casos el arreglo es el mismo — que readmitir y permanecer se
+    midan con la misma vara, más la asimetría que se haya decidido a conciencia y no de rebote.
+
+    El P95 **sigue siendo el correcto** en `meta_policy` y `fundamental_policy`, y no es
+    incoherencia: allí la pregunta es «¿este mecanismo aporta algo o es azar?», con un solo
+    candidato al que se le exige evidencia fuerte. Aquí es «¿esta temporalidad merece volver?», con
+    muchos competidores homogéneos. Preguntas distintas, percentiles distintos.
+
+    Qué se conserva del Hito A
+    ---------------------------
+    Lo que se buscaba: **neutralidad respecto al régimen**. Un umbral fijo es exigente en las
+    rachas buenas y regalado en las malas; contra la mediana, el listón sube y baja con el mercado.
+    El P95 no lo hacía neutral, lo hacía extremo.
+
+    Y el suelo se mantiene: por muy malo que fuera el mercado —mediana negativa— nunca se sale con
+    menos de `MIN_EXPECTANCY_SALIDA`. Volver a operar con 0,00 R sigue sin valer.
+    """
+    return max(MIN_EXPECTANCY_SALIDA, float(ev.get("nula_mediana", 0.0)) + MIN_EXPECTANCY_SALIDA)
+
+
 def decide_quarantine(en_cuarentena: bool, ev: dict[str, Any]) -> tuple[bool, str]:
     """Decide si la temporalidad debe estar en cuarentena, y por qué.
 
@@ -215,15 +273,13 @@ def decide_quarantine(en_cuarentena: bool, ev: dict[str, Any]) -> tuple[bool, st
             return True, (
                 f"sigue en cuarentena: {n}/{MIN_SAMPLES_SALIDA} decisiones sombra evaluadas"
             )
-        # Umbral efectivo = el más exigente entre el fijo y lo que alcanza el azar con esta muestra.
-        # Tomar el máximo **solo endurece**: sin nula calculada vale 0,0 y manda el fijo de siempre.
-        exigido = max(MIN_EXPECTANCY_SALIDA, float(ev.get("nula_p95", 0.0)))
+        exigido = umbral_salida(ev)
         if exp < exigido:
             detalle = f"se exige ≥{exigido:+.3f} R"
             if exigido > MIN_EXPECTANCY_SALIDA:
                 detalle += (
-                    f", que es lo que alcanza el azar con {n} decisiones de este periodo"
-                    f" (por encima del fijo {MIN_EXPECTANCY_SALIDA})"
+                    f", que es {MIN_EXPECTANCY_SALIDA} por encima del tramo típico del mercado"
+                    f" en este periodo ({float(ev.get('nula_mediana', 0.0)):+.3f} R)"
                 )
             return True, (
                 f"sigue en cuarentena: en sombra habría dado {exp:+.3f} R en {n} decisiones "
@@ -385,14 +441,11 @@ def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
                 # Los tres se guardan aunque la entrada no los use: la diferencia entre «el azar da
                 # esto» y «se exigía esto» tiene que poder auditarse desde el artefacto, no
                 # reconstruirse. En la entrada salen a 0 y el umbral efectivo coincide con el fijo.
+                "nula_mediana": round(float(ev.get("nula_mediana", 0.0)), 4),
                 "nula_p95": round(float(ev.get("nula_p95", 0.0)), 4),
                 "n_poblacion": int(ev.get("n_poblacion", 0)),
                 "bloques_poblacion": int(ev.get("bloques_poblacion", 0)),
-                "umbral_salida": (
-                    round(max(MIN_EXPECTANCY_SALIDA, float(ev.get("nula_p95", 0.0))), 4)
-                    if vetada
-                    else None
-                ),
+                "umbral_salida": round(umbral_salida(ev), 4) if vetada else None,
             },
         }
     return save_policy(artifacts, decisiones)

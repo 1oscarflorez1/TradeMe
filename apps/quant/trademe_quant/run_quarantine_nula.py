@@ -15,8 +15,9 @@ decisiones cualesquiera de la plataforma, en bloques de 24 h, del mismo periodo?
 
 Qué gobierna y qué es solo información
 ---------------------------------------
-- **Puerta de salida**: la nula **sí** gobierna desde el Hito A. Se exige `max(0,05 R, P95)`. Solo
-  endurece.
+- **Puerta de salida**: la nula **sí** gobierna desde el Hito A. Se exige **no-inferioridad al
+  mercado** — `mediana de la nula + 0,05 R`, con el fijo como suelo. En v0.46.0 se exigió el P95 y
+  hubo que corregirlo: sobre una nula muestreada de la propia plataforma, eso es un cupo del 5 %.
 - **Puerta de entrada**: la nula **NO** gobierna, a propósito. Exigir significancia para entrar
   dejaría operando temporalidades malas mientras no se demuestre que lo son. Se muestra porque
   responde a la pregunta «¿mala o mal martes?», que es interesante aunque no decida nada.
@@ -48,6 +49,7 @@ import numpy as np
 from .ensemble import artifacts_dir, load_ensemble
 from .nula import (
     DIAS_POBLACION,
+    PERCENTIL_REFERENCIA,
     PERMUTACIONES_ESTUDIO,
     agrupar,
     distribucion_expectancy_bloques,
@@ -62,6 +64,7 @@ from .quarantine_policy import (
     estado_previo,
     fetch_expedientes,
     load_policy,
+    umbral_salida,
 )
 
 ANCHO = 98
@@ -222,19 +225,19 @@ def _seccion_salida(fichas: list[tuple[str, dict[str, Any] | None]]) -> None:
                 f"el fijo {MIN_EXPECTANCY_SALIDA:+.3f}"
             )
             continue
-        p95 = float(np.percentile(dist, 95))
-        exigido = max(MIN_EXPECTANCY_SALIDA, p95)
-        salia_antes = f["exp"] >= MIN_EXPECTANCY_SALIDA
-        sale_ahora = f["exp"] >= exigido
-        endurecidas += 1 if (salia_antes and not sale_ahora) else 0
+        # La regla vive en `quarantine_policy.umbral_salida`; aquí solo se muestra. Duplicarla es
+        # exactamente lo que dejó claves atrapadas la última vez.
+        mediana = float(np.percentile(dist, PERCENTIL_REFERENCIA))
+        exigido = umbral_salida({"nula_mediana": mediana})
+        sale = f["exp"] >= exigido
+        endurecidas += 1 if (f["exp"] >= MIN_EXPECTANCY_SALIDA and not sale) else 0
         print(
-            f"  {clave:14s} n={f['n']:3d} exp={f['exp']:+.3f} R · azar P95={p95:+.3f} · "
-            f"exigido={exigido:+.3f} -> {'SALE' if sale_ahora else 'SIGUE VETADA'}"
-            + ("  (antes salía)" if salia_antes and not sale_ahora else "")
+            f"  {clave:14s} n={f['n']:3d} exp={f['exp']:+.3f} R · mercado típico={mediana:+.3f} · "
+            f"exigido={exigido:+.3f} -> {'SALE' if sale else 'SIGUE VETADA'}"
         )
     print()
-    print(f"  Vetos que la nula endurece: {endurecidas}. Ninguna clave SALE por este cambio, por")
-    print("  construcción: el umbral de salida solo puede subir.")
+    print("  El listón es no-inferioridad: la mediana de la nula más 0,05 R, con el fijo como")
+    print(f"  suelo. Claves que el ajuste por régimen retiene: {endurecidas}.")
     print()
 
 

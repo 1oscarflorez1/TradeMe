@@ -17,6 +17,7 @@ from trademe_quant.quarantine_policy import (
     estado_previo,
     evaluate_real,
     evaluate_shadow,
+    umbral_salida,
 )
 
 INICIO = datetime(2026, 8, 1, tzinfo=UTC)
@@ -241,10 +242,10 @@ def test_una_racha_buena_de_mercado_ya_no_basta_para_salir() -> None:
     ev = evaluate_shadow(_sombra(60, 0.30), poblacion=poblacion)
 
     assert ev["expectancy"] >= MIN_EXPECTANCY_SALIDA  # antes del Hito A habría salido
-    assert ev["nula_p95"] > MIN_EXPECTANCY_SALIDA  # el azar da más que el umbral fijo
+    assert ev["nula_mediana"] > MIN_EXPECTANCY_SALIDA  # un tramo típico del mercado da más
     sigue, motivo = decide_quarantine(True, ev)
     assert sigue is True
-    assert "lo que alcanza el azar" in motivo
+    assert "tramo típico del mercado" in motivo
 
 
 def test_la_nula_nunca_deja_salir_a_quien_el_umbral_fijo_retenia() -> None:
@@ -406,3 +407,68 @@ def test_el_destrabe_no_libera_a_nadie_de_golpe(tmp_path, monkeypatch) -> None: 
     qp.publish(tmp_path, "dsn", [])
     out = qp.publish(tmp_path, "dsn", [])
     assert out["intervals"]["BTCUSDT:30m"]["quarantined"] is True
+
+
+# --- El umbral de salida es no-inferioridad, no un cupo (22/08/2026, corrige la v0.46.0) ------
+#
+# La v0.46.0 exigió el percentil 95 de una nula muestreada de la PROPIA plataforma. Eso no es un
+# listón de calidad, es un cupo del 5 %: pedía un 57 % de aciertos para volver cuando para seguir
+# operando bastaba un 28 %, y la mitad de las claves que operaban ese día no habrían podido regresar
+# con el rendimiento que tenían.
+
+
+def test_una_temporalidad_rentable_puede_volver() -> None:
+    """El caso que motiva la corrección: BTCUSDT:1m opera con +0,267 R y no habría podido volver.
+
+    Con el mercado en calma —mediana en torno a 0— el listón vuelve a ser el fijo de 0,05 R, así que
+    una temporalidad rentable recupera su sitio. Con el P95 se le exigían ~0,70 R.
+    """
+    poblacion = _poblacion([0.4, -0.4, 0.2, -0.2, 0.0])
+    ev = evaluate_shadow(_sombra(60, 0.267), poblacion=poblacion)
+    assert ev["nula_p95"] > 0.267  # con el criterio viejo no habría salido
+    assert decide_quarantine(True, ev)[0] is False  # con el nuevo, sí
+
+
+def test_el_liston_sigue_a_la_mediana_del_mercado() -> None:
+    """Neutralidad de régimen, el objetivo del Hito A: sube en rachas buenas y baja en malas."""
+    buena = evaluate_shadow(_sombra(60, 0.30), poblacion=_poblacion([1.0, 0.9, 1.1]))
+    calma = evaluate_shadow(_sombra(60, 0.30), poblacion=_poblacion([0.1, -0.1, 0.0]))
+    assert umbral_salida(buena) > umbral_salida(calma)
+    assert decide_quarantine(True, buena)[0] is True  # no basta: solo hubo mercado
+    assert decide_quarantine(True, calma)[0] is False  # aquí sí demuestra algo
+
+
+def test_el_suelo_absoluto_aguanta_un_mercado_malo() -> None:
+    """Con la mediana negativa `mediana + 0,05` sería negativo. Salir con 0,00 R sigue sin valer."""
+    poblacion = _poblacion([-0.8, -1.0, -0.9, -0.7, -1.0])
+    ev = evaluate_shadow(_sombra(60, 0.0), poblacion=poblacion)
+    assert ev["nula_mediana"] < 0
+    assert umbral_salida(ev) == MIN_EXPECTANCY_SALIDA
+    assert decide_quarantine(True, ev)[0] is True
+
+
+def test_el_umbral_de_salida_no_es_un_cupo() -> None:
+    """La propiedad que distingue un listón de un cupo, comprobada sobre la nula misma.
+
+    Con el P95, el umbral por construcción solo lo cruza ~1 de cada 20 tramos de la plataforma. Con
+    la mediana, en torno a la mitad — más la asimetría de 0,05 R, que es deliberada.
+    """
+    ev = evaluate_shadow(_sombra(60, 0.30), poblacion=_poblacion([0.4, -0.4, 0.2, -0.2, 0.0]))
+    assert umbral_salida(ev) < ev["nula_p95"]
+    esperado = max(MIN_EXPECTANCY_SALIDA, ev["nula_mediana"] + MIN_EXPECTANCY_SALIDA)
+    assert abs(umbral_salida(ev) - esperado) < 1e-9
+
+
+def test_sin_nula_el_umbral_es_el_fijo_de_siempre() -> None:
+    """Compatibilidad: sin población, `umbral_salida` es MIN_EXPECTANCY_SALIDA y nada cambia."""
+    ev = evaluate_shadow(_sombra(60, 0.10))
+    assert umbral_salida(ev) == MIN_EXPECTANCY_SALIDA
+    assert decide_quarantine(True, ev)[0] is False
+
+
+def test_la_entrada_sigue_sin_mirar_la_nula() -> None:
+    """Decidido dejar intacto: la puerta de entrada no cambia con esta corrección."""
+    ev = evaluate_real(_real(50, -0.5))
+    ev["nula_mediana"] = 5.0
+    ev["nula_p95"] = 9.0
+    assert decide_quarantine(False, ev)[0] is True
