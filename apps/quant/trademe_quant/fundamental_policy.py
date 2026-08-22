@@ -43,7 +43,10 @@ import time
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from .correlaciones import observaciones_efectivas
+from .nula import p95_seleccion
 
 MODES = ["off", "shadow", "active"]
 
@@ -60,6 +63,11 @@ MIN_AUC = 0.55
 #: Permutaciones para la nula que se calcula en cada ciclo. Menos que en el estudio (10.000),
 #: suficiente para un percentil 95 estable y barato de ejecutar cada pocas horas.
 PERMUTACIONES_NULA = 1_000
+
+
+def _lift_descartando(arr: np.ndarray[Any, Any], descartadas: np.ndarray[Any, Any]) -> float:
+    """Lift de descartar ese conjunto: las descartadas no se abren y aportan 0, sobre `n`."""
+    return float(np.where(descartadas, 0.0, arr).mean()) - float(arr.mean())
 
 
 def lift_nulo_p95(
@@ -80,30 +88,20 @@ def lift_nulo_p95(
     La permutación es **por bloques**: se reparten entre ventanas los conteos de descartes en vez de
     elegir filas sueltas. Los cuatro activos cripto valen 1,52 efectivos, así que una permutación
     simple subestimaría la varianza — sería tratar `n` como evidencia otra vez.
+
+    El bucle vive en `nula.py` desde el Hito A, porque el mismo control lo necesitan la cuarentena y
+    el meta-modelo. Lo que **no** se comparte es el estadístico: aquí los descartes aportan 0 y el
+    denominador sigue siendo `n`, mientras que el meta-modelo promedia solo las conservadas. Se
+    verificó que el traslado no mueve un solo dígito del percentil con la misma semilla.
     """
-    import numpy as np
-
-    n = len(rs)
-    if n == 0 or not any(descartadas):
-        return 0.0
-    arr = np.asarray(rs, dtype=float)
-    base = float(arr.mean())
-    bloques: dict[int, list[int]] = {}
-    for i, m in enumerate(marcas):
-        bloques.setdefault(m, []).append(i)
-    grupos = [np.asarray(v) for _, v in sorted(bloques.items())]
-    conteos = np.asarray([int(sum(descartadas[i] for i in g)) for g in grupos])
-
-    rng = np.random.default_rng(semilla)
-    lifts = np.empty(PERMUTACIONES_NULA, dtype=float)
-    for k in range(PERMUTACIONES_NULA):
-        elegidas = np.zeros(n, dtype=bool)
-        for grupo, cuantas in zip(grupos, rng.permutation(conteos), strict=True):
-            c = min(int(cuantas), grupo.size)
-            if c > 0:
-                elegidas[rng.choice(grupo, size=c, replace=False)] = True
-        lifts[k] = float(np.where(elegidas, 0.0, arr).mean()) - base
-    return float(np.percentile(lifts, 95))
+    return p95_seleccion(
+        rs,
+        marcas,
+        descartadas,
+        _lift_descartando,
+        permutaciones=PERMUTACIONES_NULA,
+        semilla=semilla,
+    )
 
 
 def evaluate_shadow(
