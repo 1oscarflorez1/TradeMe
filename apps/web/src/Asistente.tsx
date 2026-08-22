@@ -10,6 +10,7 @@ import {
 } from './api';
 import type { AssistantInfo, Sustento, SystemStatus, TimeframeUsage } from './api';
 import type { Interval, Signal, SnapshotStats } from './types';
+import { buscarArticulo } from './help/contenido';
 
 /** Lo que el asistente sabe del sistema en este instante. Se refresca al abrirlo. */
 interface Contexto {
@@ -43,7 +44,7 @@ const pct = (n: number | null | undefined, d = 0) =>
  */
 const TEMAS: Array<{
   claves: string[];
-  responder: (c: Contexto) => string;
+  responder: (c: Contexto, pregunta?: string) => string;
 }> = [
   {
     claves: ['por que', 'porque', 'decision', 'decide', 'hold', 'mantener', 'ahora', 'senal', 'señal'],
@@ -107,13 +108,23 @@ const TEMAS: Array<{
       'cuarentena', 'no trade', 'documentacion', 'docs',
       'fundamental', 'funding', 'score fundamental', 'sombra', 'percentil',
     ],
-    responder: () =>
-      'Eso está explicado en la **documentación del proyecto**, que se mantiene con cada entrega: ' +
-      'la tienes en el **Centro de ayuda**.\n\n' +
-      'Yo, sin un modelo de lenguaje configurado, respondo con el estado en vivo y tus cifras — ' +
-      'pregúntame por la decisión de ahora, los registros, el régimen o el estado del sistema.\n\n' +
-      'Con un modelo configurado puedo además **consultar la documentación** y explicarte cualquier ' +
-      'concepto con el texto vigente, no con una copia que se quedó atrás.',
+    // Se cita el artículo EXACTO, no «el Centro de ayuda» a secas. Desde que el contenido salió del
+    // componente, el índice es un dato consultable y remitir con precisión no cuesta nada. Si
+    // alguien renombra un artículo citado, el test de coherencia lo caza en vez de dejar una
+    // remisión rota que nadie nota hasta que la sigue.
+    responder: (_c, pregunta) => {
+      const art = pregunta ? buscarArticulo(pregunta) : null;
+      const donde = art
+        ? `Lo tienes explicado en **«${art.title}»**, dentro del Centro de ayuda.`
+        : 'Eso está explicado en el **Centro de ayuda**, que se mantiene con cada entrega.';
+      return (
+        donde +
+        '\n\nYo, sin un modelo de lenguaje configurado, respondo con el estado en vivo y tus ' +
+        'cifras — pregúntame por la decisión de ahora, los registros, el régimen o el estado.' +
+        '\n\nCon un modelo configurado puedo además **consultar la documentación** y explicarte ' +
+        'cualquier concepto con el texto vigente, no con una copia que se quedó atrás.'
+      );
+    },
   },
   {
     claves: ['optuna', 'optimizacion', 'optimizar', 'pesos', 'peso'],
@@ -282,7 +293,7 @@ function responder(pregunta: string, c: Contexto): string {
       'Si buscas algo más largo o con ejemplos, el **Centro de ayuda** lo tiene desarrollado.'
     );
   }
-  return mejor.responder(c);
+  return mejor.responder(c, pregunta);
 }
 
 /** Convierte **negrita** y saltos de línea en JSX. */
