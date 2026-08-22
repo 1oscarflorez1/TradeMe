@@ -59,6 +59,7 @@ from .quarantine_policy import (
     MIN_SAMPLES_ENTRADA,
     MIN_SAMPLES_SALIDA,
     Poblacion,
+    estado_previo,
     fetch_expedientes,
     load_policy,
 )
@@ -67,15 +68,14 @@ ANCHO = 98
 
 
 def claves_vetadas(datos: dict[str, list[dict[str, Any]]], politica: dict[str, Any]) -> set[str]:
-    """Veto efectivo: lo que dice el artefacto, más lo que dice el yaml por temporalidad."""
-    intervalos = {str(x) for x in politica.get("intervals_yaml", [])}
-    vetadas = {
-        clave
-        for clave, entrada in (politica.get("intervals") or {}).items()
-        if isinstance(entrada, dict) and entrada.get("quarantined")
-    }
-    vetadas |= {c for c in datos if c.split(":", 1)[1] in intervalos}
-    return vetadas
+    """Veto efectivo, delegando en `quarantine_policy.estado_previo`.
+
+    El informe tenía su propia copia de esta regla, y esa duplicación es justo lo que hacía falta
+    para que el fallo de las claves atrapadas existiera: el informe sabía leer el artefacto por
+    clave y el gobierno no. Con una sola fuente, informe y gobierno no pueden discrepar.
+    """
+    actuales = [str(x) for x in politica.get("intervals_yaml", [])]
+    return {c for c in datos if estado_previo(politica, c, c.split(":", 1)[1], actuales)}
 
 
 def _ventana(
@@ -152,6 +152,7 @@ def informe(
     poblacion: Poblacion,
     vetadas: set[str],
     intervalos_yaml: set[str],
+    politica: dict[str, Any] | None = None,
 ) -> None:
     print("=" * ANCHO)
     print("CUARENTENA · ¿los vetos distinguen una temporalidad mala de un mal martes?")
@@ -162,6 +163,15 @@ def informe(
     print(f"  claves vetadas hoy     : {len(vetadas)} de {len(datos)}")
     print()
 
+    previas = (politica or {}).get("intervals") or {}
+
+    def juzgada_real(clave: str) -> bool:
+        """¿El artefacto la juzgó con su expediente REAL estando vetada? Eso es estar atrapada."""
+        entrada = previas.get(clave)
+        if not isinstance(entrada, dict) or not entrada.get("quarantined"):
+            return False
+        return (entrada.get("evidence") or {}).get("source") == "real"
+
     salidas, condenas, entradas = [], [], []
     for clave in sorted(datos):
         filas = datos[clave]
@@ -170,9 +180,13 @@ def informe(
             salidas.append((clave, sombra))
             real = _ficha(filas, poblacion, "outcome_return_r", MIN_SAMPLES_ENTRADA)
             if real is not None:
-                # `publish` juzga por `interval in yaml`. Una clave vetada cuyo intervalo NO está en
-                # esa lista se sigue juzgando con el expediente real, que ya no crece: atrapada.
-                real["atrapada"] = clave.split(":", 1)[1] not in intervalos_yaml
+                # Detector de regresión. Hasta v0.46.0 `publish` elegía expediente con
+                # `interval in yaml`, así que una clave vetada cuyo intervalo no figuraba ahí se
+                # juzgaba con su expediente real —que ya no crece— y no salía jamás. Desde el
+                # destrabe esto debe dar SIEMPRE 0; si vuelve a marcar algo, el fallo ha vuelto.
+                real["atrapada"] = clave.split(":", 1)[1] not in intervalos_yaml and juzgada_real(
+                    clave
+                )
                 condenas.append((clave, real))
         else:
             real = _ficha(filas, poblacion, "outcome_return_r", MIN_SAMPLES_ENTRADA)
@@ -243,15 +257,15 @@ def _seccion_condenas(fichas: list[tuple[str, dict[str, Any]]]) -> None:
         )
     if atrapadas:
         print()
-        print(
-            f"  ⚠ {atrapadas} claves ATRAPADAS. Están vetadas por el artefacto, pero su intervalo"
-        )
-        print("    no figura en `quarantine_intervals` del yaml, que es lo que `publish` consulta")
-        print("    para elegir expediente. Se las sigue juzgando con el REAL — que ya no crece,")
-        print("    porque una clave vetada solo produce sombra— así que se recondenan cada ciclo")
-        print("    con las mismas filas y jamás llegan a la puerta de salida.")
-        print("    Es el fallo de la migración 017 reaparecido en el eje SÍMBOLO:intervalo, y es")
-        print("    un problema APARTE del Hito A: no lo arregla ni lo empeora.")
+        print(f"  ⚠ REGRESIÓN: {atrapadas} claves ATRAPADAS. Están vetadas y aun así se las")
+        print("    juzga con su expediente REAL, que ya no crece porque una clave vetada solo")
+        print("    produce sombra. Se recondenan cada ciclo con las mismas filas y jamás llegan")
+        print("    a la puerta de salida. Se corrigió en v0.47.0 y esto debe dar 0: si aparece,")
+        print("    el fallo de la migración 017 ha vuelto por el eje SÍMBOLO:intervalo.")
+    else:
+        print()
+        print("  Sin claves atrapadas: toda clave vetada se juzga con su expediente sombra, que")
+        print("  sí crece, así que todas tienen camino de vuelta. Corregido en v0.47.0.")
     print()
 
 
@@ -284,7 +298,7 @@ def main() -> None:
         str(x) for x in load_ensemble(artifacts / "ensemble.yaml").get("quarantine_intervals", [])
     }
     politica["intervals_yaml"] = sorted(yaml)
-    informe(datos, poblacion, claves_vetadas(datos, politica), yaml)
+    informe(datos, poblacion, claves_vetadas(datos, politica), yaml, politica)
 
 
 if __name__ == "__main__":
