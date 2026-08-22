@@ -7,6 +7,70 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.49.0] — 2026-08-22
+
+> Fase 0 del CVD. El flujo de agresores no se gana el voto — y por el camino quedó demostrado que
+> una de las tres reglas con las que se le juzgaba no la puede cruzar **ninguna variable real**,
+> incluidos los seis votos que la plataforma ya usa.
+
+### Added — `flow.py` y `run_cvd_study.py`: medición, sin voto
+
+- `flow.py` calcula el flujo de agresores por vela. **No se importa desde ningún camino de
+  decisión**, igual que `levels.py`.
+- Dos métricas candidatas declaradas antes de medir: `cvd_z` (presión acumulada, estandarizada) y
+  `divergencia` (el z del CVD menos el z del retorno de precio).
+- El estudio aplica las tres reglas acordadas: control de ruido sobre votos efectivos, correlación
+  con los seis votos por temporalidad, y expectancy por tercil LONG/SHORT con Bonferroni.
+
+### Changed — No hacen falta `aggTrades`: el dato ya viene en las klines
+
+- El campo 9 de las klines de Binance es `taker buy base asset volume`, así que
+  `delta = 2·taker_buy − volumen` sale directamente. Verificado presente en el histórico a 90 días.
+- **~520 peticiones en vez de ~250.000**, y lo que más importa: **es backtesteable**. El *order book
+  imbalance* se descartó porque el backtest solo consume `fetch_klines`; el CVD llega por ese mismo
+  camino.
+- Por eso se invirtió el orden acordado: estudio primero, proveedor en la DIL solo si pasaba. Como
+  no pasa, **no se ha creado tabla, ni migración, ni backfill**.
+
+### Fixed — La regla de «superar al ruido» no la puede cruzar ninguna variable real
+
+- La regla 1 falló en **32 de 32** casos, incluso donde la correlación con los seis votos era 0,32.
+  Eso no cuadraba, así que se le preguntó al listón por los votos que ya están en producción:
+
+  ```
+  BTCUSDT:30m   n=254
+    ema_cross   lift real = -0.014   listón ruido p95 = +0.610   -> NO PASA
+    macd        lift real = +0.174   listón ruido p95 = +0.561   -> NO PASA
+    supertrend  lift real = +0.279   listón ruido p95 = +0.532   -> NO PASA
+    rsi14       lift real = -0.122   listón ruido p95 = +0.637   -> NO PASA
+    bbands      lift real = -0.083   listón ruido p95 = +0.628   -> NO PASA
+    stoch14     lift real = +0.002   listón ruido p95 = +0.606   -> NO PASA
+  ```
+
+- **Ninguno de los seis.** Reproducido en las diez claves: 0/6 en todas. La razón es matemática: el
+  ruido gaussiano está descorrelacionado con todo por construcción, así que es el máximo teórico de
+  «añadir votos efectivos». Exigir superarlo es exigir ser más independiente que el azar puro.
+- Los votos efectivos miden **diversificación**, no aportación. Son la métrica correcta para
+  descontar muestra —para eso los usa `independence.py`— y la equivocada para juzgar una fuente
+  nueva.
+- El estudio incorpora esa calibración como paso propio, así que el diagnóstico es reproducible y no
+  una afirmación de un informe.
+
+### Veredicto — El CVD no se gana el voto
+
+**0 de 32 casos pasan las tres reglas.** Apartando la regla rota, tres casos pasan las otras dos,
+los tres con `cvd_z` y **los tres en la misma dirección** (más presión compradora acumulada → peor
+resultado, se compre o se venda): `BTCUSDT:4h` SHORT (|t| 3,74), `ETHUSDT:30m` LONG (|t| 5,88) y
+`SOLUSDT:15m` LONG (|t| 3,43).
+
+No basta: son tres de dieciséis claves, con 20-30 decisiones por tercil, y el criterio de
+independencia está sin reemplazar. Dar voto ahora sería construir sobre un aprobado parcial.
+
+### Pendiente — Revisar el veredicto del Analista de Niveles
+
+Se cerró en negativo apoyándose en esta misma regla. Queda anotado en su documento, **sin reabrirlo
+aquí**: hacerlo sin un criterio nuevo sería cambiar la regla después de ver el resultado.
+
 ## [0.48.0] — 2026-08-22
 
 > Un listón no es un cupo. El umbral de salida que se entregó en 0.46.0 exigía el percentil 95 de

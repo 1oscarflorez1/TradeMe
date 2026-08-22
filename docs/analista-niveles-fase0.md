@@ -89,9 +89,26 @@ momento, que era exactamente el propósito de hacer la Fase 0 antes que nada.
 
 **Una corrección metodológica que vale para todo lo que venga.** El lift de votos efectivos era la
 métrica con la que el proyecto pensaba juzgar futuros candidatos a «eje independiente» —está escrito
-como criterio de juicio en la especificación del Fundamental Score—. Ahora se sabe que **hay que
-acompañarlo siempre de un control de ruido**, o premiará por igual a una fuente nueva y a un dado.
-Anotado en [independencia.md](independencia.md).
+como criterio de juicio en la especificación del Fundamental Score—. Ahora se sabe que **premia por
+igual a una fuente nueva y a un dado**. Anotado en [independencia.md](independencia.md).
+
+> ### ⚠ Revisión pendiente (22 ago 2026): este veredicto se apoya en un instrumento roto
+>
+> La Fase 0 del CVD llevó el control de ruido un paso más allá y preguntó lo que aquí no se
+> preguntó: **¿superarían el listón los seis votos que la plataforma ya usa?** La respuesta es
+> **ninguno** — ni uno de los seis, en las diez claves medidas. Ver
+> [cvd-fase0.md](cvd-fase0.md).
+>
+> La razón es matemática: el ruido gaussiano está descorrelacionado con todo por construcción, así
+> que es el **máximo teórico** de «añadir votos efectivos». Ninguna variable informativa puede
+> superarlo, porque toda variable que describa el mismo mercado correlaciona algo con las demás.
+>
+> La conclusión correcta del hallazgo de este hito no era «hay que superar al ruido», sino que **los
+> votos efectivos no sirven para decidir si una fuente aporta información**: miden diversificación.
+> El Analista de Niveles se cerró en negativo apoyándose en esa comparación, así que **su veredicto
+> habría que volver a mirarlo** con un criterio de información incremental sobre el desenlace. Se
+> deja anotado y no se reabre aquí: reabrirlo sin la regla nueva sería cambiar el criterio después
+> de ver el resultado, que es justo lo que este proyecto no hace.
 
 **Un detector con las garantías puestas.** `levels.py` no vota y no se importa desde ningún camino
 de decisión, pero está probado contra look-ahead (ocho tests, incluido el que comprueba que un
