@@ -7,6 +7,79 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.50.0] — 2026-08-22
+
+> El veredicto del CVD de la 0.49.0 se apoyaba en un criterio que no lo podía pasar ninguna variable
+> real. Aquí se sustituye por uno que sí discrimina — y el CVD sigue sin ganarse el voto, ahora por
+> el motivo de fondo: **no aporta información sobre el desenlace**.
+
+### Added — `informacion.py`: el criterio de admisión que sí discrimina
+
+- Mide si añadir una columna **mejora el AUC fuera de muestra** por encima de su propia nula, con
+  regresión logística, validación por bloques temporales contiguos y una nula que permuta el orden
+  de los bloques —conservando la autocorrelación de la columna y rompiendo solo su relación con el
+  desenlace—.
+- Tres decisiones de diseño con su porqué escrito: modelo simple porque con 100-250 filas uno
+  flexible memoriza; bloques contiguos porque barajar el tiempo entrena con el futuro; y permutar
+  bloques y no filas porque destruir la estructura haría la nula demasiado fácil de superar.
+- **Calibrado igual que se descubrió el fallo del anterior**, preguntándole por los seis votos en
+  producción: aprueba a `supertrend` (+0,0202 sobre una nula de +0,0160) y suspende a los otros
+  cinco. **1 de 6**, que es justo lo que el criterio viejo no hacía.
+
+### Fixed — Por qué el criterio anterior no valía, medido en el límite
+
+- El listón viejo —superar el p95 de 200 columnas de ruido en lift de votos efectivos— falló en
+  **32 de 32** casos del estudio del CVD, incluso donde la correlación con los seis votos era 0,32.
+- Se le preguntó por los votos **en producción**: `ema_cross −0,014 · macd +0,174 ·
+  supertrend +0,279 · rsi14 −0,122 · bbands −0,083 · stoch14 +0,002`, contra listones de +0,53 a
+  +0,64. **Ninguno de los seis.** 0/6 en las diez claves.
+- Y se midió en el límite: una columna construida por **Gram-Schmidt** para ser *perfectamente*
+  ortogonal a los seis supera el p95 del ruido por **0,001** — un 0,2 %. Corrige la formulación de
+  la 0.49.0: el ruido no es exactamente el techo, pero el listón deja una rendija del 0,2 % entre
+  «imposible» y «el máximo concebible», y ninguna variable informativa cabe ahí.
+- Los votos efectivos miden **diversificación**, no aportación. Siguen siendo lo correcto para
+  descontar muestra (`independence.py`) y lo equivocado para admitir una fuente nueva.
+
+### Changed — La regla 1 del estudio del CVD, y su alcance
+
+- `run_cvd_study` usa el criterio nuevo y conserva el viejo impreso como diagnóstico, porque el
+  contraste entre los dos es el hallazgo.
+- **Pasa a evaluarse en global, no por temporalidad.** Aplicada por clave, con 40-285 decisiones, el
+  AUC fuera de muestra oscilaba entre 0,04 y 0,74 y las nulas llegaban a ±0,50: a ese nivel el test
+  no distingue nada. Con las claves juntas hay ~1.000 decisiones y 23 bloques de 24 h.
+- El informe imprime `supertrend` como **referencia del instrumento**: sirve para comprobar que el
+  criterio detecta lo que hay que detectar antes de fiarse de un «no aporta».
+
+### Changed — Corroborado que el campo 9 es el CVD, no una aproximación
+
+Sumando los `aggTrades` reales de un minuto y comparándolos con la kline de ese mismo minuto
+(BTCUSDT, 21:58 UTC): volumen, taker buy y delta **idénticos** — 1,08041000 los dos. La única
+diferencia es el conteo de operaciones, porque `aggTrades` agrega las consecutivas al mismo precio
+y lado.
+
+### Veredicto — El CVD sigue sin ganarse el voto, ahora por el motivo de fondo
+
+```
+  n = 978 decisiones cerradas · 23 bloques de 24 h
+
+  columna           AUC 6    AUC 7     delta   nula p95  veredicto
+  cvd_z            0.5645   0.5522   -0.0122    +0.0088  no aporta
+  divergencia      0.5645   0.5562   -0.0083    +0.0091  no aporta
+  supertrend       0.5443   0.5645   +0.0202    +0.0160  APORTA   (referencia)
+```
+
+No solo no aporta: **empeora** la predicción. Eso explica los casos que sí acertaban por tercil
+—`BTCUSDT:4h` SHORT |t| 3,74, `ETHUSDT:30m` LONG 5,88, `SOLUSDT:15m` LONG 3,43, los tres en la misma
+dirección—: la relación existe, pero **el conjunto de los seis votos ya la captura**.
+
+### Pendiente — Dos cosas que abre este hito
+
+- **Revisar el Analista de Niveles**, cerrado en negativo con el listón roto. Ahora hay criterio con
+  el que rehacerlo; anotado en su documento.
+- **Cinco de los seis votos no aportan información incremental** sobre el desenlace. No es materia
+  de este hito, pero es la medición más directa que hay hasta ahora de por qué el meta-modelo no
+  encuentra nada.
+
 ## [0.49.0] — 2026-08-22
 
 > Fase 0 del CVD. El flujo de agresores no se gana el voto — y por el camino quedó demostrado que
