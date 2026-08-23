@@ -7,6 +7,67 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.53.0] — 2026-08-23
+
+> El mecanismo del sesgo direccional: **once de las quince configuraciones publicadas invierten la
+> conmutación por régimen**. Cuando una decisión dice «tendencia», en la mayoría de las claves el
+> motor aplica pesos que favorecen la reversión.
+
+### Added — `regimen.py`: la auditoría que faltaba, y la alerta en el piloto automático
+
+- `ensemble.yaml` declara *«en tendencia sube tendencia/momentum; en rango, reversión»*, y la config
+  base lo cumple. Pero el optimizador propone cada peso con `suggest_float(..., 0.0, 2.0)` **sin
+  restricción de orden**: nada impide publicar `trend: 0.50` con `reversion: 1.99`.
+- `regimen.auditar` lo detecta, y el scheduler la ejecuta **tras cada promoción**: si la
+  configuración recién promovida invierte la semántica, levanta una alerta `regimen_incoherente`.
+- `optimize_and_publish` devuelve ahora la config promovida en su informe, para que la auditoría
+  pueda mirarla. No se escribe en el JSON de disco: duplicarla allí la haría envejecer en dos sitios.
+
+### El mecanismo, medido
+
+En régimen de **tendencia**, cuando la plataforma emite un **SHORT**, los votos medios son:
+
+```
+  ema_cross  +0.517   ·   macd  +0.096   ·   supertrend  +0.661     (tendencia y momentum)
+  rsi14      -0.600   ·   bbands -0.447  ·   stoch14     -0.567     (reversión)
+  net        -0.386
+```
+
+Los tres indicadores de tendencia están claramente positivos y aun así sale un corto: **la
+plataforma se pone corta contra la tendencia que sus propios indicadores señalan**. En ese régimen
+sus cortos dan −0,563 R frente a +0,624 R de sus largos.
+
+### Auditoría sobre lo publicado hoy: 5 coherentes de 16
+
+Casos extremos — en tendencia `SOLUSDT:15m` (dominante 0,50 · reversión 1,99, **3,97x**) y
+`BTCUSDT:30m` (**1,95x**); en rango `SOLUSDT:1d` (**26,19x**) y `ETHUSDT:15m` (**2,50x**).
+
+**Cómo se cuenta, porque es fácil equivocarse**: en tendencia dominan dos familias y basta con que
+una mande. Mirar solo `trend` e ignorar `momentum` infla el recuento — `BNBUSDT:1h` tiene
+`trend 0.15` pero `momentum 1.69`, así que su bloque de tendencia es coherente. Hay un test que lo
+fija.
+
+### Qué está demostrado y qué no
+
+- **Demostrado**: once de quince invierten la semántica declarada.
+- **No demostrado**: que la inversión *cause* los cortos malos. Solo cinco claves tienen suficientes
+  cortos en régimen de tendencia, y con esa muestra la correlación (r = −0,405) no dice nada.
+- El argumento que **sí se sostiene sin estadística**: `regime_label` se guarda en cada decisión y se
+  muestra en el panel. Cuando dice «tendencia» y los pesos favorecen la reversión, ese registro
+  **describe algo que no ocurrió**. Es el mismo patrón que los umbrales decorativos y el cupo del
+  percentil 95: un nombre que dejó de corresponderse con el mecanismo.
+
+### No hecho, a propósito
+
+No se restringe el espacio de búsqueda ni se bloquea ninguna promoción: eso cambiaría lo que la
+plataforma opera. La decisión queda planteada en `docs/regimen-coherencia.md` — restringir la
+búsqueda para que el régimen signifique lo que dice, o aceptar que el optimizador mande y renombrar
+el mecanismo. Dejarlo como está no vale.
+
+Y una pregunta que este hito abre y no responde: esas configuraciones **ganaron en el backtest fuera
+de muestra** —si no, no se habrían promocionado— y en producción dan −0,563 R en cortos. Esa
+desconexión entre backtest y realidad probablemente importe más que la elección anterior.
+
 ## [0.52.0] — 2026-08-23
 
 > El mercado regalaba **+0,626 R** a quien se pusiera largo sin pensar. La plataforma sacó
