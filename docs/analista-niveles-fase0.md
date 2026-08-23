@@ -99,16 +99,19 @@ igual a una fuente nueva y a un dado**. Anotado en [independencia.md](independen
 > **ninguno** — ni uno de los seis, en las diez claves medidas. Ver
 > [cvd-fase0.md](cvd-fase0.md).
 >
-> La razón es matemática: el ruido gaussiano está descorrelacionado con todo por construcción, así
-> que es el **máximo teórico** de «añadir votos efectivos». Ninguna variable informativa puede
-> superarlo, porque toda variable que describa el mismo mercado correlaciona algo con las demás.
+> Cuánto de inalcanzable se midió en el límite: una columna construida por **Gram-Schmidt** para ser
+> *perfectamente* ortogonal a los seis votos supera al p95 del ruido por **0,001** — un 0,2 %. El
+> listón deja esa rendija entre «imposible» y «el máximo concebible», y ninguna variable informativa
+> cabe ahí, porque describir el mismo mercado implica correlacionar algo.
 >
 > La conclusión correcta del hallazgo de este hito no era «hay que superar al ruido», sino que **los
 > votos efectivos no sirven para decidir si una fuente aporta información**: miden diversificación.
 > El Analista de Niveles se cerró en negativo apoyándose en esa comparación, así que **su veredicto
-> habría que volver a mirarlo** con un criterio de información incremental sobre el desenlace. Se
-> deja anotado y no se reabre aquí: reabrirlo sin la regla nueva sería cambiar el criterio después
-> de ver el resultado, que es justo lo que este proyecto no hace.
+> habría que volver a mirarlo**. El criterio que lo sustituye ya existe —`informacion.py`, que mide
+> aportación de información sobre el desenlace y viene calibrado: aprueba a `supertrend` y suspende
+> al ruido—, así que la revisión es reproducible con un comando. Se deja anotado y no se reabre
+> dentro del hito del CVD: hacerlo allí habría sido cambiar el criterio después de ver el resultado,
+> que es justo lo que este proyecto no hace.
 
 **Un detector con las garantías puestas.** `levels.py` no vota y no se importa desde ningún camino
 de decisión, pero está probado contra look-ahead (ocho tests, incluido el que comprueba que un
