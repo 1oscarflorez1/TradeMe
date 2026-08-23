@@ -7,6 +7,65 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.52.0] — 2026-08-23
+
+> El mercado regalaba **+0,626 R** a quien se pusiera largo sin pensar. La plataforma sacó
+> **+0,035 R**. No es que no aporte: es que se comió la ventaja que tenía delante.
+
+### Added — `direccion.py` y `run_direccion_study.py`: la medición que faltaba
+
+- Cada decisión guardó su plan al tomarla. El **plan espejo** es ese plan con la dirección invertida
+  y los niveles reflejados sobre la entrada —mismo riesgo, misma relación—, evaluado con
+  **`backtest.evaluate_trade`**, el evaluador real del proyecto, contra las mismas velas y el mismo
+  `horizon_by_tf`. Da el contrafactual exacto: qué habría pasado apostando al revés.
+- La nula es **elegir la dirección a cara y cruz, una tirada por bloque de 24 h**. Por bloque y no
+  por decisión: sortear una a una promediaría la deriva hasta hacerla desaparecer.
+- Nada de esto toca producción. `direccion.py` no se importa desde ningún camino de decisión.
+
+### Veredicto — No hay habilidad direccional demostrable en este periodo
+
+```
+  TODAS   n=970  obs=+0.035R  largo=+0.626  corto=-0.418  moneda p50=+0.102 p95=+0.257  no supera
+  LONG    n=442  obs=+0.658R  largo=+0.658  corto=-0.337  moneda p50=+0.160 p95=+0.644  supera*
+  SHORT   n=528  obs=-0.486R  largo=+0.599  corto=-0.486  moneda p50=+0.054 p95=+0.540  no supera
+```
+
+Lo que aporta **elegir**, descontada la deriva de cada lado:
+
+| | la plataforma | apostar siempre a ese lado | aportación de elegir |
+|---|---|---|---|
+| en largos | +0,658 R | +0,626 R | **+0,032 R** |
+| en cortos | −0,486 R | −0,418 R | **−0,068 R** |
+
+Casi todo el resultado de los largos es **deriva**. Y en los cortos, elegir cuáles **resta**.
+
+`*` El «supera» de los largos no significa lo que parece: dentro de ese subconjunto la moneda
+incluiría cortos, que en un tramo alcista pierden. La comparación válida es contra el propio lado.
+
+**Emitiendo 528 cortos frente a 442 largos en un mercado que subía**, la plataforma convirtió un
++0,626 R gratis en +0,035 R. Eso da sentido a todo lo medido este mes: el meta-modelo sin señal, los
+cinco votos que no aportan, el CVD que empeora y los niveles que no aportan **no eran el problema,
+eran síntomas de este**.
+
+### Salvedades, que pesan
+
+- **Un solo régimen**: 27 días alcistas. En un tramo bajista «siempre largo» sería ruinoso. Esto no
+  demuestra que la plataforma sea mala en general, sino que aquí no aportó y perdió la deriva.
+- **«Siempre largo» no es una estrategia**: no tiene gestión de riesgo. Es el listón correcto para
+  «¿aportaste al elegir?», no una alternativa operable.
+- **El espejo es una idealización**: asume niveles simétricos.
+
+### Fixed — El histórico mezcla dos reglas de evaluación
+
+- Al reevaluar el plan **real** para comprobar coherencia, **248 de 1.218** no reproducen el
+  `outcome_return_r` guardado — todas anteriores al 6 de agosto, y con exactamente 15, 18, 25 o 30
+  velas disponibles: los valores de `horizon_by_tf`, introducido en M10.5. Antes eran 20 fijas.
+- Desde el 6 de agosto la coincidencia es perfecta: **0 de 673**.
+- El estudio descarta lo no reproducible y lo declara. Descartar por eso no sesga: el horizonte
+  depende de la temporalidad y de cuándo se evaluó, no de cómo acabó la operación.
+- **Afecta a cualquier análisis que use `outcome_return_r` del histórico antiguo**, el entrenamiento
+  del meta-modelo incluido.
+
 ## [0.51.0] — 2026-08-22
 
 > El Analista de Niveles queda cerrado con datos limpios. Y al reabrirlo saltó el guardia del propio
