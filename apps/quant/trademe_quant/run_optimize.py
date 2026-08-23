@@ -66,6 +66,10 @@ def optimize_and_publish(symbol: str, interval: str, n_trials: int = 60) -> dict
         opt_path = out_dir / f"ensemble.{symbol.upper()}.{interval}.yaml"
         with open(opt_path, "w", encoding="utf-8") as fh:
             yaml.safe_dump(opt_cfg, fh, sort_keys=False, allow_unicode=True)
+        # La config viaja en el valor devuelto pero NO en el JSON de disco: el informe es un
+        # resumen para consultar a mano y duplicar ahí la configuración entera solo la haría
+        # envejecer en dos sitios. Quien la necesita es la auditoría de régimen del scheduler.
+        report["config"] = opt_cfg
     return report
 
 

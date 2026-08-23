@@ -206,6 +206,35 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
                 report = optimize_and_publish(symbol, iv, cfg.trials)
                 run_and_save(symbol, iv)  # re-medir con la config activa resultante
                 log.append(f"optimizado {symbol} {iv} ({reason}; promovido={report['promoted']})")
+
+                # Auditoría de coherencia del régimen. El espacio de búsqueda de Optuna propone cada
+                # peso entre 0 y 2 sin restricción de orden, así que puede publicar —y publicaba, en
+                # 12 de 15 claves— configuraciones donde la reversión pesa más que la tendencia EN
+                # RÉGIMEN DE TENDENCIA. Cuando eso pasa, el `regime_label` que se guarda en cada
+                # decisión deja de describir el mecanismo que se aplicó.
+                #
+                # Solo avisa: restringir la búsqueda cambiaría lo que la plataforma opera y esa es
+                # una decisión aparte. Lo que faltaba era que alguien lo señalara.
+                if report["promoted"]:
+                    try:
+                        from .regimen import auditar
+
+                        diag = auditar(report.get("config") or {})
+                        if not diag.coherente:
+                            log.append(f"⚠ régimen incoherente {symbol} {iv}: {diag.resumen()}")
+                            insert_alert(
+                                dsn,
+                                "regimen_incoherente",
+                                "warning",
+                                f"{symbol} {iv}: el régimen no significa lo que dice",
+                                f"La configuración promovida invierte la conmutación por régimen "
+                                f"({diag.resumen()}). El `regime_label` de sus decisiones ya no "
+                                f"describe los pesos que se aplican.",
+                                symbol,
+                                iv,
+                            )
+                    except Exception as err:  # noqa: BLE001 - auditar nunca puede tumbar el ciclo
+                        log.append(f"error auditoría de régimen: {err}")
                 cal_ok, cal_reason = should_calibrate(
                     _hours_since_file("calibrators.json"),
                     bool(report["promoted"]),
