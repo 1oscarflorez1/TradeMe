@@ -92,26 +92,34 @@ métrica con la que el proyecto pensaba juzgar futuros candidatos a «eje indepe
 como criterio de juicio en la especificación del Fundamental Score—. Ahora se sabe que **premia por
 igual a una fuente nueva y a un dado**. Anotado en [independencia.md](independencia.md).
 
-> ### ⚠ Revisión pendiente (22 ago 2026): este veredicto se apoya en un instrumento roto
+> ### ✅ Revisado y cerrado (22 ago 2026): el veredicto se sostiene
 >
-> La Fase 0 del CVD llevó el control de ruido un paso más allá y preguntó lo que aquí no se
-> preguntó: **¿superarían el listón los seis votos que la plataforma ya usa?** La respuesta es
-> **ninguno** — ni uno de los seis, en las diez claves medidas. Ver
-> [cvd-fase0.md](cvd-fase0.md).
+> Este hito se cerró apoyándose en el control de ruido sobre votos efectivos, y ese listón resultó
+> **imposible de cruzar para cualquier variable real**: ninguno de los seis votos en producción lo
+> pasa, y una columna construida por Gram-Schmidt para ser *perfectamente* ortogonal lo supera por
+> 0,001 — un 0,2 %. Ver [cvd-fase0.md](cvd-fase0.md).
 >
-> Cuánto de inalcanzable se midió en el límite: una columna construida por **Gram-Schmidt** para ser
-> *perfectamente* ortogonal a los seis votos supera al p95 del ruido por **0,001** — un 0,2 %. El
-> listón deja esa rendija entre «imposible» y «el máximo concebible», y ninguna variable informativa
-> cabe ahí, porque describir el mismo mercado implica correlacionar algo.
+> Un veredicto apoyado en un instrumento roto no vale ni para condenar ni para absolver, así que se
+> reabrió con el criterio que lo sustituyó —aportación de información sobre el desenlace, ya escrito
+> y calibrado antes de mirar estos datos— sobre **1.033 decisiones cerradas** y promediando seis
+> esquemas de validación:
 >
-> La conclusión correcta del hallazgo de este hito no era «hay que superar al ruido», sino que **los
-> votos efectivos no sirven para decidir si una fuente aporta información**: miden diversificación.
-> El Analista de Niveles se cerró en negativo apoyándose en esa comparación, así que **su veredicto
-> habría que volver a mirarlo**. El criterio que lo sustituye ya existe —`informacion.py`, que mide
-> aportación de información sobre el desenlace y viene calibrado: aprueba a `supertrend` y suspende
-> al ruido—, así que la revisión es reproducible con un comando. Se deja anotado y no se reabre
-> dentro del hito del CVD: hacerlo allí habría sido cambiar el criterio después de ver el resultado,
-> que es justo lo que este proyecto no hace.
+> | columna | AUC 6 | AUC 7 | delta | nula p95 | |
+> |---|---|---|---|---|---|
+> | score de niveles | 0,5610 | 0,5641 | **+0,0031** | +0,0085 | no aporta |
+> | distancia al nivel | 0,5610 | 0,5540 | **−0,0070** | +0,0099 | no aporta |
+>
+> **El cierre se sostiene.** La distancia al nivel es negativa en los seis esquemas de validación
+> (media −0,0070, desviación 0,0025); el score de niveles ronda el cero (+0,0031 ± 0,0080) y no se
+> acerca al listón.
+>
+> Un matiz que hay que decir: se sostiene porque las dos lecturas quedan en cero o por debajo, **no
+> porque el instrumento haya demostrado que sabría detectar un aporte real**. Con esta muestra
+> ninguna columna de referencia da positivo de forma estable — ni `supertrend`, el voto que más se
+> acerca, con +0,0014 ± 0,0174. El criterio está demostrado para suspender y no para aprobar; con
+> más historia habrá que recalibrarlo antes de fiarse de un «APORTA».
+>
+> Reproducible con `python -m trademe_quant.run_levels_revision votos.csv`.
 
 **Un detector con las garantías puestas.** `levels.py` no vota y no se importa desde ningún camino
 de decisión, pero está probado contra look-ahead (ocho tests, incluido el que comprueba que un

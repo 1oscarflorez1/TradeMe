@@ -7,6 +7,60 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.51.0] — 2026-08-22
+
+> El Analista de Niveles queda cerrado con datos limpios. Y al reabrirlo saltó el guardia del propio
+> criterio: su veredicto dependía de una constante elegida a ojo. Tercera vez que este proyecto
+> tropieza con lo mismo, y esta vez sobre un instrumento de ayer.
+
+### Fixed — El veredicto ya no lo decide el número de bloques de validación
+
+- `informacion.py` fijaba `BLOQUES_CV = 5`, y ese 5 decidía el resultado. Medido sobre las 1.033
+  decisiones cerradas, el delta de `supertrend` **cambiaba de signo** según el esquema:
+
+  ```
+  bloques      3        4        5        6        8       10
+  supertrend  -0.0312  -0.0118  +0.0147  +0.0120  +0.0075  +0.0173
+  ```
+
+- Pasa a promediar sobre `ESQUEMAS_CV = (3, 4, 5, 6, 8, 10)`. Cuesta seis veces más y para un
+  estudio que se ejecuta a mano eso da igual.
+- **Corrige la lectura del PR #69**: el «1 de 6 votos aporta» era un artefacto de haber elegido 5
+  bloques. Promediado, `supertrend` queda en **+0,0014 ± 0,0174** — indistinguible de cero.
+
+### Changed — Qué está demostrado del criterio, y qué no
+
+- **Demostrado para suspender.** Distingue con solidez lo claramente negativo de lo que ronda el
+  cero: `cvd_z` da −0,0205 ± 0,0047, negativo en los seis esquemas.
+- **No demostrado para aprobar.** Ninguna columna de referencia da positivo de forma estable con
+  esta muestra, así que no hay con qué comprobar que detectaría un aporte real. Con más historia,
+  recalibrar antes de fiarse de un «APORTA». Queda escrito en el módulo.
+- **El veredicto sobre el CVD no cambia y sale reforzado**: era negativo con 5 bloques y lo es con
+  los seis esquemas.
+
+### Added — `run_levels_revision.py`: el expediente del Analista de Niveles, cerrado
+
+Sobre 1.033 decisiones cerradas, 24 bloques de 24 h, promediando los seis esquemas:
+
+```
+  columna                 AUC 6    AUC 7     delta   nula p95  veredicto
+  score de niveles       0.5610   0.5641   +0.0031    +0.0085  no aporta
+  distancia al nivel     0.5610   0.5540   -0.0070    +0.0099  no aporta
+```
+
+**El cierre de su Fase 0 se sostiene.** La distancia al nivel es negativa en los seis esquemas
+(−0,0070 ± 0,0025) y el score ronda el cero (+0,0031 ± 0,0080), sin acercarse al listón. `levels.py`
+se queda como estaba: biblioteca medida, sin votar y sin importarse desde ningún camino de decisión.
+
+Con el matiz honesto de arriba: se sostiene porque las dos lecturas quedan en cero o por debajo, no
+porque el instrumento haya demostrado que sabría ver un positivo.
+
+### Fixed — `run_levels_study.cargar` no filtraba por símbolo
+
+Cuando se escribió, el CSV era de un solo activo. Con el multiactivo, ejecutarlo tal cual cruzaría
+snapshots de ETH con velas de BTC. La revisión filtra; el estudio original se deja como registro
+histórico de lo que se hizo entonces.
+
 ## [0.50.0] — 2026-08-22
 
 > El veredicto del CVD de la 0.49.0 se apoyaba en un criterio que no lo podía pasar ninguna variable

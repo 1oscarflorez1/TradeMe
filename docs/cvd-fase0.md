@@ -114,7 +114,22 @@ bbands         0.5688   0.5654  -0.0035   +0.0099  no aporta
 stoch14        0.5708   0.5654  -0.0054   +0.0077  no aporta
 ```
 
-**El instrumento discrimina: 1 de 6.** Eso es lo que el anterior no hacía —allí no pasaba nadie—.
+**El instrumento discrimina: 1 de 6** con este esquema de validación. Eso es lo que el anterior no
+hacía —allí no pasaba nadie—.
+
+> **Corrección del 22 de agosto por la noche.** Ese «1 de 6» dependía de haber fijado 5 bloques de
+> validación. Variando el esquema, el delta de `supertrend` va de **−0,0312 con 3 bloques a +0,0173
+> con 10**: cambia de signo. Promediado sobre seis esquemas queda en **+0,0014 ± 0,0174**, es decir
+> indistinguible de cero.
+>
+> `informacion.py` promedia ahora sobre `ESQUEMAS_CV` en vez de fijar un número, para que ninguna
+> constante elegida a ojo decida un veredicto. Y la lectura honesta del instrumento pasa a ser:
+> **está demostrado para suspender, no para aprobar**. Distingue con solidez lo claramente negativo
+> —`cvd_z` da −0,0205 ± 0,0047, negativo en los seis esquemas— de lo que ronda el cero, pero no hay
+> referencia positiva estable con la que comprobar que detectaría un aporte real.
+>
+> **El veredicto sobre el CVD no cambia y sale reforzado**: era negativo con 5 bloques y lo es con
+> los seis esquemas.
 
 Que cinco de los seis votos no aporten incrementalmente no es un fallo del criterio: es coherente
 con todo lo demás que sabe el proyecto. Los seis valen 1,41 efectivos y el meta-modelo no encuentra
