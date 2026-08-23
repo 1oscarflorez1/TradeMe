@@ -27,11 +27,20 @@ votos contra el de un modelo con los siete, **fuera de muestra**, y se contrasta
 rompe la relación entre la columna nueva y el resultado.
 
 Que el instrumento funciona se comprueba igual que se descubrió que el otro no: preguntándole por
-los votos que ya están en producción. `supertrend` lo pasa (+0,025 de AUC contra una nula de
-+0,006). Los otros cinco no, y eso no es un fallo del criterio sino un hallazgo coherente con todo
-lo demás que sabe el proyecto — los seis votos valen 1,41 efectivos y el meta-modelo no encuentra
-señal en ellos: son redundantes entre sí, así que casi ninguno aporta **incrementalmente** aunque
-el conjunto sí informe.
+los votos que ya están en producción. Y ahí hay una limitación que conviene tener delante:
+**ninguno de los seis aporta de forma estable**. `supertrend` es el que más se acerca, pero su delta
+promediado queda en +0,0014 con una desviación de 0,0174 entre esquemas de validación — es decir,
+indistinguible de cero.
+
+Eso significa que el criterio está **demostrado para suspender y no para aprobar**: distingue con
+solidez lo claramente negativo —`cvd_z` da −0,0205 con desviación 0,0047, negativo en los seis
+esquemas— de lo que ronda el cero, pero no hay ninguna columna de referencia que dé positivo de
+forma robusta con la que comprobar que sabría detectar un aporte real. Con más historia habrá que
+volver a calibrarlo antes de fiarse de un «APORTA».
+
+Que ningún voto aporte incrementalmente no es un fallo del criterio: es coherente con lo demás que
+sabe el proyecto — los seis valen 1,41 efectivos y el meta-modelo no encuentra señal en ellos. Son
+redundantes entre sí, así que casi ninguno aporta **por separado** aunque el conjunto sí informe.
 
 Decisiones de diseño, y por qué
 -------------------------------
@@ -55,7 +64,19 @@ import numpy as np
 
 from .nula import PERMUTACIONES_CICLO, SEMILLA, agrupar
 
-#: Bloques temporales contiguos para la validación fuera de muestra.
+#: Esquemas de validación sobre los que se promedia. **No es un número, es una lista**, y esa es la
+#: corrección del 22 de agosto de 2026 por la noche.
+#:
+#: La primera versión fijaba `BLOQUES_CV = 5`, y ese 5 decidía el veredicto. Medido sobre las 1.033
+#: decisiones cerradas, el delta de `supertrend` iba de **−0,0312 con 3 bloques a +0,0173 con 10**:
+#: cambiaba de signo. Un criterio cuyo resultado depende de una constante elegida a ojo no es un
+#: criterio, es una elección disfrazada de medición — el mismo error que el listón de ruido y que el
+#: percentil 95 de la cuarentena, por tercera vez.
+#:
+#: Promediar el delta sobre varios esquemas quita esa arbitrariedad. Cuesta seis veces más, y para
+#: un estudio que se ejecuta a mano eso da igual.
+ESQUEMAS_CV = (3, 4, 5, 6, 8, 10)
+#: Compatibilidad: quien pida un solo esquema sigue pudiendo hacerlo.
 BLOQUES_CV = 5
 #: Mejora mínima de AUC exigida además de superar la nula. Un +0,001 significativo sigue siendo
 #: irrelevante para operar, y sin este suelo una muestra grande convertiría cualquier nimiedad en
@@ -111,6 +132,21 @@ def auc_fuera_de_muestra(
     return _auc(y[listos], pred[listos])
 
 
+def auc_promedio(
+    X: np.ndarray[Any, Any],
+    y: np.ndarray[Any, Any],
+    esquemas: Sequence[int] = ESQUEMAS_CV,
+) -> float:
+    """AUC fuera de muestra promediado sobre varios repartos en bloques.
+
+    Cada reparto da una estimación con su propio sesgo —cuántas filas entrena, cuántas evalúa—, y
+    con ~1.000 decisiones la diferencia entre 3 y 10 bloques llega a mover el delta de una columna
+    de −0,03 a +0,02. Promediar no elimina esa varianza, pero deja de dejar el veredicto en manos de
+    una constante arbitraria.
+    """
+    return float(np.mean([auc_fuera_de_muestra(X, y, b) for b in esquemas]))
+
+
 def _permuta_por_bloques(
     columna: np.ndarray[Any, Any], marcas: Sequence[int], rng: np.random.Generator
 ) -> np.ndarray[Any, Any]:
@@ -131,9 +167,9 @@ def aporta_informacion(
     extra: Sequence[float],
     ganadora: Sequence[int],
     marcas: Sequence[int],
-    permutaciones: int = PERMUTACIONES_CICLO // 5,
+    permutaciones: int = PERMUTACIONES_CICLO // 8,
     semilla: int = SEMILLA,
-    bloques: int = BLOQUES_CV,
+    esquemas: Sequence[int] = ESQUEMAS_CV,
 ) -> Aportacion:
     """¿Mejora `extra` la predicción del desenlace por encima de lo que ya hacen los votos?
 
@@ -150,15 +186,15 @@ def aporta_informacion(
     if X6.ndim != 2 or X6.shape[0] != y.size or col.size != y.size:
         return Aportacion(0.5, 0.5, 0.0, 0.0, False)
 
-    base = auc_fuera_de_muestra(X6, y, bloques)
-    ampliado = auc_fuera_de_muestra(np.column_stack([X6, col]), y, bloques)
+    base = auc_promedio(X6, y, esquemas)
+    ampliado = auc_promedio(np.column_stack([X6, col]), y, esquemas)
     delta = ampliado - base
 
     rng = np.random.default_rng(semilla)
     nulos = np.empty(permutaciones, dtype=float)
     for k in range(permutaciones):
         barajada = _permuta_por_bloques(col, marcas, rng)
-        nulos[k] = auc_fuera_de_muestra(np.column_stack([X6, barajada]), y, bloques) - base
+        nulos[k] = auc_promedio(np.column_stack([X6, barajada]), y, esquemas) - base
     p95 = float(np.percentile(nulos, 95))
 
     return Aportacion(

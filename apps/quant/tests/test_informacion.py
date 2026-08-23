@@ -10,9 +10,11 @@ from __future__ import annotations
 import numpy as np
 
 from trademe_quant.informacion import (
+    ESQUEMAS_CV,
     MIN_DELTA_AUC,
     aporta_informacion,
     auc_fuera_de_muestra,
+    auc_promedio,
 )
 
 N = 400
@@ -111,3 +113,29 @@ def test_la_validacion_es_por_bloques_temporales() -> None:
     col = np.concatenate([np.zeros(N // 2), rng.standard_normal(N // 2)])
     auc = auc_fuera_de_muestra(col.reshape(-1, 1), y)
     assert 0.0 <= auc <= 1.0
+
+
+# --- El veredicto no puede depender de una constante elegida a ojo (22/08/2026) ---------------
+
+
+def test_el_auc_promediado_no_lo_decide_un_solo_esquema() -> None:
+    """La corrección que motivó `ESQUEMAS_CV`.
+
+    Con `BLOQUES_CV = 5` fijo, el delta de `supertrend` sobre las 1.033 decisiones reales iba de
+    −0,0312 con 3 bloques a +0,0173 con 10: cambiaba de signo. El promedio queda entre el mínimo y
+    el máximo de las estimaciones individuales por construcción, que es justo lo que se quiere —
+    ninguna constante arbitraria manda sobre el veredicto.
+    """
+    votos, y, oculta = _mundo()
+    X = np.column_stack([np.asarray(votos, dtype=float).T, np.asarray(oculta)])
+    yy = np.asarray(y)
+    sueltos = [auc_fuera_de_muestra(X, yy, b) for b in ESQUEMAS_CV]
+    promedio = auc_promedio(X, yy)
+    assert min(sueltos) <= promedio <= max(sueltos)
+    assert len(ESQUEMAS_CV) > 1, "un solo esquema volvería a dejar el veredicto en manos de un 5"
+
+
+def test_promediar_no_rompe_la_deteccion() -> None:
+    """Robustecerlo no puede costar la capacidad de ver lo que sí predice."""
+    votos, y, oculta = _mundo()
+    assert aporta_informacion(votos, list(oculta), y, BLOQUES, permutaciones=40).aporta
