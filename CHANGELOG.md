@@ -7,6 +7,59 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.54.0] — 2026-08-23
+
+> No había desconexión entre backtest y realidad: **las configuraciones nunca prometieron ganar**.
+> El criterio de promoción era `opt_exp > base_exp`, y cuatro de las doce activas se promocionaron
+> con expectancy negativa porque la anterior perdía más.
+
+### Fixed — El optimizador pasa por el mismo gobierno que todo lo demás
+
+- `promocion.decidir` exige **las tres**: 25 operaciones mínimas en hold-out, expectancy ≥ +0,05 R
+  y superar el P95 de una nula que sortea por bloques a cuál de las dos ramas se atribuye cada tramo.
+- **Solo endurece**: `mejora > nula ≥ 0` implica `optimizada > base`, así que todo lo que pase el
+  guardia nuevo habría pasado el viejo. Hay un test que barre el espacio para comprobarlo.
+- **No toca lo ya promovido.** Decide promociones futuras; lo que opera hoy sigue operando.
+- El informe del optimizador gana un bloque `promocion` con el motivo, para poder auditarlo después.
+
+### Lo que se midió
+
+| clave | promovida | base R | optimizada R | n hold-out |
+|---|---|---|---|---|
+| BTCUSDT:15m | sí | −0,768 | **−0,579** | 21 |
+| BNBUSDT:30m | sí | −0,583 | **−0,274** | **11** |
+| SOLUSDT:1d | sí | −0,258 | **−0,124** | 23 |
+| BTCUSDT:30m | sí | −0,478 | **−0,066** | 32 |
+
+Y hay un efecto acumulativo: cada promoción compara contra la configuración **activa**, no contra un
+estándar. Si la activa ya está degradada, basta perder un poco menos para sustituirla.
+
+Aplicando el guardia a los informes de hoy: **de 12 promovidas, seguirían siéndolo 2**.
+
+### Descartado por el camino — la vela en formación
+
+Producción decide sobre la vela abierta (`buffer.ts` la reemplaza a cada tick) y el backtest sobre
+velas cerradas. Parecía la causa. Medido sobre `BTCUSDT:15m` en 7 días, reconstruyendo el estado
+parcial de cada vela desde las de 1 minuto: la decisión **cambia en un 10-16 %** de los casos pero la
+expectancy es la misma (−0,140 / −0,205 / −0,168 frente a **−0,189** al cierre). Ruido con n≈300.
+Queda `run_vela_formacion_study` para revisarlo con otra clave.
+
+Tampoco se encontró leakage en el walk-forward: tiene embargo y purga de horizonte.
+
+### Added — `vela_parcial.py`, `run_vela_formacion_study.py`, `promocion.py`
+
+Ninguno se importa desde un camino de decisión salvo `promocion`, que es el guardia.
+
+### El problema de fondo que esto destapa
+
+De las diez promociones que se habrían frenado, **ocho lo hacen por muestra**, no por rentabilidad.
+Un hold-out de 11-32 operaciones no permite distinguir una mejora de una racha por muy buen criterio
+que se le ponga encima: **la ventana de optimización es demasiado corta para decidir nada**.
+
+Con el guardia activo la plataforma dejará de promocionar casi nada hasta que la ventana crezca. Es
+lo correcto —no promocionar es mejor que promocionar ruido— pero es un freno, no una solución. El
+siguiente hito natural es darle más historia al hold-out.
+
 ## [0.53.0] — 2026-08-23
 
 > El mecanismo del sesgo direccional: **once de las quince configuraciones publicadas invierten la
