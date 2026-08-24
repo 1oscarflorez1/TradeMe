@@ -71,6 +71,27 @@ penalización es **0**, no una estimación. Lo mismo si no se conoce el funding 
 no un cero por defecto. Un cero se situaría en la distribución y produciría un percentil con toda la
 pinta de ser una medición — es el fallo que tuvo 0.38.0 durante su primer día en producción.
 
+**Y sin ventana, tampoco.** Contar observaciones responde «cuántos datos hay»; la pregunta que
+faltaba era «de cuándo son». Desde 0.55.0 hacen falta las dos cosas: `MIN_OBSERVACIONES = 30` y
+`MIN_COBERTURA = 0,8` de los días de la ventana, medida en **días distintos con dato** para que un
+hueco en mitad también cuente.
+
+Lo que dejaba pasar el guardia anterior: BTCUSDT publicaba **120 observaciones** —cuatro veces el
+mínimo— repartidas por **40 de los 90 días**, porque al incorporar los activos nuevos se les hizo el
+relleno retroactivo a ellos y no a él. Su distribución describía otro periodo, y su tercil de
+referencia quedó en **+5,0e-5** frente al **+2,0e-5** de ETHUSDT y el **−2,5e-5** de SOLUSDT. Con un
+funding real de +3,0e-5, dos símbolos penalizaban el largo y BTCUSDT no. **Un percentil solo compara
+si las ventanas comparan**, y esa condición no la estaba comprobando nadie.
+
+El 0,8 se fijó mirando lo que ya estaba dentro, no el resultado que interesaba: los tres símbolos
+con histórico completo cubren el 100 % de la ventana, así que el listón les deja veinte puntos de
+margen y solo excluye al que de verdad está incompleto.
+
+El artefacto publica `cobertura` y `min_cobertura` para que el veredicto se pueda auditar, y el log
+del piloto distingue los dos motivos: «faltan datos» se arregla esperando, «faltan días» se arregla
+con un relleno retroactivo. Decir «sin muestra suficiente» cuando sobran observaciones y lo que
+falta es historia manda a mirar donde no es.
+
 **El funding no depende del sesgo macro.** Se refresca por su cuenta, para los perpetuos de Binance,
 tenga `MACRO_ENABLED` el valor que tenga. El score existe precisamente porque el funding no deriva
 del precio; acoplarlo al interruptor del macro uniría justo lo que este hito separa.

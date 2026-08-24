@@ -7,6 +7,82 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.55.0] — 2026-08-24
+
+> Cuatro guardias que medían la unidad equivocada. Ninguno estaba mal escrito: todos comprobaban
+> algo *parecido* a lo que prometían, y la diferencia era exactamente por donde se colaba el fallo.
+
+### Fixed — La ventana del desenlace se mide en tiempo, no en velas
+
+- `db._velas_de_la_ventana` acota las velas del desenlace a `captured_at + h x duración`. Antes se
+  pedían con `LIMIT h` a secas: con un hueco de ingesta llegaban `h` velas repartidas por un tramo
+  mucho más largo, así que la operación se juzgaba contra un mercado que no era el suyo, con un
+  salto de precio artificial entre dos velas contiguas capaz de disparar un stop que nunca se tocó.
+- El guardia de M10.5 (`len(future) < h` deja el registro pendiente) era correcto en intención y
+  estaba escrito en filas donde la promesa hablaba de tiempo. Acotando la ventana, ese mismo conteo
+  vuelve a significar lo que dice.
+- `db.bloqueadas_por_hueco` cuenta las decisiones que ya nunca se evaluarán porque a su ventana le
+  faltan velas. Es preferible a inventarles un desenlace, pero no puede quedar mudo.
+
+### Fixed — El Fundamental Score exige ventana cubierta, no solo observaciones
+
+- `MIN_COBERTURA = 0,8`: hacen falta observaciones **y** días. `MIN_OBSERVACIONES = 30` respondía
+  «hay de sobra» a una pregunta que nadie había hecho.
+- `funding_window` devuelve la fecha junto al valor: sin ella la cobertura no se puede calcular, y
+  la firma ya no admite el argumento equivocado.
+- El artefacto publica `cobertura` y `min_cobertura`, y el log distingue los dos motivos: «faltan
+  datos» se arregla esperando, «faltan días» se arregla con un backfill.
+
+### Fixed — Una fuente que responde no es una fuente que informa
+
+- `dil/frescura.py` vigila cuánto lleva callada cada serie frente a su periodicidad de publicación.
+  `data_sources` solo sabía si la descarga funcionó, y con eso una fuente estancada es idéntica a
+  una sana. El piloto lo registra y levanta alerta.
+- El estado no se duplica: el `observed_at` más reciente ya está en la tabla, así que se consulta.
+
+### Fixed — La cobertura del histórico deja de depender de que alguien se acuerde
+
+- `dil.asegurar_cobertura_funding` comprueba y repara la ventana de cada símbolo en cada ciclo. El
+  backfill existía desde M11 y funcionaba; lo que faltaba era quien lo llamara solo. No pide nada a
+  Binance si la ventana ya está cubierta.
+
+### Lo que se midió
+
+| guardia | dice medir | medía | qué dejaba pasar |
+|---|---|---|---|
+| evaluación | horizonte completo | nº de velas | 50 de 83 timeouts desde el 6-ago |
+| Fundamental | muestra suficiente | nº de observaciones | BTCUSDT con la ventana al 44 % |
+| salud de fuente | fuente sana | filas devueltas | BCE: 33 pasadas OK, IPC parado 237 días |
+| backfill | — | que alguien se acordara | BTCUSDT con 0 filas reconstruidas |
+
+**El caso del Fundamental, con números.** BTCUSDT publicaba 120 observaciones —cuatro veces el
+mínimo— repartidas por **40 de los 90 días**, porque al añadir los activos nuevos se les hizo el
+backfill a ellos y no a él. Su tercil de referencia quedó en **+5,0e-5** frente al **+2,0e-5** de
+ETHUSDT y el **−2,5e-5** de SOLUSDT: con un funding real de +3,0e-5, dos símbolos penalizaban el
+largo y BTCUSDT no. Un percentil solo compara si las ventanas comparan.
+
+**Re-simulando las 839 decisiones cerradas desde el 6-ago con la ventana acotada: ninguna cambia de
+desenlace.** Los toques registrados ocurrieron de verdad. Lo que cambia es que 343 no se habrían
+dado por cerradas, porque a su ventana le faltan velas — y ahí está el aviso: mientras la ingesta
+siga perdiendo velas (63 huecos en BTCUSDT 1m, el mayor de 71 h), la plataforma dejará de poder
+evaluar una parte grande de lo que decide. El guardia lo hace visible en vez de taparlo; rellenar
+los huecos es lo siguiente.
+
+**El umbral, contrastado contra lo que ya está dentro** —la comprobación que este proyecto exige—:
+los tres símbolos con backfill cubren el 100 % de la ventana y pasan con 20 puntos de margen; solo
+queda fuera el que de verdad está incompleto. Y al declarar la frescura del sentimiento como
+`fear_greed` no vigilaba nada, porque se guarda con `scope='cripto'`: una clave que no existe nunca
+dispara, y no avisar se ve igual que ir bien.
+
+### Verificado y no verificado
+
+- Verificado contra la base de datos: las cuatro cifras de la tabla, la re-simulación de las 839
+  decisiones y la cobertura por símbolo.
+- El IPC del BCE está congelado **en la fuente**, no en el ingestor: su API tampoco publica nada
+  posterior a diciembre de 2025, comprobado directamente.
+- Sin verificar en ejecución real: el ciclo completo del piloto con los módulos nuevos. Se verá en
+  el primer ciclo tras el despliegue, en el log (`cobertura:` y `frescura:`).
+
 ## [0.54.0] — 2026-08-23
 
 > No había desconexión entre backtest y realidad: **las configuraciones nunca prometieron ganar**.
