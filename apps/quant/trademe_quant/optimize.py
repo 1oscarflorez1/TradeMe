@@ -14,6 +14,7 @@ from typing import Any
 import optuna
 
 from .backtest import MIN_CANDLES, run_backtest
+from .promocion import decidir, marcas_de_indices, mejora_nula_p95, resumen
 from .walkforward import in_test_folds, make_folds
 
 WEIGHT_KEYS = ["ema_cross", "macd", "supertrend", "rsi14", "bbands", "stoch14"]
@@ -58,6 +59,44 @@ def penalized_expectancy(
     weightlike = [v for k, v in params.items() if k.startswith("w_") or k.startswith("r_")]
     complexity = sum(abs(v - 1.0) for v in weightlike) / max(1, len(weightlike))
     return exp - complexity_penalty * complexity
+
+
+def _holdout_series(
+    high: list[float],
+    low: list[float],
+    close: list[float],
+    base_config: dict[str, Any],
+    best_cfg: dict[str, Any],
+    split: int,
+    horizon: int,
+) -> tuple[list[float], list[float], list[int]]:
+    """Los retornos del hold-out de cada rama, y sus bloques temporales para la nula.
+
+    El bloque se mide en velas —un día de esa temporalidad— porque el backtest trabaja con índices,
+    no con fechas. Se usan los índices de la rama optimizada como referencia común: solo hace falta
+    que los bloques sean comparables entre las dos, no que coincidan operación a operación.
+    """
+    velas_dia = max(1, int(round(86_400 / max(1, _segundos_por_vela(horizon)))))
+    out: list[list[float]] = []
+    indices: list[int] = []
+    for cfg in (base_config, best_cfg):
+        res = run_backtest(high, low, close, cfg, horizon=horizon)
+        ho = [t for t in res["trades"] if int(t["index"]) >= split]
+        out.append([float(t["r"]) for t in ho])
+        indices = [int(t["index"]) for t in ho]
+    largo = max(len(out[0]), len(out[1]), len(indices))
+    marcas = marcas_de_indices(indices + list(range(len(indices), largo)), velas_dia)
+    return out[0], out[1], marcas
+
+
+def _segundos_por_vela(horizon: int) -> int:
+    """Aproximación del tamaño de vela a partir del horizonte configurado.
+
+    No hay forma de saber la temporalidad desde aquí sin cambiar la firma pública, y para agrupar en
+    bloques basta con un orden de magnitud: lo que importa es que varias operaciones seguidas caigan
+    juntas, no la duración exacta.
+    """
+    return max(60, 900 * max(1, horizon) // 20)
 
 
 def _holdout_expectancy(
@@ -116,13 +155,21 @@ def optimize_weights(
     best_cfg = apply_params(base_config, study.best_params)
     base_exp, base_n = _holdout_expectancy(high, low, close, base_config, split, horizon)
     opt_exp, opt_n = _holdout_expectancy(high, low, close, best_cfg, split, horizon)
-    promoted = opt_exp > base_exp
+
+    # El criterio era `opt_exp > base_exp`: puramente relativo. Promocionaba configuraciones que
+    # prometían PERDER, porque la anterior perdía más — y con hold-outs de once operaciones. Ver
+    # `promocion.py`. Ahora hacen falta las tres: muestra, rentabilidad y superar al azar.
+    r_base, r_opt, marcas = _holdout_series(high, low, close, base_config, best_cfg, split, horizon)
+    nula = mejora_nula_p95(r_base, r_opt, marcas)
+    veredicto = decidir(base_exp, opt_exp, opt_n, nula)
+    promoted = veredicto.promover
 
     return {
         "promoted": promoted,
         "best_params": study.best_params,
         "best_config": best_cfg if promoted else base_config,
         "validation_score": float(study.best_value),
+        "promocion": resumen(veredicto),
         "holdout": {
             "base_expectancy": base_exp,
             "base_trades": base_n,
