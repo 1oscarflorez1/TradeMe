@@ -309,6 +309,39 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin datos externos el motor decide igual que hoy
         log.append(f"error datos externos: {err}")
 
+    # Y acto seguido la otra pregunta, la que `data_sources` no responde: ¿alguna de esas fuentes
+    # lleva callada más de lo que le toca? El BCE figuraba con 33 pasadas correctas y cero errores
+    # mientras su IPC llevaba siete meses sin moverse. Responder «sí» a «¿funcionó la descarga?» no
+    # es responder «¿hay algo nuevo?».
+    try:
+        from .dil.frescura import series_estancadas
+
+        estancadas = series_estancadas(dsn)
+        for e in estancadas:
+            log.append(f"frescura: {e}")
+        if estancadas:
+            insert_alert(
+                dsn,
+                "datos_estancados",
+                "warning",
+                f"{len(estancadas)} serie(s) de datos sin actualizarse",
+                "; ".join(str(e) for e in estancadas),
+            )
+    except Exception as err:  # noqa: BLE001 - la vigilancia no debe tumbar el ciclo que vigila
+        log.append(f"error frescura: {err}")
+
+    # Antes de publicar la distribución, asegurarse de que hay ventana con la que construirla. El
+    # sondeo solo trae el presente: sin este paso, un símbolo que se incorpore hoy tarda 90 días en
+    # tener referencia, y uno al que nadie le hiciera el backfill se queda a medias para siempre
+    # sin que nada lo delate. No llama a Binance si la ventana ya está cubierta.
+    try:
+        from .dil import asegurar_cobertura_funding
+
+        for linea in asegurar_cobertura_funding(dsn, symbols):
+            log.append(f"cobertura: {linea}")
+    except Exception as err:  # noqa: BLE001 - sin histórico el score se declara stale, no miente
+        log.append(f"error cobertura funding: {err}")
+
     # Fundamental Score (M12): publica la distribución de referencia del funding de cada símbolo.
     # Va DESPUÉS de la DIL a propósito — usa lo que esa acaba de guardar. Sigue sin decidir nada:
     # el score está en sombra y la penalización efectiva es 0 hasta que demuestre su lift.

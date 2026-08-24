@@ -58,9 +58,17 @@ def publish(
             art = build_artifact(sym, valores, ahora, window_days)
             write_artifact(art, base)
             if art["stale"]:
-                log.append(
-                    f"{sym}: sin muestra suficiente ({art['n']}/{MIN_OBSERVACIONES}), score en 0"
-                )
+                # Dos motivos distintos y conviene no confundirlos: «faltan datos» se arregla
+                # esperando, «faltan días» se arregla con un backfill. Decir solo «sin muestra»
+                # cuando sobran observaciones y lo que falta es historia manda a mirar donde no es.
+                if art["n"] < MIN_OBSERVACIONES:
+                    motivo = f"sin muestra suficiente ({art['n']}/{MIN_OBSERVACIONES})"
+                else:
+                    motivo = (
+                        f"ventana cubierta al {art['cobertura']:.0%} de los {window_days} días "
+                        f"(se exige {art['min_cobertura']:.0%}); faltan datos históricos"
+                    )
+                log.append(f"{sym}: {motivo}, score en 0")
             else:
                 log.append(f"{sym}: distribución de {art['n']} observaciones ({art['version']})")
         except Exception as err:  # noqa: BLE001 - un símbolo caído no tumba el ciclo
