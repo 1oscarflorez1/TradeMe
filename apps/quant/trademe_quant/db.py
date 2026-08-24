@@ -77,6 +77,48 @@ def save_backtest(dsn: str, symbol: str, interval: str, result: dict[str, Any]) 
         conn.commit()
 
 
+def _velas_de_la_ventana(
+    conn: Any, symbol: str, interval: str, captured_at: Any, h: int
+) -> list[tuple[float, float, float]]:
+    """Las `h` velas que le tocan a una decisión, **acotadas en tiempo**.
+
+    Antes se pedían con `LIMIT h` a secas, y ahí vivía un fallo silencioso: `h` velas no son `h`
+    periodos en cuanto falta una. Con un hueco de ingesta, las `h` primeras velas posteriores se
+    reparten por un tramo mucho más largo, así que el desenlace se decidía contra un mercado que no
+    era el suyo —y con un salto de precio artificial entre dos velas contiguas, capaz de disparar
+    un stop que nunca se tocó así—. Medido el 24-ago-2026: de los 83 «timeout» evaluados ya con la
+    regla buena de M10.5, **44 abarcaban más del 150 %** de su horizonte, hasta 10,1x en 15m.
+
+    El guardia de M10.5 (`len(future) < h` deja el registro pendiente) era correcto en su intención
+    y estaba escrito en la unidad equivocada: contaba filas donde la promesa hablaba de tiempo.
+    Acotando aquí la ventana, ese mismo conteo vuelve a significar lo que dice.
+
+    Si la temporalidad no tiene duración conocida (`1M`), no se puede acotar: se cae al
+    comportamiento anterior, que no empeora nada de lo que ya había.
+    """
+    from .market.normalize import INTERVAL_MS
+
+    ms = INTERVAL_MS.get(str(interval))
+    if ms is None:
+        sql = """
+            SELECT high, low, close FROM candles
+            WHERE symbol=%s AND interval=%s AND ts > %s
+            ORDER BY ts LIMIT %s
+            """
+        params: tuple[Any, ...] = (symbol, interval, captured_at, h)
+    else:
+        sql = """
+            SELECT high, low, close FROM candles
+            WHERE symbol=%s AND interval=%s AND ts > %s
+              AND ts <= %s + (%s * interval '1 millisecond')
+            ORDER BY ts LIMIT %s
+            """
+        params = (symbol, interval, captured_at, captured_at, ms * h, h)
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        return [(float(r[0]), float(r[1]), float(r[2])) for r in cur.fetchall()]
+
+
 def evaluate_shadow_outcomes(
     dsn: str, horizon: int = 20, horizons: dict[str, int] | None = None
 ) -> int:
@@ -108,16 +150,7 @@ def evaluate_shadow_outcomes(
         for row in pending:
             sid, symbol, interval, captured_at, direction, entry, stop, tp = row
             h = (horizons or {}).get(str(interval), horizon)
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT high, low, close FROM candles
-                    WHERE symbol=%s AND interval=%s AND ts > %s
-                    ORDER BY ts LIMIT %s
-                    """,
-                    (symbol, interval, captured_at, h),
-                )
-                future = cur.fetchall()
+            future = _velas_de_la_ventana(conn, symbol, interval, captured_at, h)
             if not future:
                 continue
             res = evaluate_trade(
@@ -125,9 +158,9 @@ def evaluate_shadow_outcomes(
                 float(entry),
                 float(stop),
                 float(tp),
-                [float(r[0]) for r in future],
-                [float(r[1]) for r in future],
-                [float(r[2]) for r in future],
+                [r[0] for r in future],
+                [r[1] for r in future],
+                [r[2] for r in future],
             )
             if res["result"] == "timeout" and len(future) < h:
                 continue
@@ -161,6 +194,10 @@ def evaluate_snapshot_outcomes(
       nulo, no se volvían a evaluar jamás: en 1d eso convertía el 100 % de los registros en timeouts
       artificiales.
 
+    «Horizonte completo» se comprueba **en tiempo**, no en número de filas: las velas se piden ya
+    acotadas a la ventana (`_velas_de_la_ventana`). Contarlas bastaba mientras no hubiera huecos de
+    ingesta, y dejó de bastar en cuanto los hubo — ver el detalle en ese helper.
+
     El horizonte es **por temporalidad** desde M10.5 (`horizons`). Las 20 velas fijas anteriores
     eran 20 minutos en 1m y 20 días en 1d: en las cortas cerraban por tiempo operaciones que aún
     tenían recorrido —el 31 % del total—, y en 1d, 1w y 1M exigían más histórico del que existe, de
@@ -185,16 +222,7 @@ def evaluate_snapshot_outcomes(
         for row in pending:
             sid, symbol, interval, captured_at, direction, entry, stop, tp = row
             h = (horizons or {}).get(str(interval), horizon)
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT high, low, close FROM candles
-                    WHERE symbol=%s AND interval=%s AND ts > %s
-                    ORDER BY ts LIMIT %s
-                    """,
-                    (symbol, interval, captured_at, h),
-                )
-                future = cur.fetchall()
+            future = _velas_de_la_ventana(conn, symbol, interval, captured_at, h)
             if not future:
                 continue
             res = evaluate_trade(
@@ -202,9 +230,9 @@ def evaluate_snapshot_outcomes(
                 float(entry),
                 float(stop),
                 float(tp),
-                [float(r[0]) for r in future],
-                [float(r[1]) for r in future],
-                [float(r[2]) for r in future],
+                [r[0] for r in future],
+                [r[1] for r in future],
+                [r[2] for r in future],
             )
             # Sin el horizonte completo, un «timeout» es prematuro: se deja pendiente.
             if res["result"] == "timeout" and len(future) < h:
@@ -264,3 +292,49 @@ def insert_alert(
             (symbol, interval, type_, severity, title, message),
         )
         conn.commit()
+
+
+def bloqueadas_por_hueco(
+    dsn: str, horizons: dict[str, int] | None = None, horizon: int = 20
+) -> int:
+    """Decisiones que ya nunca se evaluarán porque a su ventana le faltan velas.
+
+    Acotar la ventana en tiempo corrige el desenlace falso, pero tiene una consecuencia que no debe
+    quedar muda: si un hueco de ingesta cae dentro de la ventana de una decisión, esa decisión se
+    queda pendiente **para siempre**, porque el momento de recogerlas ya pasó. Es preferible a
+    inventarle un desenlace, y aun así hay que poder contarlas: una cifra que crece delata que la
+    ingesta está perdiendo velas, y era justo lo que nadie estaba mirando.
+
+    Solo cuenta aquellas cuya ventana ya venció; las recientes están pendientes por motivos
+    normales.
+    """
+    import psycopg
+
+    from .market.normalize import INTERVAL_MS
+
+    total = 0
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute("""
+            SELECT symbol, interval, captured_at FROM snapshots
+            WHERE outcome_result IS NULL AND plan_entry IS NOT NULL
+                  AND direction IN ('LONG','SHORT')
+            """)
+        pendientes = cur.fetchall()
+        for symbol, interval, captured_at in pendientes:
+            ms = INTERVAL_MS.get(str(interval))
+            if ms is None:
+                continue
+            h = (horizons or {}).get(str(interval), horizon)
+            cur.execute(
+                """
+                SELECT count(*) >= %s, now() > %s + (%s * interval '1 millisecond')
+                FROM candles
+                WHERE symbol=%s AND interval=%s AND ts > %s
+                  AND ts <= %s + (%s * interval '1 millisecond')
+                """,
+                (h, captured_at, ms * h, symbol, interval, captured_at, captured_at, ms * h),
+            )
+            fila = cur.fetchone()
+            if fila is not None and not fila[0] and fila[1]:
+                total += 1
+    return total

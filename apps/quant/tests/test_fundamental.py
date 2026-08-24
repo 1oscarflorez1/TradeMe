@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from trademe_quant.fundamental import (
     DEFAULT_START,
+    MIN_COBERTURA,
     MIN_OBSERVACIONES,
     build_artifact,
+    cobertura,
     long_penalty,
     percentile_of,
     quantiles,
@@ -17,6 +19,16 @@ from trademe_quant.fundamental import (
 )
 
 MOMENTO = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
+
+
+def _muestras(valores: list[float], dias: int = 90) -> list[tuple[datetime, float]]:
+    """Reparte los valores de forma uniforme por los `dias` de la ventana.
+
+    Con 270 valores en 90 días salen las tres observaciones diarias que publica Binance, que es lo
+    que hay en producción cuando el símbolo tiene su histórico completo.
+    """
+    n = max(1, len(valores))
+    return [(MOMENTO - timedelta(days=int(i * dias / n)), v) for i, v in enumerate(valores)]
 
 
 def test_quantiles_cubren_el_rango_y_estan_ordenados() -> None:
@@ -65,15 +77,20 @@ def test_penalizacion_crece_hasta_uno() -> None:
 
 def test_artefacto_sin_muestra_suficiente_se_declara_stale() -> None:
     """Sin datos no se penaliza, no se adivina: la api lee `stale` y aplica 0."""
-    art = build_artifact("BTCUSDT", [0.0001] * (MIN_OBSERVACIONES - 1), MOMENTO)
+    pocos = [0.0001] * (MIN_OBSERVACIONES - 1)
+    # Ventana corta y cubierta al 100 %: así el único motivo posible es el tamaño de la muestra.
+    art = build_artifact(
+        "BTCUSDT", _muestras(pocos, dias=len(pocos)), MOMENTO, window_days=len(pocos)
+    )
     assert art["stale"] is True
+    assert art["cobertura"] == 1.0
     assert art["knots"] == []
     assert art["n"] == MIN_OBSERVACIONES - 1
 
 
 def test_artefacto_con_muestra_suficiente_publica_los_cortes() -> None:
-    valores = [i / 100_000 for i in range(MIN_OBSERVACIONES + 10)]
-    art = build_artifact("BTCUSDT", valores, MOMENTO)
+    valores = [i / 100_000 for i in range(270)]  # 3 al día x 90 días, como en producción
+    art = build_artifact("BTCUSDT", _muestras(valores), MOMENTO)
     assert art["stale"] is False
     assert len(art["knots"]) == 101
     assert art["symbol"] == "BTCUSDT"
@@ -82,8 +99,8 @@ def test_artefacto_con_muestra_suficiente_publica_los_cortes() -> None:
 
 
 def test_write_artifact_escribe_donde_la_api_lo_busca(tmp_path: Path) -> None:
-    valores = [i / 100_000 for i in range(MIN_OBSERVACIONES + 1)]
-    art = build_artifact("ETHUSDT", valores, MOMENTO)
+    valores = [i / 100_000 for i in range(270)]
+    art = build_artifact("ETHUSDT", _muestras(valores), MOMENTO)
     ruta = write_artifact(art, tmp_path)
     assert ruta == tmp_path / "fundamental" / "ETHUSDT.json"
     leido = json.loads(ruta.read_text(encoding="utf8"))
@@ -105,3 +122,28 @@ def test_el_percentil_sobrevive_al_cambio_de_regimen() -> None:
     assert percentile_of(agitado, funding) < 0.15
     assert long_penalty(percentile_of(tranquilo, funding)) > 0.7
     assert long_penalty(percentile_of(agitado, funding)) == 0.0
+
+
+def test_muestra_abundante_pero_ventana_a_medias_tambien_es_stale() -> None:
+    """El caso real de BTCUSDT: 120 observaciones —cuatro veces el mínimo— en 40 de 90 días.
+
+    Contar observaciones respondía «hay de sobra» a una pregunta que nadie había hecho. La que
+    importaba era de cuándo son: una distribución construida sobre menos de la mitad de la ventana
+    describe otro periodo, y su percentil deja de ser comparable con el de los demás símbolos.
+    """
+    art = build_artifact("BTCUSDT", _muestras([0.00005] * 120, dias=40), MOMENTO)
+
+    assert art["n"] > MIN_OBSERVACIONES, "la muestra sobra: el guardia viejo la dejaba pasar"
+    assert art["cobertura"] < MIN_COBERTURA
+    assert art["stale"] is True
+    assert art["knots"] == []
+
+
+def test_la_cobertura_cuenta_dias_distintos_no_la_distancia_entre_extremos() -> None:
+    """Un hueco en mitad de la ventana tiene que notarse.
+
+    Midiendo `max - min` una muestra con los extremos en su sitio y nada en medio parecería
+    completa, que es justo el fallo que se persigue.
+    """
+    extremos = [(MOMENTO, 0.0001), (MOMENTO - timedelta(days=89), 0.0001)]
+    assert cobertura([f for f, _ in extremos], window_days=90) < 0.05

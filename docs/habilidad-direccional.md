@@ -109,6 +109,22 @@ temporalidad y de cuándo se evaluó, no de cómo acabó.
 **Afecta a cualquier análisis que use `outcome_return_r` del histórico antiguo**, el entrenamiento
 del meta-modelo incluido.
 
+### Y reproducible no era lo mismo que correcto (0.55.0)
+
+Esa coincidencia perfecta desde el 6 de agosto decía menos de lo que parecía: la reevaluación pedía
+las velas igual que la evaluación original —`LIMIT h`, sin acotar en tiempo—, así que **verificador
+y verificado compartían el mismo defecto**. Coincidían porque los dos cogían las mismas velas
+equivocadas cuando había un hueco de ingesta.
+
+Repitiendo la comprobación con la ventana acotada en tiempo, de las 839 decisiones cerradas desde el
+6 de agosto **ninguna cambia de desenlace** —los toques registrados ocurrieron de verdad, y eso es
+lo importante— pero **343 no se habrían dado por cerradas**, porque a su ventana le faltan velas: el
+toque que las cerró caía fuera del horizonte que les correspondía.
+
+La lección se parece a las otras del proyecto: una comprobación solo vale si puede fallar por el
+motivo que se está buscando. Reevaluar con la misma consulta defectuosa no podía detectar un fallo
+que estaba en la consulta.
+
 ## Qué se puede hacer con esto
 
 No se ha tocado nada de producción: esto es una medición. Lo que abre, por orden de lo más directo a

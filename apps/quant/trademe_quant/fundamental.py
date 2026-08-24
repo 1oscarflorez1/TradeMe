@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,17 @@ DEFAULT_WINDOW_DAYS = 90
 #: Mínimo de observaciones para que la distribución signifique algo. Por debajo, el score se
 #: declara `stale` y la penalización es 0: sin datos no se penaliza, no se adivina.
 MIN_OBSERVACIONES = 30
+#: Fracción de la ventana que debe estar realmente cubierta. Contar observaciones no basta: son
+#: dos preguntas distintas y solo una estaba hecha. BTCUSDT llegó a publicar 120 observaciones
+#: —muy por encima de las 30— repartidas por **40 de los 90 días**, porque nunca se le hizo el
+#: backfill que sí recibieron los demás. Su distribución describía otro periodo, así que su tercil
+#: bajo quedó en +5,0e-5 frente al +2,0e-5 de ETHUSDT: con el mismo funding real, uno penalizaba
+#: el largo y el otro no. Un percentil solo compara si las ventanas comparan.
+#:
+#: El 0,8 se fija mirando lo que ya está dentro, no el resultado que interesa: los tres símbolos
+#: con backfill cubren el 100 % de la ventana, así que el listón les deja 20 puntos de margen y
+#: solo excluye al que de verdad está incompleto.
+MIN_COBERTURA = 0.8
 #: Número de cortes publicados (p0, p1, ... p100).
 N_KNOTS = 101
 
@@ -115,43 +127,66 @@ def quantiles(valores: list[float], n: int = N_KNOTS) -> list[float]:
     return out
 
 
+def cobertura(fechas: Sequence[datetime], window_days: int = DEFAULT_WINDOW_DAYS) -> float:
+    """Fracción de días de la ventana con al menos una observación.
+
+    Se cuentan **días distintos**, no la distancia entre la primera y la última: así un hueco en
+    mitad de la ventana también se nota, que es de donde vino el problema.
+    """
+    if not fechas or window_days <= 0:
+        return 0.0
+    dias = {f.date() for f in fechas}
+    return min(1.0, len(dias) / float(window_days))
+
+
 def funding_window(
     dsn: str, symbol: str, momento: datetime, window_days: int = DEFAULT_WINDOW_DAYS
-) -> list[float]:
-    """Funding **conocido** en `momento` durante los `window_days` previos.
+) -> list[tuple[datetime, float]]:
+    """Funding **conocido** en `momento` durante los `window_days` previos, con su fecha.
 
     Filtra por `published_at`, igual que `dil.store.as_of`. Con `observed_at` la ventana incluiría
     valores que en ese instante todavía no se habían publicado: look-ahead silencioso, del que no
     falla sino que mejora los resultados.
+
+    Devuelve la fecha junto al valor porque sin ella no se puede saber si la ventana está cubierta,
+    y esa pregunta —distinta de «¿hay bastantes observaciones?»— es la que faltaba.
     """
     import psycopg
 
     desde = momento - timedelta(days=window_days)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT value FROM derivatives_metrics "
+            "SELECT published_at, value FROM derivatives_metrics "
             "WHERE metric='funding_rate' AND symbol=%s "
             "AND published_at <= %s AND published_at > %s "
             "ORDER BY published_at",
             (symbol, momento, desde),
         )
         filas = cur.fetchall()
-    return [float(f[0]) for f in filas if f[0] is not None]
+    return [(f[0], float(f[1])) for f in filas if f[1] is not None]
 
 
 def build_artifact(
     symbol: str,
-    valores: list[float],
+    muestras: Sequence[tuple[datetime, float]],
     momento: datetime,
     window_days: int = DEFAULT_WINDOW_DAYS,
     start: float = DEFAULT_START,
 ) -> dict[str, Any]:
     """Artefacto publicable: la distribución de referencia, no una decisión.
 
-    `stale=True` cuando no hay muestra suficiente. La api lo respeta poniendo la penalización a 0:
-    una fuente muda no debe empujar la decisión en ninguna dirección, y menos disimuladamente.
+    `stale=True` cuando no hay muestra suficiente **o** la ventana no está cubierta. La api lo
+    respeta poniendo la penalización a 0: una fuente muda no debe empujar la decisión en ninguna
+    dirección, y menos disimuladamente.
+
+    Son dos condiciones y no una porque miden cosas distintas: `n` dice cuántos datos hay y
+    `cobertura` dice de cuándo son. Una muestra abundante pero concentrada en medio periodo
+    describe un mercado que no es el de la ventana, y el percentil que sale de ahí no es comparable
+    con el de otro símbolo — ver `MIN_COBERTURA`.
     """
-    suficiente = len(valores) >= MIN_OBSERVACIONES
+    valores = [v for _, v in muestras]
+    cob = cobertura([f for f, _ in muestras], window_days)
+    suficiente = len(valores) >= MIN_OBSERVACIONES and cob >= MIN_COBERTURA
     return {
         "version": f"fund-{momento.strftime('%Y%m%dT%H%M%SZ')}",
         "symbol": symbol,
@@ -159,6 +194,8 @@ def build_artifact(
         "window_days": window_days,
         "n": len(valores),
         "min_observaciones": MIN_OBSERVACIONES,
+        "cobertura": round(cob, 4),
+        "min_cobertura": MIN_COBERTURA,
         "stale": not suficiente,
         "start": start,
         "knots": quantiles(valores) if suficiente else [],

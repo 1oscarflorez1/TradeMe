@@ -54,6 +54,37 @@ fuente caída y una fuente sin novedades son indistinguibles, y el sistema creer
 informado llevando días a ciegas. Es lo que permitirá en M12 **bajar la confianza** del score en vez
 de fingir que todo va bien.
 
+### Responder no es informar
+
+`data_sources` resuelve la mitad de esa frase. Registra si la descarga funcionó y cuántas filas
+trajo, y con eso una fuente **estancada** sigue siendo idéntica a una sana: el BCE devolvía sus 48
+filas cada doce horas —las mismas 48— y figuraba con 33 pasadas correctas y cero errores mientras su
+serie de IPC llevaba **siete meses sin avanzar**. El ingestor no fallaba; «sana» se estaba midiendo
+como «el grifo se abre» en vez de «sale agua nueva».
+
+`dil/frescura.py` hace la otra pregunta: cuánto lleva callada cada serie frente a su periodicidad de
+**publicación** —no la de consulta, que es otra cosa—. El funding sale cada 8 h, así que un día mudo
+son tres publicaciones perdidas; el IPC es mensual y llega con 17 días de retraso, de modo que se le
+toleran 45 días sin dar falsos positivos. Lo que pasa del umbral se registra en el log del piloto y
+levanta alerta.
+
+No guarda estado nuevo: el `observed_at` más reciente ya está en la tabla, así que se consulta en
+vez de duplicarse.
+
+Una serie sin umbral declarado se deja pasar en vez de inventarle uno. Y conviene declararla con el
+nombre con el que **se guarda**: el índice de miedo y codicia usa `scope='cripto'`, así que anotarlo
+como `fear_greed` no vigilaba nada — una clave que no existe nunca dispara, y no avisar se ve igual
+que ir bien.
+
+### La cobertura no depende de que alguien se acuerde
+
+El relleno retroactivo de la sección siguiente existía desde M11 y funcionaba. Lo que no existía era
+quien lo llamara solo. Cuando se incorporaron los activos nuevos se les reconstruyó el histórico a
+mano y a BTCUSDT no, porque el sondeo ya le daba datos: acabó con **120 observaciones repartidas por
+40 de los 90 días** de ventana frente a las 270 de los demás. `dil.asegurar_cobertura_funding`
+comprueba y repara la ventana de cada símbolo en cada ciclo, y no pide nada a Binance si ya está
+cubierta.
+
 ## Relleno retroactivo, y la primera hipótesis comprobada
 
 Binance publica el histórico de funding, así que se puede **reconstruir el contexto de decisiones ya

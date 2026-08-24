@@ -107,3 +107,45 @@ def backfill_funding(dsn: str, symbol: str, desde: Any, hasta: Any) -> int:
     n = store(dsn, p, registros)
     mark_health(dsn, p.id, n)
     return n
+
+
+def asegurar_cobertura_funding(
+    dsn: str, symbols: list[str], window_days: int = 90, ahora: Any = None
+) -> list[str]:
+    """Rellena el histórico de funding que le falte a cada símbolo. Sin que nadie se acuerde.
+
+    El backfill existía desde M11 y funcionaba; lo que no existía era quien lo llamara por su
+    cuenta. Cuando se añadieron los activos nuevos se les reconstruyó el histórico a mano y a
+    BTCUSDT no, porque el sondeo ya le daba datos: acabó con **120 observaciones repartidas por 40
+    de los 90 días** de ventana frente a las 270 de los demás, y su tercil de referencia quedó en
+    otro sitio. Con el mismo funding real, unos símbolos penalizaban el largo y BTCUSDT no.
+
+    Es el mismo fallo que el de `default_providers(["BTCUSDT"])` cableado, y por la misma razón: la
+    cobertura dependía de la memoria de alguien. Aquí deja de depender — se comprueba y se repara
+    en cada ciclo, que es lo único que no se olvida.
+
+    Solo pide lo que falta: si la ventana ya está cubierta no se llama a Binance.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from ..fundamental import MIN_COBERTURA, cobertura, funding_window
+
+    momento = ahora or datetime.now(tz=UTC)
+    log: list[str] = []
+    for symbol in symbols:
+        sym = symbol.upper()
+        try:
+            muestras = funding_window(dsn, sym, momento, window_days)
+            cob = cobertura([f for f, _ in muestras], window_days)
+            if cob >= MIN_COBERTURA:
+                continue
+            desde = momento - timedelta(days=window_days)
+            n = backfill_funding(dsn, sym, desde, momento)
+            nuevas = funding_window(dsn, sym, momento, window_days)
+            ahora_cob = cobertura([f for f, _ in nuevas], window_days)
+            log.append(
+                f"{sym}: cobertura {cob:.0%} -> {ahora_cob:.0%} ({n} observaciones reconstruidas)"
+            )
+        except Exception as err:  # noqa: BLE001 - un símbolo sin perpetuo no tumba a los demás
+            log.append(f"{sym}: no se pudo reconstruir el funding ({err})")
+    return log
