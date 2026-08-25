@@ -236,18 +236,23 @@ def decide_mode(current: str, ev: dict[str, Any], max_mode: str = "active") -> t
     return current, "sin cambios"
 
 
-def fetch_rows(dsn: str) -> list[dict[str, Any]]:
+def fetch_rows(
+    dsn: str, solo_reproducibles: bool = True, horizons: dict[str, int] | None = None
+) -> list[dict[str, Any]]:
     """Decisiones LONG cerradas que además registraron la sombra del score.
 
     Se deduplica por símbolo, temporalidad y vela: la captura repetida de una misma vela no son
     observaciones independientes, y sin esto una situación repetida pesaría varias veces.
+
+    Y se filtra por reproducibilidad del desenlace, por la misma razón que se deduplica: lo que no
+    mide lo que dice medir no debería contar.
     """
     import psycopg
 
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute("""SELECT * FROM (
                  SELECT DISTINCT ON (symbol, interval, candle_open)
-                        symbol, action, fund_shadow_action, fund_penalty,
+                        id, symbol, action, fund_shadow_action, fund_penalty,
                         outcome_return_r, captured_at
                    FROM snapshots
                   WHERE direction = 'LONG'
@@ -256,6 +261,7 @@ def fetch_rows(dsn: str) -> list[dict[str, Any]]:
                   ORDER BY symbol, interval, candle_open, captured_at ASC
                ) t ORDER BY captured_at ASC""")
         columnas = [
+            "id",
             "symbol",
             "action",
             "fund_shadow_action",
@@ -263,7 +269,18 @@ def fetch_rows(dsn: str) -> list[dict[str, Any]]:
             "outcome_return_r",
             "captured_at",
         ]
-        return [dict(zip(columnas, r, strict=True)) for r in cur.fetchall()]
+        filas = [dict(zip(columnas, r, strict=True)) for r in cur.fetchall()]
+
+    # Mismo criterio que el resto de estudios: un desenlace escrito con otra regla de evaluación
+    # no mide lo mismo, y aquí decide si el Fundamental Score sale de sombra. Ver `evaluacion.py`.
+    if solo_reproducibles:
+        from .evaluacion import ids_reproducibles
+
+        fiables = ids_reproducibles(dsn, horizons)
+        filas = [f for f in filas if f["id"] in fiables]
+    for f in filas:
+        f.pop("id", None)
+    return filas
 
 
 def load_policy(artifacts: Path) -> dict[str, Any]:

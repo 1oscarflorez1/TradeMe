@@ -346,6 +346,22 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin datos externos el motor decide igual que hoy
         log.append(f"error datos externos: {err}")
 
+    # Salud del histórico: cuántos desenlaces guardados se reproducen con la regla vigente. Es lo
+    # que los estudios usan para filtrar, así que conviene verlo bajar o subir — sube al rellenar
+    # huecos, y bajaría de golpe si alguien volviera a cambiar la regla de evaluación sin darse
+    # cuenta de que el histórico deja de ser comparable consigo mismo.
+    try:
+        from .evaluacion import resumir, veredictos
+
+        r = resumir(veredictos(dsn))
+        if r.total:
+            log.append(
+                f"histórico: {r.reproducibles}/{r.total} desenlaces reproducibles "
+                f"({r.fraccion:.0%}); {r.sin_ventana} sin ventana, {r.discrepantes} discrepantes"
+            )
+    except Exception as err:  # noqa: BLE001 - un diagnóstico que falla no tumba el ciclo
+        log.append(f"error reproducibilidad: {err}")
+
     # Y acto seguido la otra pregunta, la que `data_sources` no responde: ¿alguna de esas fuentes
     # lleva callada más de lo que le toca? El BCE figuraba con 33 pasadas correctas y cero errores
     # mientras su IPC llevaba siete meses sin moverse. Responder «sí» a «¿funcionó la descarga?» no

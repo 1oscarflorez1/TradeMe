@@ -18,8 +18,14 @@ Y no coinciden en todas, por un motivo que conviene tener presente más allá de
 histórico contiene desenlaces evaluados con dos reglas distintas**. El horizonte por temporalidad
 (`horizon_by_tf`) se introdujo en M10.5; antes eran 20 velas fijas para todo. Medido el 23 de agosto
 de 2026, 248 de 1.218 decisiones no se reproducen, **todas anteriores al 6 de agosto**, y las velas
-disponibles en ellas son exactamente 15, 18, 25 y 30 — los valores nuevos del mapa. Desde esa fecha
-la coincidencia es perfecta: 0 de 673.
+disponibles en ellas son exactamente 15, 18, 25 y 30 — los valores nuevos del mapa.
+
+Aquella medición decía que desde esa fecha la coincidencia era perfecta (0 de 673), y **decía menos
+de lo que parecía**: las velas se pedían con `LIMIT h` sin acotar en tiempo, igual que la evaluación
+original, así que verificador y verificado compartían el mismo defecto y coincidían por repetir el
+error. Con la ventana acotada (0.55.0) la cifra cambia: de las 839 cerradas desde el 6 de agosto,
+ninguna cambia de desenlace pero 343 no tenían ventana completa. Una comprobación solo vale si puede
+fallar por el motivo que se busca.
 
 Así que el estudio **se queda solo con lo reproducible** y dice cuánto descarta. Descartar por no
 poder reproducir no sesga el veredicto: el horizonte de una decisión depende de su temporalidad y de
@@ -61,6 +67,13 @@ def horizontes(artifacts: Any = None) -> dict[str, int]:
         return {}
 
 
+def _ms(interval: str) -> int:
+    """Duración de la vela: sin ella no se puede acotar la ventana ni juzgar nada."""
+    from .market.normalize import INTERVAL_MS
+
+    return INTERVAL_MS.get(interval, 900_000)
+
+
 def recoger(dsn: str, h_por_tf: dict[str, int]) -> list[dict[str, Any]]:
     """Cada decisión cerrada, con su desenlace real, el reevaluado y el del plan espejo."""
     import psycopg
@@ -80,11 +93,16 @@ def recoger(dsn: str, h_por_tf: dict[str, int]) -> list[dict[str, Any]]:
 
         for sid, symbol, interval, capturada, direction, entry, stop, tp, r_real in pendientes:
             h = h_por_tf.get(str(interval), HORIZONTE_POR_DEFECTO)
+            # Acotada en TIEMPO, igual que la evaluación real desde 0.55.0. Pedirlas con `LIMIT h`
+            # a secas era lo que hacía que este estudio se declarase «coherente»: verificador y
+            # verificado compartían el mismo defecto, así que coincidían por repetir el error.
             with conn.cursor() as cur:
                 cur.execute(
                     """SELECT high, low, close FROM candles
-                       WHERE symbol=%s AND interval=%s AND ts > %s ORDER BY ts LIMIT %s""",
-                    (symbol, interval, capturada, h),
+                       WHERE symbol=%s AND interval=%s AND ts > %s
+                         AND ts <= %s + (%s * interval '1 millisecond')
+                       ORDER BY ts LIMIT %s""",
+                    (symbol, interval, capturada, capturada, _ms(str(interval)) * h, h),
                 )
                 futuro = cur.fetchall()
             if not futuro:

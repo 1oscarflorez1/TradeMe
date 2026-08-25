@@ -41,8 +41,18 @@ SNAPSHOT_COLUMNS = [
 ]
 
 
-def fetch_rows(dsn: str) -> list[dict[str, Any]]:
-    """Snapshots evaluados (TP/SL) ordenados por fecha: el dataset del meta-modelo."""
+def fetch_rows(
+    dsn: str, solo_reproducibles: bool = True, horizons: dict[str, int] | None = None
+) -> list[dict[str, Any]]:
+    """Snapshots evaluados (TP/SL) ordenados por fecha: el dataset del meta-modelo.
+
+    Filtra por **reproducibilidad**, no por fecha: el histórico mezcla reglas de evaluación y un
+    desenlace escrito con otra regla no es un dato antiguo, es otra medición. Entrenar con ellos
+    enseña al bosque una relación que no existió. Ver `evaluacion.py`.
+
+    `id` se arrastra solo para poder filtrar y se retira antes de devolver: como `symbol`, no es
+    una feature y meterlo como tal enseñaría al bosque a memorizar registros concretos.
+    """
     import psycopg
 
     cols = ", ".join(SNAPSHOT_COLUMNS)
@@ -60,11 +70,20 @@ def fetch_rows(dsn: str) -> list[dict[str, Any]]:
             #
             # El envoltorio devuelve el orden cronológico, que es el que necesita la división
             # temporal del entrenamiento (si no, se entrenaría con el futuro).
-            f"SELECT * FROM (SELECT DISTINCT ON (symbol, interval, candle_open) {cols} "  # noqa: S608
+            f"SELECT * FROM (SELECT DISTINCT ON (symbol, interval, candle_open) id, {cols} "  # noqa: S608
             "FROM snapshots WHERE outcome_result IN ('tp','sl') "
             "ORDER BY symbol, interval, candle_open, captured_at ASC) t ORDER BY captured_at ASC"
         )
-        return [dict(zip(SNAPSHOT_COLUMNS, r, strict=False)) for r in cur.fetchall()]
+        filas = [dict(zip(["id", *SNAPSHOT_COLUMNS], r, strict=False)) for r in cur.fetchall()]
+
+    if solo_reproducibles:
+        from .evaluacion import ids_reproducibles
+
+        fiables = ids_reproducibles(dsn, horizons)
+        filas = [f for f in filas if f["id"] in fiables]
+    for f in filas:
+        f.pop("id", None)
+    return filas
 
 
 def fetch_shadow_rows(dsn: str, limit: int = 500) -> list[dict[str, Any]]:
