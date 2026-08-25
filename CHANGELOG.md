@@ -7,6 +7,57 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.56.0] — 2026-08-24
+
+> **BTCUSDT 1m tenía el 31 % de sus velas.** La api persiste solo lo que ve pasar por el stream, así
+> que cada rato con el proceso parado dejaba un agujero que nadie volvía a llenar.
+
+### Fixed — Las velas que nunca llegaron se recuperan de Binance
+
+- `huecos.py` detecta los tramos que faltan, los pide por REST acotando `startTime`/`endTime` y los
+  guarda con el upsert idempotente de siempre. El piloto lo hace **antes** de evaluar desenlaces:
+  las velas recuperadas son justamente las que faltaban para poder cerrarlos.
+- `fetch_klines` acepta `start_ms` y `end_ms`. Sin ellos Binance devuelve siempre lo más reciente y
+  no había forma de pedir el trozo que falta.
+- `detect_gaps` llevaba desde el principio en `market/normalize.py`, con test y sin que nadie la
+  llamara — el mismo patrón que `backfill_funding` y que `dil.store.as_of`. La pieza estaba; faltaba
+  quien la usara.
+
+### Tres límites deliberados
+
+- **Solo huecos interiores**, entre la primera y la última vela existentes. Extender la serie hacia
+  atrás es otro hito: el backtest crece con el **cuadrado** del número de velas, así que multiplicar
+  por diez la ventana multiplica por cien el tiempo del piloto. Se lineariza antes, no después.
+- **Solo símbolos de Binance**, leído de `watchlist.provider`. En una acción un hueco no es un
+  fallo, es que la bolsa estaba cerrada; rellenarlo inventaría sesiones que no existieron.
+- **Presupuesto de 20 peticiones por ciclo**, atacando primero los huecos mayores, que son los que
+  más evaluaciones bloquean.
+
+### Lo que se midió
+
+| símbolo · tf | velas que había | de las suyas | faltaban |
+|---|---|---|---|
+| BTCUSDT 1m | 11.099 | 36.037 | **24.938** |
+| BTCUSDT 5m | 2.219 | 7.207 | 4.988 |
+| ETH · SOL · BNB 1m | 3.786 c/u | 7.994 | 4.208 c/u |
+
+Unas **50.000 velas** en total, que se recuperan con unas **66 peticiones**.
+
+**La causa, confirmada con datos:** los huecos son simultáneos en los cuatro símbolos. El de 24 h
+del 20 de agosto aparece a la vez en BTCUSDT, ETHUSDT, SOLUSDT y BNBUSDT; el de 15 h del día 24, en
+los cuatro con un minuto de diferencia. No se cae el stream de un activo — se para el proceso.
+
+**Verificado contra la API real de Binance**, no solo con dobles: el hueco mayor —4.266 velas, 2
+días y 23 horas— se recupera **entero**, sin duplicados, todas dentro del rango y sin una sola vela
+que Binance no tuviera. Las cinco peticiones que costó coinciden con la estimación del presupuesto.
+
+### Verificado y no verificado
+
+- Verificado: la detección de huecos contra la base de datos, y el relleno de extremo a extremo
+  contra Binance con un sink en memoria.
+- **Sin verificar**: el ciclo completo del piloto escribiendo en la base de datos de producción. Se
+  verá en el primer ciclo tras el despliegue, en la línea `huecos:` del log.
+
 ## [0.55.0] — 2026-08-24
 
 > Cuatro guardias que medían la unidad equivocada. Ninguno estaba mal escrito: todos comprobaban

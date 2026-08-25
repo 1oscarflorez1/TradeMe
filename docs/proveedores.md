@@ -83,6 +83,36 @@ siempre pasa por un presupuesto de peticiones para no agotar el plan gratuito.
 Es el proveedor con el que nació TradeMe y sigue siendo el preferente. Catálogo completo de spot
 (`exchangeInfo`, caché de 6 h), velas por WebSocket, histórico por REST. No requiere registro.
 
+#### Las velas que nunca llegaron
+
+La api persiste **solo lo que ve pasar**: `onCandle` escribe la vela cuando el stream la cierra. Si
+el proceso no está corriendo —la máquina apagada, un reinicio, un despliegue— esas velas no las
+guarda nadie y nadie volvía nunca a por ellas.
+
+No es un fallo de reconexión que se pueda arreglar en el stream: es una condición del despliegue.
+Se nota en que los huecos son **simultáneos en todos los símbolos** —el de 24 h del 20 de agosto de
+2026 está en BTCUSDT, ETHUSDT, SOLUSDT y BNBUSDT a la vez—, porque no se cae el stream de un
+activo, se para el proceso entero.
+
+Costaba más de lo que parecía. Medido el 24-ago-2026, **BTCUSDT 1m tenía 11.099 velas de las
+36.037** de su propio rango: un 31 %. Y la evaluación de desenlaces lee de aquí, así que **343 de
+las 839** decisiones cerradas desde el 6 de agosto no tenían ventana completa.
+
+Desde 0.56.0 el piloto lo compensa (`huecos.py`): detecta los tramos que faltan, los pide a Binance
+por REST acotando `startTime`/`endTime`, y los guarda con el mismo upsert idempotente de siempre.
+Tres decisiones que conviene conocer:
+
+- **Solo huecos interiores**, entre la primera y la última vela que ya existen. Extender la serie
+  hacia atrás es otra cosa: alargar la ventana tiene un coste que hay que medir antes, porque el
+  backtest crece con el **cuadrado** del número de velas.
+- **Solo símbolos de Binance**, leído de `watchlist.provider`. En una acción un hueco no es un
+  fallo, es que la bolsa estaba cerrada, y rellenarlo inventaría sesiones que no existieron.
+- **Con presupuesto por ciclo** (20 peticiones), atacando primero los huecos más grandes, que son
+  los que más evaluaciones bloquean. Ponerse al día desde cero costaba unas 66 peticiones.
+
+Verificado contra la API real: el hueco mayor —4.266 velas, 2 días y 23 horas— se recupera entero,
+sin duplicados y sin una sola vela que Binance no tuviera.
+
 ### Twelve Data — acciones, divisas, índices y ETF
 
 Se activa poniendo una clave gratuita en el `.env`:

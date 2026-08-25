@@ -92,14 +92,25 @@ envía las alertas Reditum por webhook, pero no publica API de velas para tercer
 
 ## Deuda técnica conocida
 
-**La plataforma se describe a sí misma en cuatro sitios escritos a mano** y hay que acordarse de
-tocarlos todos en cada entrega: `NewsView.tsx`, `HelpView.tsx`, `Asistente.tsx` y
-`assistant/context.ts`. El único al día es `CHANGELOG.md`, porque sí está en el checklist del PR.
+**Resuelta la de las cuatro copias a mano** (comprobado el 24-ago-2026). La plataforma ya no se
+describe a sí misma en sitios que envejecen por su cuenta:
 
-Distinción importante al resolverlo: **Novedades y el historial del asistente sí deben derivarse
-del CHANGELOG**; el **Centro de ayuda no** — es documentación conceptual, no un registro de
-cambios. Para Ayuda, la vía correcta es que el asistente lea `docs/`, no una copia dentro del
-código.
+- **Novedades** (`NewsView.tsx`) lee el CHANGELOG vía `GET /releases`. No tiene nada propio que
+  desviarse, y CI comprueba que la versión de los `package.json` coincide con la primera entrada.
+- **El asistente** tiene `cambios_de_version` (sobre el CHANGELOG) y `consultar_documentacion`
+  (sobre `docs/`), y el prompt le prohíbe responder de memoria sobre ambas cosas.
+- **El Centro de ayuda** se quedó como documentación conceptual, que es lo que debía ser: no es un
+  registro de cambios y no debe derivarse del CHANGELOG.
+
+Lo que esto implica al entregar: **la documentación conceptual vive en `docs/`**, y hay que
+actualizarla ahí cuando un hito cambia cómo funciona algo por dentro. El asistente la lee de ahí, así
+que un `docs/` desactualizado se convierte en un asistente que miente con seguridad.
+
+**El backtest es cuadrático en el número de velas.** `decide()` llama a `compute_readings(high[:t+1],
+…)` en cada vela y los `*_last()` recorren la serie entera: 250→500→1000 velas cuesta 0,03→0,14→0,46
+s (×4 el tiempo al ×2 las velas). Multiplicar por diez la ventana multiplicaría por cien el tiempo
+del piloto, de ~9 minutos a más de 15 horas. **Linealizar antes de alargar ninguna ventana** — los
+indicadores son incrementales por naturaleza.
 
 ---
 
