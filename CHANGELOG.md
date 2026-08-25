@@ -23,6 +23,17 @@ y [Versionado Semántico](https://semver.org/lang/es/).
   llamara — el mismo patrón que `backfill_funding` y que `dil.store.as_of`. La pieza estaba; faltaba
   quien la usara.
 
+### Changed — El sink de velas escribe por lotes
+
+- `PgCandleSink` acumula y compromete cada **500 velas** con `executemany`, en vez de un commit por
+  vela. Era irrelevante mientras solo servía para sembrar unos cientos; con el relleno pasan decenas
+  de miles por ciclo y cada commit es un viaje de ida y vuelta. Un ciclo de 20.000 velas baja de
+  20.000 commits a 40.
+- `close()` compromete lo que quede antes de cerrar, y la conexión se cierra pase lo que pase. Quien
+  necesite que algo esté en disco antes de tiempo tiene `flush()`.
+- Lo que se pierde si el proceso muere a media tanda son como mucho 499 velas, y el ciclo siguiente
+  vuelve a por ellas: el upsert es idempotente.
+
 ### Tres límites deliberados
 
 - **Solo huecos interiores**, entre la primera y la última vela existentes. Extender la serie hacia

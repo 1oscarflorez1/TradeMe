@@ -98,3 +98,83 @@ def test_rellenar_se_corta_si_la_api_deja_de_avanzar(monkeypatch: Any) -> None:
 
     rellenar_hueco("dsn-falso", Hueco("BTCUSDT", "1m", 0, 100 * MIN), sink=_SinkFalso())
     assert llamadas["n"] <= 2
+
+
+class _ConexionFalsa:
+    """Doble de psycopg: registra los `executemany` y los commits."""
+
+    def __init__(self) -> None:
+        self.lotes: list[int] = []
+        self.commits = 0
+        self.cerrada = False
+
+    def cursor(self) -> Any:
+        conexion = self
+
+        class _Cur:
+            def __enter__(self) -> Any:
+                return self
+
+            def __exit__(self, *_: object) -> None:
+                return None
+
+            def executemany(self, sql: str, filas: list[Any]) -> None:
+                conexion.lotes.append(len(filas))
+
+        return _Cur()
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    def close(self) -> None:
+        self.cerrada = True
+
+
+def _sink_falso(monkeypatch: Any, lote: int) -> tuple[Any, _ConexionFalsa]:
+    """`psycopg` no está instalado en el entorno de tests —de ahí los imports perezosos del
+    proyecto—, así que se inyecta un módulo falso en su lugar."""
+    import sys
+    import types
+
+    from trademe_quant.db import PgCandleSink
+
+    conexion = _ConexionFalsa()
+    modulo = types.ModuleType("psycopg")
+    modulo.connect = lambda *_a, **_k: conexion  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "psycopg", modulo)
+    return PgCandleSink("dsn-falso", lote=lote), conexion
+
+
+def _vela(i: int) -> Any:
+    from trademe_quant.market.normalize import Candle
+
+    return Candle("BTCUSDT", "1m", i * MIN, 1.0, 2.0, 0.5, 1.5, 10.0, i * MIN + MIN - 1, True)
+
+
+def test_el_sink_agrupa_las_velas_en_lotes(monkeypatch: Any) -> None:
+    """Un commit por vela eran decenas de miles de viajes por ciclo de relleno."""
+    sink, conexion = _sink_falso(monkeypatch, lote=100)
+    for i in range(250):
+        sink.write(_vela(i))
+
+    assert conexion.lotes == [100, 100], "debe comprometer al llenarse el lote, no al escribir"
+    assert conexion.commits == 2
+
+
+def test_al_cerrar_no_se_queda_nada_sin_escribir(monkeypatch: Any) -> None:
+    sink, conexion = _sink_falso(monkeypatch, lote=100)
+    for i in range(250):
+        sink.write(_vela(i))
+    sink.close()
+
+    assert sum(conexion.lotes) == 250, "las 50 de la última tanda no pueden perderse"
+    assert conexion.cerrada is True
+
+
+def test_cerrar_sin_nada_pendiente_no_compromete_de_mas(monkeypatch: Any) -> None:
+    sink, conexion = _sink_falso(monkeypatch, lote=100)
+    sink.close()
+
+    assert conexion.lotes == []
+    assert conexion.commits == 0
+    assert conexion.cerrada is True
