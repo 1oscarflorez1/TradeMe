@@ -13,33 +13,59 @@ ON CONFLICT (symbol, interval, ts) DO UPDATE SET
 """
 
 
-class PgCandleSink:
-    """Sink que persiste velas en TimescaleDB vía psycopg (import perezoso)."""
+#: Velas por lote. Un commit por vela era irrelevante mientras el sink solo servía para sembrar unos
+#: cientos; con el relleno de huecos pasan decenas de miles por ciclo y cada commit es un viaje de
+#: ida y vuelta. Quinientas caben de sobra en un `executemany` y acotan lo que se pierde si el
+#: proceso muere a media tanda — que no es gran cosa, porque el upsert es idempotente y el ciclo
+#: siguiente vuelve a por ellas.
+LOTE_VELAS = 500
 
-    def __init__(self, dsn: str) -> None:
+
+class PgCandleSink:
+    """Sink que persiste velas en TimescaleDB vía psycopg (import perezoso).
+
+    Escribe **por lotes**: `write` acumula y comprometer ocurre cada `lote` velas y al cerrar. Quien
+    necesite que algo esté en disco antes de tiempo, que llame a `flush`.
+    """
+
+    def __init__(self, dsn: str, lote: int = LOTE_VELAS) -> None:
         import psycopg
 
         self._conn: Any = psycopg.connect(dsn)
+        self._lote = max(1, lote)
+        self._pendientes: list[tuple[Any, ...]] = []
 
     def write(self, candle: Candle) -> None:
-        with self._conn.cursor() as cur:
-            cur.execute(
-                _UPSERT,
-                (
-                    candle.symbol,
-                    candle.interval,
-                    candle.open_time,
-                    candle.open,
-                    candle.high,
-                    candle.low,
-                    candle.close,
-                    candle.volume,
-                ),
+        self._pendientes.append(
+            (
+                candle.symbol,
+                candle.interval,
+                candle.open_time,
+                candle.open,
+                candle.high,
+                candle.low,
+                candle.close,
+                candle.volume,
             )
+        )
+        if len(self._pendientes) >= self._lote:
+            self.flush()
+
+    def flush(self) -> None:
+        """Compromete lo acumulado. Idempotente: sin nada pendiente no hace nada."""
+        if not self._pendientes:
+            return
+        with self._conn.cursor() as cur:
+            cur.executemany(_UPSERT, self._pendientes)
         self._conn.commit()
+        self._pendientes.clear()
 
     def close(self) -> None:
-        self._conn.close()
+        """Cierra, comprometiendo antes lo que quede. La conexión se cierra pase lo que pase."""
+        try:
+            self.flush()
+        finally:
+            self._conn.close()
 
 
 def save_backtest(dsn: str, symbol: str, interval: str, result: dict[str, Any]) -> None:

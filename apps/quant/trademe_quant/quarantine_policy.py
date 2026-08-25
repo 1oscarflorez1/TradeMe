@@ -336,8 +336,16 @@ def save_policy(artifacts: Path, decisiones: dict[str, dict[str, Any]]) -> dict[
     return data
 
 
-def fetch_expedientes(dsn: str) -> tuple[dict[str, list[dict[str, Any]]], Poblacion]:
-    """Expedientes por clave y, de la misma consulta, la población para la nula."""
+def fetch_expedientes(
+    dsn: str, solo_reproducibles: bool = True, horizons: dict[str, int] | None = None
+) -> tuple[dict[str, list[dict[str, Any]]], Poblacion]:
+    """Expedientes por clave y, de la misma consulta, la población para la nula.
+
+    Se filtra por reproducibilidad **en las dos ramas**: aquí la sombra no es un adorno, es lo que
+    decide si una temporalidad vetada puede volver a operar. Un expediente construido sobre
+    desenlaces escritos con otra regla de evaluación es tan engañoso como un entrenamiento, con el
+    agravante de que su conclusión levanta o mantiene un veto. Ver `evaluacion.py`.
+    """
     import psycopg
 
     agrupado: dict[str, list[dict[str, Any]]] = {}
@@ -347,12 +355,30 @@ def fetch_expedientes(dsn: str) -> tuple[dict[str, list[dict[str, Any]]], Poblac
         # De la más reciente a la más antigua: el expediente se queda con las primeras, porque lo
         # que describe al sistema de hoy es lo que ha hecho últimamente, no su historia entera.
         cur.execute("""
-            SELECT symbol, interval, captured_at, outcome_return_r, shadow_outcome_return_r
+            SELECT id, symbol, interval, captured_at, outcome_return_r, shadow_outcome_return_r
               FROM snapshots
              WHERE outcome_return_r IS NOT NULL OR shadow_outcome_return_r IS NOT NULL
              ORDER BY captured_at DESC
             """)
-        for symbol, interval, capturada, real, sombra in cur.fetchall():
+        crudas = cur.fetchall()
+
+        fiables_real: set[Any] | None = None
+        fiables_sombra: set[Any] | None = None
+        if solo_reproducibles:
+            from .evaluacion import ids_reproducibles
+
+            fiables_real = ids_reproducibles(dsn, horizons, rama="real")
+            fiables_sombra = ids_reproducibles(dsn, horizons, rama="sombra")
+
+        for sid, symbol, interval, capturada, real, sombra in crudas:
+            # Cada rama se descarta por su cuenta: una fila puede tener el desenlace real fiable y
+            # el de sombra no, y viceversa.
+            if fiables_real is not None and sid not in fiables_real:
+                real = None
+            if fiables_sombra is not None and sid not in fiables_sombra:
+                sombra = None
+            if real is None and sombra is None:
+                continue
             agrupado.setdefault(f"{symbol}:{interval}", []).append(
                 {
                     "outcome_return_r": real,

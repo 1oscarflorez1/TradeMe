@@ -7,6 +7,59 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.57.0] — 2026-08-24
+
+> El histórico mezcla **tres** reglas de evaluación y cuatro consumidores se lo comían entero. Un
+> desenlace escrito con otra regla no es un dato antiguo: es otra medición.
+
+### Added — Criterio de reproducibilidad compartido
+
+- `evaluacion.py`: reevalúa cada decisión cerrada con la regla vigente y la compara con lo guardado.
+  Misma asimetría que la evaluación real —un toque es definitivo, un «timeout» exige horizonte
+  completo— y distingue los dos motivos de descarte, que no significan lo mismo: **sin ventana** se
+  arregla rellenando huecos, **discrepante** es un desenlace escrito con otra regla.
+- Cubre las **dos ramas**, real y sombra. En la cuarentena la sombra no es un adorno: es lo que
+  decide si una temporalidad vetada puede volver a operar.
+- **Se recalcula, no se marca.** El veredicto cambia con los datos: al rellenar huecos, una decisión
+  que hoy no reproduce pasa a reproducir en cuanto llegan sus velas. Una marca sería falsa mañana.
+- El piloto registra la salud del histórico cada ciclo.
+
+### Fixed — Los cuatro consumidores filtran
+
+`run_metamodel.fetch_rows`, `fundamental_policy.fetch_rows` y `quarantine_policy.fetch_expedientes`
+descartan lo no reproducible. En la cuarentena cada rama se descarta por su cuenta: una decisión
+puede tener el desenlace real fiable y el de sombra no.
+
+### Fixed — Había dos implementaciones de la misma regla, y una estaba mal
+
+`run_direccion_study.recoger` seguía pidiendo las velas con `LIMIT h` sin acotar en tiempo. Por eso
+declaraba «coincidencia perfecta desde el 6-ago: 0 de 673» — **verificador y verificado compartían
+el mismo defecto** y coincidían por repetir el error. Una comprobación solo vale si puede fallar por
+el motivo que se busca.
+
+### Lo que se midió
+
+Sobre las **1.042** decisiones cerradas con `tp`/`sl`:
+
+| | n | qué significa |
+|---|---|---|
+| reproducen | **564** | entran en los estudios |
+| sin toque en ventana | 467 | de ellas, **464 es solo que le faltan velas** |
+| discrepan | 11 | desenlace distinto con las velas completas |
+
+**Solo 14 de 1.042 son discrepancias genuinas.** Todo lo demás es falta de datos, no una medición
+equivocada — y se arregla solo cuando el relleno de huecos se ponga al día.
+
+**Predicción falsable:** la muestra del meta-modelo debería subir de 564 a cerca de 1.028 conforme
+avance el relleno. Si no sube, el relleno no está haciendo su trabajo, y la cifra está en el log del
+piloto cada ciclo para poder verlo.
+
+### Verificado y no verificado
+
+- Verificado contra la base de datos: las cifras de la tabla y que 464 de los 467 descartes son por
+  velas ausentes, replicando la regla del primer toque en SQL.
+- Sin verificar: el ciclo del piloto con el filtro puesto. Se verá en la línea `histórico:` del log.
+
 ## [0.56.0] — 2026-08-24
 
 > **BTCUSDT 1m tenía el 31 % de sus velas.** La api persiste solo lo que ve pasar por el stream, así
@@ -22,6 +75,17 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - `detect_gaps` llevaba desde el principio en `market/normalize.py`, con test y sin que nadie la
   llamara — el mismo patrón que `backfill_funding` y que `dil.store.as_of`. La pieza estaba; faltaba
   quien la usara.
+
+### Changed — El sink de velas escribe por lotes
+
+- `PgCandleSink` acumula y compromete cada **500 velas** con `executemany`, en vez de un commit por
+  vela. Era irrelevante mientras solo servía para sembrar unos cientos; con el relleno pasan decenas
+  de miles por ciclo y cada commit es un viaje de ida y vuelta. Un ciclo de 20.000 velas baja de
+  20.000 commits a 40.
+- `close()` compromete lo que quede antes de cerrar, y la conexión se cierra pase lo que pase. Quien
+  necesite que algo esté en disco antes de tiempo tiene `flush()`.
+- Lo que se pierde si el proceso muere a media tanda son como mucho 499 velas, y el ciclo siguiente
+  vuelve a por ellas: el upsert es idempotente.
 
 ### Tres límites deliberados
 
