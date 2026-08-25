@@ -169,6 +169,27 @@ def watchlist_symbols(dsn: str) -> list[str]:
         return []
 
 
+def watchlist_binance(dsn: str) -> list[str]:
+    """Solo los activos que sirve Binance, según la propia watchlist.
+
+    La distinción importa para los huecos de velas: en un mercado 24/7 una vela que falta es una
+    vela perdida, pero en una acción es que la bolsa estaba cerrada. Rellenar ahí inventaría
+    sesiones que no existieron, así que el criterio se lee de `watchlist.provider` en vez de
+    adivinarse por el nombre del símbolo.
+    """
+    import psycopg
+
+    try:
+        with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT symbol FROM watchlist "
+                "WHERE enabled = true AND provider = 'binance' ORDER BY added_at"
+            )
+            return [str(r[0]) for r in cur.fetchall()]
+    except Exception:  # noqa: BLE001 - sin watchlist no se rellena nada, que es lo prudente
+        return []
+
+
 def _dsn() -> str:
     return os.environ.get("DATABASE_URL", "postgresql://trademe:trademe@localhost:5432/trademe")
 
@@ -184,6 +205,22 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     log: list[str] = []
     dsn = _dsn()
     symbols = watchlist_symbols(dsn) or cfg.symbols
+
+    # Velas que nunca llegaron. La api solo persiste lo que ve pasar por el stream, así que cada
+    # rato con el proceso parado deja un agujero que nadie vuelve a llenar — y se nota en que los
+    # huecos son simultáneos en los cuatro símbolos. De ahí venía que 343 de 839 decisiones no
+    # tuvieran ventana completa. Va ANTES de evaluar desenlaces: las velas recuperadas son
+    # justamente las que faltaban para poder cerrarlos.
+    try:
+        from .huecos import rellenar as rellenar_huecos
+
+        cripto = watchlist_binance(dsn)
+        if cripto:
+            for linea in rellenar_huecos(dsn, cripto, cfg.intervals):
+                log.append(f"huecos: {linea}")
+    except Exception as err:  # noqa: BLE001 - sin relleno se sigue midiendo, solo que con menos
+        log.append(f"error relleno de huecos: {err}")
+
     for symbol in symbols:
         for iv in cfg.intervals:
             try:
