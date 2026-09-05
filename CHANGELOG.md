@@ -7,6 +7,61 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.60.0] — 2026-09-05
+
+> El hold-out del optimizador pasa de **25 operaciones a 445**. Y lo primero que se ve con esa
+> muestra es que **la configuración base bate a la optimizada en las cinco claves probadas**.
+
+### Added — La ventana deja de topar en las 1.000 velas de una petición
+
+- `market.binance.historico` pagina hacia atrás hasta reunir el objetivo, y se detiene sola cuando
+  Binance deja de dar más historia (BTCUSDT en 1d devuelve 3.307 velas, desde agosto de 2017).
+- `VELAS_POR_DEFECTO = 20.000` — elegido midiendo, no a ojo. En 15m son 208 días.
+- El backtest, la calibración y el optimizador usan la misma ventana, configurable por parámetro.
+
+### Added — Caché de series, porque veinte mil velas ya no son gratis
+
+- `velas.series` cachea las series **ya normalizadas**: 20.000 velas crudas ocupan 14 MB y las tres
+  listas de float que usa el backtest, 1,9 MB. Veinte claves pasan de 280 MB a 38.
+- Sin ella, los tres consumidores descargaban lo mismo por separado: sesenta descargas por ciclo,
+  unos nueve minutos solo de red. TTL de 30 minutos, holgado a propósito — el backtest mide
+  historia, no el presente.
+
+### Lo que se midió
+
+| velas | días | una optimización | piloto | hold-out |
+|---|---|---|---|---|
+| 1.000 | 10 | 1,7 s | 0,6 min | **25** |
+| 10.000 | 104 | 10,0 s | 3,3 min | 232 |
+| **20.000** | **208** | **19,3 s** | **6,4 min** | **445** |
+
+**El ciclo sigue cabiendo**: 3,5 min cuando solo mide, unos 10 cuando además optimiza (semanal).
+
+### El primer hallazgo que la muestra nueva permite ver
+
+| clave | n hold-out | base | optimizada |
+|---|---|---|---|
+| BTCUSDT:15m | 445 | **+0,074** | −0,019 |
+| BTCUSDT:30m | 468 | **+0,007** | −0,065 |
+| ETHUSDT:1h | 529 | **+0,120** | +0,031 |
+| SOLUSDT:15m | 530 | **+0,117** | +0,014 |
+| BNBUSDT:30m | 543 | **+0,170** | +0,013 |
+
+Ninguna promociona, pero el motivo cambia de «muestra insuficiente» a «no promete ganar»: **la
+configuración base gana a la optimizada fuera de muestra en las cinco**. Es sobreajuste, y es
+exactamente lo que un hold-out de 25 operaciones no podía ver.
+
+Cautela: son cinco claves con 40 trials. Puede ser sobreajuste, pocos trials o un espacio de
+búsqueda mal planteado —el mismo `suggest_float(0.0, 2.0)` sin restricción que produjo el régimen
+invertido. Lo establecido es que ahora **se puede distinguir**.
+
+### Verificado y no verificado
+
+- Verificado: la paginación contra Binance real en tres claves (series contiguas, sin huecos ni
+  duplicados), los tiempos de la tabla y los cinco veredictos de promoción.
+- Sin verificar: el ciclo del piloto en producción con la ventana nueva. Se verá en el tiempo entre
+  `last_cycle` consecutivos.
+
 ## [0.59.0] — 2026-09-05
 
 > El backtest era O(N²): al doblar las velas, el tiempo se cuadruplicaba. Ahora es O(N), y **produce
