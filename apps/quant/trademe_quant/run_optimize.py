@@ -49,6 +49,10 @@ def optimize_and_publish(symbol: str, interval: str, n_trials: int = 60) -> dict
         "symbol": symbol,
         "interval": interval,
         "promoted": result["promoted"],
+        # El motivo del veredicto. 0.54.0 lo prometió en su registro de cambios y no llegó a
+        # escribirse: el optimizador rechazaba 20 de 20 promociones sin dejar rastro auditable de
+        # por qué, que era justo lo que ese hito decía resolver.
+        "promocion": result.get("promocion"),
         "validation_score": result["validation_score"],
         "holdout": result["holdout"],
         "best_params": result["best_params"],

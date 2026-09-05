@@ -131,7 +131,10 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
   temperature: 0.5,
   holdBand: 0.06,
   weights: { ema_cross: 1, macd: 1, supertrend: 1, rsi14: 1, bbands: 1, stoch14: 1 },
-  externalWeights: { tradingview: 2 },
+  // Reditum en sombra. El valor por defecto importa tanto como el del yaml: si la clave
+  // desapareciera del artefacto, un 2 aquí devolvería a la fuente el peso más alto del sistema
+  // sin que nadie lo decidiera. Ver `artifacts/ensemble.yaml`.
+  externalWeights: { tradingview: 0 },
   regime: {
     adxThreshold: 25,
     adxLo: 15,

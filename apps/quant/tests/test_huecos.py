@@ -178,3 +178,45 @@ def test_cerrar_sin_nada_pendiente_no_compromete_de_mas(monkeypatch: Any) -> Non
     assert conexion.lotes == []
     assert conexion.commits == 0
     assert conexion.cerrada is True
+
+
+def test_las_temporalidades_a_rellenar_salen_de_la_base_no_de_una_lista(monkeypatch: Any) -> None:
+    """El fallo de 0.56.0: recibía `cfg.intervals` —lo que el piloto decide— en vez de lo guardado.
+
+    Las cinco de esa lista quedaron a cero huecos mientras 1m y 5m acumulaban 118.606 velas
+    ausentes. Preguntándoselo a la base, una temporalidad nueva entra sola.
+    """
+    import sys
+    import types
+
+    from trademe_quant.huecos import intervalos_almacenados
+
+    class _Cur:
+        def __enter__(self) -> Any:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, sql: str, params: Any) -> None:
+            assert "candles" in sql
+
+        def fetchall(self) -> list[tuple[str]]:
+            # incluye una temporalidad sin duración conocida, que debe quedarse fuera
+            return [("1m",), ("5m",), ("15m",), ("1M",)]
+
+    class _Conn:
+        def cursor(self) -> Any:
+            return _Cur()
+
+        def __enter__(self) -> Any:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    modulo = types.ModuleType("psycopg")
+    modulo.connect = lambda *_a, **_k: _Conn()  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "psycopg", modulo)
+
+    assert intervalos_almacenados("dsn-falso", "BTCUSDT") == ["15m", "1m", "5m"]

@@ -77,3 +77,29 @@ def test_entrena_y_evalua_con_dataset_suficiente() -> None:
     assert 0.0 <= out["auc"] <= 1.0
     assert out["features"][0] == "net"
     assert isinstance(out["promote"], bool)
+
+
+def test_el_metamodelo_no_se_publica_solo_por_mejorar_al_baseline() -> None:
+    """El criterio era `filtered > baseline`: el mismo que 0.54.0 prohibió para el optimizador.
+
+    Con expectancy filtrada negativa —mejor que una base peor— no puede promocionarse: eso es una
+    carrera hacia abajo, no una mejora.
+    """
+    from trademe_quant.promocion import decidir
+
+    v = decidir(base_expectancy=-0.80, optimized_expectancy=-0.30, n_holdout=40, nula_p95=0.0)
+    assert v.promover is False
+    assert "no promete ganar" in v.motivo
+
+
+def test_el_metamodelo_necesita_muestra_y_superar_al_azar() -> None:
+    from trademe_quant.promocion import decidir
+
+    pocas = decidir(0.0, 0.5, n_holdout=12, nula_p95=0.0)
+    assert pocas.promover is False and "muestra insuficiente" in pocas.motivo
+
+    ruido = decidir(0.0, 0.20, n_holdout=40, nula_p95=0.35)
+    assert ruido.promover is False and "no supera al azar" in ruido.motivo
+
+    buena = decidir(0.0, 0.40, n_holdout=40, nula_p95=0.10)
+    assert buena.promover is True

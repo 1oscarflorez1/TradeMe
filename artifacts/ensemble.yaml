@@ -15,9 +15,20 @@ weights:
   bbands: 1.0
   stoch14: 1.0
 
-# Pesos por fuente externa. Reditum (TradingView) es la señal core -> pesa 2x.
+# Pesos por fuente externa. Reditum (TradingView) entra en SOMBRA: peso 0 hasta que demuestre algo.
+#
+# Tenía 2.0 —el peso más alto del sistema, el doble que cualquier voto interno— y **cero votos
+# emitidos** desde que existe: `external_signals` lleva vacía seis semanas y ni uno de los 3.657
+# snapshots registra `reditum_*_score`. Comprobado el 5-sep-2026.
+#
+# Mientras no emite es inocuo, pero el día que empiece entraría con doble peso sin haber pasado por
+# sombra ni por control de nula, que es precisamente lo que el proyecto exigió al Fundamental Score
+# (medido, t=2,95, y aun así en sombra al 0,5) y al optimizador. El mecanismo probado a media
+# potencia y el no probado a doble no se sostiene.
+#
+# Para reactivarlo: subirlo a 0.5 y medir su aportación con nula por bloques, como todo lo demás.
 external_weights:
-  tradingview: 2.0 # Reditum (SniperUltra + nuevoPOC) es la fuente core de alfa
+  tradingview: 0.0 # en sombra: se registra el voto, no empuja la decisión
 
 # Conmutación por régimen (ADX). En tendencia sube tendencia/momentum; en rango, reversión.
 regime:

@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
-from .market.normalize import interval_ms
+from .market.normalize import INTERVAL_MS, interval_ms
 
 #: Máximo de velas que Binance devuelve por petición.
 LIMITE_BINANCE = 1000
@@ -75,6 +75,28 @@ def tramos_faltantes(open_times: list[int], paso_ms: int) -> list[tuple[int, int
         if siguiente - anterior > paso_ms:
             fuera.append((anterior + paso_ms, siguiente))
     return fuera
+
+
+def intervalos_almacenados(dsn: str, symbol: str) -> list[str]:
+    """Temporalidades que ese símbolo **tiene guardadas**, no las que el piloto opera.
+
+    La primera versión recibía `cfg.intervals` —`15m, 30m, 1h, 4h, 1d`—, que es la lista de lo que
+    el piloto *decide*. Pero la api persiste toda vela que cierra, así que `1m` y `5m` se guardaban
+    y no se reparaban nunca: medido el 5-sep-2026, las cinco temporalidades de la lista tenían
+    **cero huecos** y las dos que faltaban acumulaban **118.606 velas ausentes** y subiendo.
+
+    El fallo no era el mecanismo sino su alcance, y venía de que la lista se escribía a mano en el
+    sitio equivocado. Preguntándoselo a la base de datos, una temporalidad nueva entra sola.
+    """
+    import psycopg
+
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT interval FROM candles WHERE symbol = %s",
+            (symbol,),
+        )
+        # Solo las de duración conocida: sin ella no se puede saber qué falta.
+        return sorted({str(r[0]) for r in cur.fetchall()} & set(INTERVAL_MS))
 
 
 def huecos_de(dsn: str, symbol: str, interval: str) -> list[Hueco]:
@@ -143,17 +165,21 @@ def rellenar_hueco(dsn: str, hueco: Hueco, sink: Any = None) -> int:
 def rellenar(
     dsn: str,
     symbols: list[str],
-    intervals: list[str],
+    intervals: list[str] | None = None,
     presupuesto: int = PRESUPUESTO_POR_CICLO,
 ) -> list[str]:
     """Rellena lo que quepa en el presupuesto, empezando por los huecos más grandes.
 
     Se atacan primero los mayores porque son los que más evaluaciones bloquean: un socavón de tres
     días en 1m deja sin desenlace muchas más decisiones que veinte huecos de una vela.
+
+    Sin `intervals` se reparan **todas las temporalidades guardadas** de cada símbolo, que es lo
+    correcto: pasarle una lista escrita a mano fue lo que dejó `1m` y `5m` sin reparar durante dos
+    semanas. El parámetro se conserva para poder acotar en pruebas, no para el uso normal.
     """
     pendientes: list[Hueco] = []
     for symbol in symbols:
-        for interval in intervals:
+        for interval in intervals if intervals is not None else intervalos_almacenados(dsn, symbol):
             try:
                 pendientes.extend(huecos_de(dsn, symbol, interval))
             except Exception as err:  # noqa: BLE001 - un símbolo ilegible no tumba a los demás

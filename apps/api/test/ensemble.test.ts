@@ -32,7 +32,7 @@ describe('inferProbs (softmax)', () => {
 });
 
 describe('aggregate (régimen + pesos)', () => {
-  it('pondera por régimen y da a Reditum el doble de peso', () => {
+  it('pondera por régimen y deja a Reditum en sombra (peso 0)', () => {
     const votes: Vote[] = [
       vote({ key: 'ema_cross', kind: 'trend', score: 0.8 }),
       vote({ key: 'rsi14', kind: 'reversion', score: -0.5 }),
@@ -44,13 +44,15 @@ describe('aggregate (régimen + pesos)', () => {
     expect(agg.regime.label).toBe('tendencia'); // ADX 30 >= 25
     // ADX/ATR no votan
     expect(agg.votes.find((v) => v.key === 'adx14')?.weight).toBe(0);
-    // Reditum/TradingView: peso 2 (externalWeights) * 1 (custom sin ajuste de régimen)
-    expect(agg.votes.find((v) => v.key === 'reditum_sniper')?.weight).toBe(2);
+    // Reditum/TradingView: peso 0 (externalWeights). El voto se registra y NO empuja: llevaba
+    // 2 —el más alto del sistema— con cero votos emitidos en seis semanas, así que entra en
+    // sombra como todo lo demás hasta que demuestre aportación.
+    expect(agg.votes.find((v) => v.key === 'reditum_sniper')?.weight).toBe(0);
     // ADX continuo (adx_lo 15, adx_hi 35): con ADX 30 => f = 0.75
     // EMA (trend): 0.6*(1-0.75) + 1.5*0.75 = 1.275 ; RSI (reversion): 1.5*0.25 + 0.6*0.75 = 0.825
     expect(agg.votes.find((v) => v.key === 'ema_cross')?.weight).toBeCloseTo(1.275, 6);
     expect(agg.votes.find((v) => v.key === 'rsi14')?.weight).toBeCloseTo(0.825, 6);
-    const expected = (0.8 * 1.275 + -0.5 * 0.825 + 1 * 2) / (1.275 + 0.825 + 2);
+    const expected = (0.8 * 1.275 + -0.5 * 0.825 + 1 * 0) / (1.275 + 0.825 + 0);
     expect(agg.net).toBeCloseTo(expected, 6);
   });
 

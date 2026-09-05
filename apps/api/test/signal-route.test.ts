@@ -17,7 +17,7 @@ describe('GET /signal', () => {
     await app.close();
   });
 
-  it('la señal externa de Reditum entra en la agregación con su peso', async () => {
+  it('la señal externa de Reditum se registra pero no empuja (sombra)', async () => {
     const app = buildApp(makeDeps({ getHistory: async () => synthCandles(80) }));
     await app.inject({
       method: 'POST',
@@ -29,7 +29,8 @@ describe('GET /signal', () => {
     const reditum = s.votes.find((v) => v.key === 'reditum_sniper');
     expect(reditum).toBeDefined();
     expect(reditum?.source).toBe('tradingview');
-    expect(reditum?.weight).toBe(2);
+    // Se sigue viendo el voto —es lo que permitirá medirlo— pero con peso 0 no mueve la decisión.
+    expect(reditum?.weight).toBe(0);
     await app.close();
   });
 });

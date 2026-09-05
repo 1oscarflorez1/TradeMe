@@ -10,8 +10,10 @@ Decisiones de diseño (honestas):
   nativa (LightGBM exige convertidores extra). Si el dataset crece mucho, migrar es trivial.
 - **Split temporal** (entrena con lo viejo, valida con lo nuevo): nunca aleatorio, para no mirar
   al futuro.
-- **Promoción sólo si mejora**: se compara la expectancy con y sin el filtro en el tramo de
-  validación; si no mejora, NO se publica el modelo (misma filosofía que el hold-out de Optuna).
+- **Promoción sólo si se la gana**: desde 0.58.0 pasa por `promocion.decidir`, el mismo gobierno
+  que el optimizador. Hacen falta las tres: muestra mínima, expectancy positiva de verdad y superar
+  el P95 de una nula por bloques. Antes bastaba `filtered > baseline`, que es puramente relativo:
+  el mismo criterio que 0.54.0 declaró inaceptable para Optuna y que aquí seguía vivo.
 - **Reentrenamiento continuo:** cada ejecución usa todos los snapshots evaluados disponibles, así
   el modelo mejora a medida que llegan registros nuevos.
 """
@@ -155,7 +157,26 @@ def train_metamodel(rows: list[dict[str, Any]], test_ratio: float = 0.3) -> dict
     # El umbral sale del tramo de SELECCIÓN. El de prueba solo juzga.
     threshold = pick_threshold(probs_sel, r_sel)
     filtered, kept = expectancy_with_filter(probs_te, r_te, threshold)
-    improves = filtered > baseline and kept >= max(5, int(0.3 * len(r_te)))
+
+    # El criterio era `filtered > baseline and kept >= 30 %`: puramente relativo, sin muestra
+    # mínima seria y **sin control de azar**. Es exactamente el que el proyecto declaró inaceptable
+    # para el optimizador en 0.54.0 —`opt_exp > base_exp`— y que aquí seguía vivo, en el componente
+    # que atenúa o veta decisiones ya tomadas.
+    #
+    # Medido el 5-sep-2026: el tramo de prueba eran **134 filas repartidas en 6 días**, con cuatro
+    # activos que la propia plataforma calcula como 1,46 independientes. Un AUC de 0,74 sobre eso
+    # no se distingue del azar, y nada lo comprobaba.
+    #
+    # La nula agrupa por bloques de 24 h porque las decisiones se amontonan en el tiempo: sin eso
+    # se contaría un día de mercado como decenas de observaciones independientes.
+    from .nula import marcas_de
+    from .promocion import decidir, mejora_nula_p95, resumen
+
+    kept_rs = [float(r) for r, p in zip(r_te, probs_te, strict=False) if p >= threshold]
+    marcas = marcas_de([r.get("captured_at") for r in usable[corte_sel:]])
+    nula = mejora_nula_p95([float(r) for r in r_te], kept_rs, marcas)
+    veredicto = decidir(baseline, filtered, kept, nula)
+    improves = veredicto.promover
 
     try:
         from sklearn.metrics import roc_auc_score
@@ -168,6 +189,7 @@ def train_metamodel(rows: list[dict[str, Any]], test_ratio: float = 0.3) -> dict
         "trained": True,
         "promote": improves,
         "model": model,
+        "promocion": resumen(veredicto),
         "n": len(usable),
         "n_train": int(split),
         "n_select": int(len(r_sel)),
