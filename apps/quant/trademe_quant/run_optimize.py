@@ -19,22 +19,20 @@ from typing import Any
 import yaml
 
 from .ensemble import artifacts_dir, load_active_ensemble
-from .market.binance import fetch_klines
-from .market.normalize import normalize_rest_kline
+from .market.binance import VELAS_POR_DEFECTO
 from .optimize import optimize_weights
+from .velas import series
 
 
 def _repo_artifact(name: str) -> str:
     return str(pathlib.Path(__file__).resolve().parents[3] / "artifacts" / name)
 
 
-def optimize_and_publish(symbol: str, interval: str, n_trials: int = 60) -> dict[str, Any]:
+def optimize_and_publish(
+    symbol: str, interval: str, n_trials: int = 60, velas: int = VELAS_POR_DEFECTO
+) -> dict[str, Any]:
     """Optimiza pesos con Optuna, escribe el informe y (si gana) el ensemble optimizado."""
-    rows = fetch_klines(symbol, interval, limit=1000)
-    candles = [normalize_rest_kline(symbol, interval, r) for r in rows]
-    high = [c.high for c in candles]
-    low = [c.low for c in candles]
-    close = [c.close for c in candles]
+    high, low, close = series(symbol, interval, velas)
 
     # La base a batir es la config ACTIVA de este símbolo+TF (mejora iterativa honesta).
     base = load_active_ensemble(symbol, interval)

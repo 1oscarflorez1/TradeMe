@@ -15,21 +15,17 @@ from .db import evaluate_shadow_outcomes, evaluate_snapshot_outcomes, save_backt
 from .decision import horizon_for
 from .ensemble import artifacts_dir, load_active_ensemble
 from .independence import load_factor
-from .market.binance import fetch_klines
-from .market.normalize import normalize_rest_kline
+from .market.binance import VELAS_POR_DEFECTO
+from .velas import series
 
 
 def _dsn() -> str:
     return os.environ.get("DATABASE_URL", "postgresql://trademe:trademe@localhost:5432/trademe")
 
 
-def run_and_save(symbol: str, interval: str) -> dict[str, Any]:
+def run_and_save(symbol: str, interval: str, velas: int = VELAS_POR_DEFECTO) -> dict[str, Any]:
     """Corre el backtest, lo guarda y evalúa snapshots. Devuelve métricas."""
-    rows = fetch_klines(symbol, interval, limit=1000)
-    candles = [normalize_rest_kline(symbol, interval, r) for r in rows]
-    high = [c.high for c in candles]
-    low = [c.low for c in candles]
-    close = [c.close for c in candles]
+    high, low, close = series(symbol, interval, velas)
     config = load_active_ensemble(symbol, interval)
     # Mismo horizonte y mismo desinflado que en vivo: si el backtest midiera con otras reglas,
     # dejaría de ser comparable con lo que la plataforma decide de verdad.
