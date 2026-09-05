@@ -7,6 +7,51 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.59.0] — 2026-09-05
+
+> El backtest era O(N²): al doblar las velas, el tiempo se cuadruplicaba. Ahora es O(N), y **produce
+> exactamente las mismas operaciones**.
+
+### Changed — El backtest calcula los indicadores una vez, no una vez por vela
+
+- `indicadores_series.py` (nuevo): versión «serie» de los ocho indicadores, que emite el valor de
+  cada índice en una sola pasada. Son prefijo-calculables —el valor en `t` solo depende de datos
+  hasta `t`—, así que esto no es una aproximación: es la misma cuenta hecha una vez en vez de N.
+- `decision.decidir_con_lecturas`: el núcleo de `decide`, separado para recibir las lecturas ya
+  calculadas y el precio. `decide` queda como fachada, de modo que **la lógica de decisión sigue
+  escrita una sola vez**.
+- `indicators.py` **no se toca**: sus `*_last` son el mirror de Node y sostienen la suite de
+  paridad. La corrección del módulo nuevo se define como «coincidir con ellas».
+
+### La paridad, sin tolerancia
+
+| comprobación | resultado |
+|---|---|
+| lecturas vela a vela (8 indicadores × 3 campos) | igualdad **exacta** con `==` |
+| operaciones del backtest contra un oráculo de la versión anterior | idénticas |
+| 4 claves reales de Binance, 189 operaciones | diferencia máxima **0,000e+00** |
+
+El oráculo se conserva en los tests: reproduce literalmente la implementación anterior y es la
+definición de «correcto» contra la que se juzga la rápida.
+
+### Lo que se midió
+
+| velas | días de 15m | antes | ahora | operaciones |
+|---|---|---|---|---|
+| 1.000 | 10 | 0,375 s | **0,023 s** | 91 |
+| 5.000 | 52 | ~9 s | **0,113 s** | 465 |
+| 10.000 | 104 | ~37 s | **0,242 s** | 921 |
+| 20.000 | 208 | ~150 s | **0,536 s** | **1.874** |
+
+Escalado lineal comprobado: ×20 velas → ×22,7 tiempo. El piloto completo sobre 20.000 velas pasa de
+unas **33 horas** a unos **7 minutos**.
+
+### Por qué importaba
+
+El cuello de la plataforma nunca fue la velocidad: era que con 30 días de producción y 22 bloques
+temporales útiles **ningún mecanismo podía demostrar nada**. La producción no se puede acelerar; el
+backtest sí. Linealizar no valida ninguna estrategia — hace posible medirla.
+
 ## [0.58.0] — 2026-09-05
 
 > Cuatro parches salidos de auditar el despliegue real. Dos son fallos propios de los hitos
