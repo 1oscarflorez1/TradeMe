@@ -9,8 +9,10 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [0.61.0] — 2026-09-05
 
-> **Reoptimizar empeora la configuración activa** (17 de 20 claves, p = 0,0013). Y ninguna
-> configuración —ni la optimizada ni la activa— se distingue del `ensemble.yaml` escrito a mano.
+> Con los **40 trials que usa producción**, reoptimizar empeora (17/20, p = 0,0013). Con **120** el
+> resultado se vuelve un empate. Lo primero que demuestra el estudio es que **producción
+> infra-optimiza**; lo segundo, que ni así ninguna configuración se distingue del `ensemble.yaml`
+> escrito a mano.
 
 ### Fixed — El piloto deja de tirar las líneas que informan de los datos
 
@@ -47,13 +49,31 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 | Optuna libre gana a la manual | 11/20 | 0,412 |
 | Optuna coherente gana a la manual | 9/20 | 0,748 |
 
-- **Ninguna de las 40 configuraciones generadas pasa el guardia de promoción.**
-- **Lo establecido:** reoptimizar ahora empeora, con significación. Y nada —ni la activa ni lo
-  optimizado— se distingue del diseño manual: un año de optimización automática no ha producido una
-  configuración demostrablemente mejor que la escrita a mano.
-- **Lo NO establecido:** que Optuna sea inútil en abstracto (se midió este espacio, con estos datos),
-  ni que la manual sea buena. Todas rondan ±0,1 R: empatar en la mediocridad sigue siendo
-  mediocridad.
+- **Ninguna de las 40 configuraciones generadas con 40 trials pasa el guardia de promoción.**
+
+### El control de 120 trials cambia parte del veredicto
+
+- Repetido con el **triple de búsqueda** sobre las mismas claves y el mismo hold-out:
+
+| comparación | 40 trials | 120 trials |
+|---|---|---|
+| la activa gana a Optuna libre | **17/20** (p = 0,0013) | 12/20 (p = 0,252) |
+| la activa gana a Optuna coherente | **15/20** (p = 0,021) | 14/20 (p = 0,058) |
+| Optuna libre gana a la manual | 11/20 (p = 0,412) | 10/20 (p = 0,588) |
+| configuraciones que pasan el guardia | 0 | 2 |
+
+- **«Reoptimizar empeora» era un artefacto de usar 40 trials.** Con 120 la diferencia deja de ser
+  significativa, y la mejora media sube de −0,063 a −0,041 R. Lo demostrado, entonces, es que
+  **`AUTO_TRIALS = 40` infra-optimiza**.
+- **Lo que no cambia:** con 120 tampoco aparece ninguna ventaja. Optuna no gana a la manual (10/20,
+  p = 0,588) ni la activa tampoco (12/20, p = 0,252). Todo dentro del empate.
+- **Las dos promociones que aparecen no son evidencia**: son 20 claves × 2 condiciones = **40
+  pruebas** contra un listón del percentil 95, y encontrar dos es exactamente lo que produce el azar.
+  Ambas caen además en 4h, la temporalidad en cuarentena desde M10.5.
+- **La coherencia de régimen no se justifica por rendimiento:** su efecto cambia de signo con los
+  trials (mejor con 40, peor con 120). Se activa porque el mecanismo debe significar lo que dice.
+- **Lo NO establecido:** que Optuna sea inútil en abstracto, ni que la manual sea buena. Todas rondan
+  ±0,1 R: empatar en la mediocridad sigue siendo mediocridad.
 
 ### La predicción de 0.57.0 salió a medias, y lo interesante es por qué
 
