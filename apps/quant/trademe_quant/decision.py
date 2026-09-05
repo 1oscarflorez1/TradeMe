@@ -92,7 +92,34 @@ def decide(
     independence: float = 1.0,
     quarantined: bool = False,
 ) -> dict[str, Any]:
-    readings = compute_readings(high, low, close)
+    """Decide sobre el final de la serie que se le pasa. Sin cambios: es la puerta de siempre."""
+    return decidir_con_lecturas(
+        compute_readings(high, low, close),
+        float(close[-1]),
+        config,
+        macro_bias,
+        external_votes,
+        independence,
+        quarantined,
+    )
+
+
+def decidir_con_lecturas(
+    readings: dict[str, dict[str, float]],
+    price: float,
+    config: dict[str, Any],
+    macro_bias: float | None = None,
+    external_votes: Sequence[dict[str, Any]] | None = None,
+    independence: float = 1.0,
+    quarantined: bool = False,
+) -> dict[str, Any]:
+    """El mismo razonamiento, con las lecturas ya calculadas.
+
+    Existe para que el backtest no tenga que rebanar las series en cada vela: `decide` solo usaba
+    de ellas `compute_readings(...)` y `close[-1]`, así que separar esas dos entradas convierte un
+    recorrido O(N²) en uno O(N) **sin duplicar la lógica de decisión**, que sigue estando escrita
+    una sola vez. Ver `indicadores_series.py`.
+    """
     adx = readings["adx14"]["value"]
     atr = readings["atr14"]["value"]
     label = "tendencia" if adx >= float(config["regime"]["adx_threshold"]) else "rango"
@@ -163,7 +190,6 @@ def decide(
         hold_reason = "cuarentena"
 
     direction = "LONG" if action == "BUY" else "SHORT" if action == "SELL" else "FLAT"
-    price = float(close[-1])
     levels = compute_plan_levels(action, price, atr, config["risk"])
     return {
         "net": net,
