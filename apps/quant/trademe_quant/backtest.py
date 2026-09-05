@@ -10,7 +10,8 @@ import statistics
 from collections.abc import Sequence
 from typing import Any
 
-from .decision import decide
+from .decision import decidir_con_lecturas
+from .indicadores_series import readings_series
 
 MIN_CANDLES = 50
 
@@ -109,12 +110,22 @@ def run_backtest(
     """
     trades: list[dict[str, Any]] = []
     n = len(close)
+
+    # Las lecturas de TODAS las velas en una sola pasada. Antes se llamaba a `decide(high[:t+1],…)`
+    # por vela y cada indicador recorría la serie entera: coste O(N²), medido en ×4 el tiempo al
+    # doblar las velas. Las lecturas son idénticas —hay un test que lo comprueba vela a vela con
+    # igualdad exacta—, así que esto no cambia ni una operación del backtest, solo lo que tarda.
+    lecturas = readings_series(high, low, close)
+
     t = MIN_CANDLES
     while t < n - 1:
-        d = decide(
-            high[: t + 1],
-            low[: t + 1],
-            close[: t + 1],
+        readings = lecturas[t]
+        if readings is None:  # sin historial para todos los indicadores todavía
+            t += 1
+            continue
+        d = decidir_con_lecturas(
+            readings,
+            float(close[t]),
             config,
             macro_bias,
             independence=independence,
