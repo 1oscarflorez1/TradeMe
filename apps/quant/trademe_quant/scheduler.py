@@ -546,7 +546,7 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     return log
 
 
-_state: dict[str, object] = {"last_cycle": None, "last_log": []}
+_state: dict[str, object] = {"last_cycle": None, "last_log": [], "datos": []}
 
 
 def _meta_policy_summary() -> dict[str, object]:
@@ -593,8 +593,26 @@ def automation_status(cfg: AutoConfig) -> dict[str, object]:
         "meta_policy": _meta_policy_summary(),
         "last_cycle": _state["last_cycle"],
         "last_log": _state["last_log"],
+        # Aparte del log: si las líneas de datos hay que buscarlas entre sesenta, no se miran.
+        "datos": _state.get("datos", []),
         "per_tf": per_tf,
     }
+
+
+#: Líneas del ciclo que se conservan. Eran **diez**, y un ciclo genera del orden de sesenta: se
+#: perdía justo el principio, que es donde van las de datos —`huecos:`, `frescura:`, `cobertura:`,
+#: `histórico:`—. Durante la auditoría del 5-sep-2026 hubo que reconstruir con SQL lo que el propio
+#: piloto ya estaba registrando y tirando.
+MAX_LINEAS_LOG = 300
+
+#: Prefijos de las líneas que informan del **estado de los datos**, no de una decisión. Se recogen
+#: aparte para que no haya que buscarlas en el log ni dependan de cuántas líneas quepan.
+PREFIJOS_DATOS = ("huecos:", "frescura:", "cobertura:", "histórico:", "datos:")
+
+
+def resumen_datos(log: list[str]) -> list[str]:
+    """Las líneas del ciclo que hablan de la salud de los datos."""
+    return [linea for linea in log if linea.startswith(PREFIJOS_DATOS)]
 
 
 def start_scheduler() -> None:
@@ -606,7 +624,8 @@ def start_scheduler() -> None:
                 log = run_cycle(cfg) if cfg.enabled else []
                 _state["last_cycle"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                 if log:
-                    _state["last_log"] = log[-10:]
+                    _state["last_log"] = log[-MAX_LINEAS_LOG:]
+                    _state["datos"] = resumen_datos(log)
             except Exception:  # noqa: BLE001
                 pass
             time.sleep(15 * 60)  # re-evaluar cada 15 min (las acciones se gatean por horas)
