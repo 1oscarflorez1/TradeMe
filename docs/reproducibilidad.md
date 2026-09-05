@@ -61,6 +61,28 @@ Sumando las 3 que tienen ventana completa y aun así no reproducen: **14 discrep
 meta-modelo debería subir de 564 a cerca de 1.028. Si no sube, es que el relleno no está haciendo su
 trabajo — y esa es justamente la gracia de tener la cifra en el log del piloto cada ciclo.
 
+### Cómo salió la predicción (5-sep-2026): a medias, y lo interesante es por qué
+
+Con el relleno ya al día —1m pasó de 118.606 velas ausentes a unas 3.000— la muestra reproducible
+subió de 564 a **710 de 1.105**. Subió, pero no hasta las ~1.028 previstas. Las 354 que siguen fuera
+se reparten en dos grupos que no significan lo mismo:
+
+| | n | de la regla vieja |
+|---|---|---|
+| aún les faltan velas | 186 | 169 |
+| **ventana completa y aun así sin toque** | **168** | 3 |
+
+- Las **186** son decisiones **anteriores a la primera vela guardada** de su símbolo. El relleno
+  cubre huecos *interiores* por diseño —no extiende la serie hacia atrás—, así que quedan fuera de
+  su alcance. Recuperarlas exigiría sembrar histórico anterior, que es otra decisión.
+- Las **168** son el hallazgo: con su ventana **completa** no hay ningún toque, y sin embargo están
+  guardadas como `tp` o `sl`. Solo 3 son de la regla vieja. Son la huella directa del fallo de
+  `LIMIT h`: se cerraron con velas tomadas de más allá de un hueco, donde sí había toque.
+
+La predicción falló porque daba por hecho que todo lo descartado era falta de datos recuperable.
+Una parte no lo era: **eran desenlaces falsos**, y el relleno no los arregla — los destapa. Que el
+criterio siga descartándolos es exactamente lo que debe hacer.
+
 ## Una advertencia que costó descubrir
 
 Una comprobación de reproducibilidad **solo vale si puede fallar por el motivo que se busca**.

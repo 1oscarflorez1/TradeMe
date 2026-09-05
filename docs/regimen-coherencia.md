@@ -115,10 +115,29 @@ identificador, no una descripción.
 
 Lo que no vale es dejarlo como está, con un nombre que promete algo que no se cumple.
 
-Una consideración para elegir: las configuraciones que invirtieron el régimen **ganaron en el
-backtest fuera de muestra** —si no, Optuna no las habría promocionado— y sin embargo en producción
-dan −0,563 R en cortos. Esa desconexión entre backtest y realidad es una pregunta abierta que este
-hito no responde, y probablemente sea más importante que la elección entre (a) y (b).
+## Decidido (0.61.0): la opción (a)
+
+`optimize_weights` restringe el espacio **por construcción**, no rechazando trials —rechazar
+sesgaría la búsqueda hacia las zonas donde es fácil cumplir la condición—. En tendencia la reversión
+se muestrea dentro de `[0, max(trend, momentum)]`; en rango, al revés. Está activado por defecto:
+producción no puede publicar una configuración que se contradice a sí misma.
+
+El coste que se temía —«si la reversión funcionara mejor en tendencia, se estaría imponiendo un
+prejuicio»— resultó no ser un coste. Medido sobre las 20 claves con hold-outs de 56 a 562
+operaciones, **la restricción no empeora: mejora un poco**. Ver `docs/optimizador-veredicto.md`.
+
+### Y la consideración que acompañaba a la decisión era falsa
+
+Decía: «las configuraciones que invirtieron el régimen ganaron en el backtest fuera de muestra y sin
+embargo en producción dan −0,563 R en cortos; esa desconexión es una pregunta abierta».
+
+**No hay tal desconexión.** Medida por clave el 5-sep-2026, la diferencia entre producción y backtest
+es de **+0,127 R con desviación 0,807** sobre diez claves: medio error estándar de cero. La
+dispersión era ruido de muestras de 26 a 202 decisiones, no un sesgo.
+
+Lo que sí ocurría es más simple y ya lo había dicho 0.54.0: aquellas configuraciones **nunca
+prometieron ganar**. Ganaban en un hold-out de 25 operaciones, que no distingue una mejora de una
+racha, y el criterio de entonces (`opt > base`) solo exigía perder menos que la anterior.
 
 ## Cómo reproducirlo
 

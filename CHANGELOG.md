@@ -7,6 +7,72 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.61.0] — 2026-09-05
+
+> **Reoptimizar empeora la configuración activa** (17 de 20 claves, p = 0,0013). Y ninguna
+> configuración —ni la optimizada ni la activa— se distingue del `ensemble.yaml` escrito a mano.
+
+### Fixed — El piloto deja de tirar las líneas que informan de los datos
+
+- `last_log` guardaba las **diez** últimas de un ciclo que genera unas sesenta, y las de datos
+  —`huecos:`, `frescura:`, `cobertura:`, `histórico:`— van al principio: se perdían siempre.
+- Durante la auditoría del 5-sep hubo que reconstruir con SQL lo que el propio piloto ya registraba
+  y tiraba a la basura.
+- Ahora se conservan 300 líneas y además se recogen aparte en `datos`, para no tener que buscarlas.
+
+### Changed — La búsqueda respeta la semántica del régimen
+
+- Decidida la opción (a) de `docs/regimen-coherencia.md`: en tendencia la reversión se muestrea en
+  `[0, max(trend, momentum)]`; en rango, al revés.
+- Se restringe **por construcción**, no rechazando trials — rechazar sesgaría la búsqueda hacia las
+  zonas donde es fácil cumplir la condición.
+- Activado por defecto: producción no puede publicar una configuración que se contradice a sí misma.
+- El coste que se temía —«si la reversión funcionara mejor en tendencia, se impondría un prejuicio»—
+  resultó no existir: la restricción **mejora ligeramente** frente a la libre (5/20 contra 3/20).
+
+### Added — El veredicto sobre el optimizador
+
+- `run_optimizador_estudio` compara cuatro condiciones sobre el mismo hold-out intacto: **manual**
+  (el `ensemble.yaml` de M3), **activa** (lo que opera hoy; en 15 de 20 claves es una optimizada de
+  agosto), **libre** y **coherente**.
+- Criterio fijado antes de ver resultados, y recuento **por claves** en vez de promediar
+  expectancies, porque las claves comparten mercado (1,49 activos efectivos).
+- Incluye contraste binomial: 11 de 20 parece una victoria y sale así el 41 % de las veces por azar.
+
+| comparación | recuento | p (una cola) |
+|---|---|---|
+| **la activa gana a Optuna libre** | **17/20** | **0,0013** |
+| **la activa gana a Optuna coherente** | **15/20** | **0,021** |
+| la activa gana a la manual | 12/20 | 0,252 |
+| Optuna libre gana a la manual | 11/20 | 0,412 |
+| Optuna coherente gana a la manual | 9/20 | 0,748 |
+
+- **Ninguna de las 40 configuraciones generadas pasa el guardia de promoción.**
+- **Lo establecido:** reoptimizar ahora empeora, con significación. Y nada —ni la activa ni lo
+  optimizado— se distingue del diseño manual: un año de optimización automática no ha producido una
+  configuración demostrablemente mejor que la escrita a mano.
+- **Lo NO establecido:** que Optuna sea inútil en abstracto (se midió este espacio, con estos datos),
+  ni que la manual sea buena. Todas rondan ±0,1 R: empatar en la mediocridad sigue siendo
+  mediocridad.
+
+### La predicción de 0.57.0 salió a medias, y lo interesante es por qué
+
+- Con el relleno al día —1m pasó de 118.606 velas ausentes a unas 3.000— la muestra reproducible
+  subió de 564 a **710 de 1.105**, no a las ~1.028 previstas.
+- De las 354 que siguen fuera, **186 son anteriores a la primera vela guardada** de su símbolo:
+  fuera del alcance de un relleno que cubre huecos interiores por diseño.
+- Las otras **168 tienen la ventana completa y aun así no reproducen**: están guardadas como
+  `tp`/`sl` sin que el precio tocara nada dentro del horizonte. Son la huella del fallo de `LIMIT h`
+  — se cerraron con velas de más allá de un hueco. Solo 3 son de la regla vieja.
+- **La predicción falló porque daba por hecho que todo lo descartado era falta de datos
+  recuperable.** Una parte eran desenlaces falsos, y el relleno no los arregla: los destapa.
+
+### También verificado
+
+- El despliegue de 0.60.0 aceleró el relleno como se predijo: al bajar el coste del ciclo, 1m pasó
+  de 54.608 a 123.287 velas en poco más de una hora.
+- El backtest cuadrático era el cuello del **ciclo entero**, no solo de la optimización.
+
 ## [0.60.0] — 2026-09-05
 
 > El hold-out del optimizador pasa de **25 operaciones a 445**. Y lo primero que se ve con esa
