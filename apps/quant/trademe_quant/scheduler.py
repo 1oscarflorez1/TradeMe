@@ -216,7 +216,10 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
 
         cripto = watchlist_binance(dsn)
         if cripto:
-            for linea in rellenar_huecos(dsn, cripto, cfg.intervals):
+            # SIN `cfg.intervals`: esa es la lista de lo que el piloto decide, no de lo que la api
+            # guarda. Pasársela dejó `1m` y `5m` sin reparar dos semanas, con 118.606 velas
+            # ausentes mientras las cinco de la lista estaban a cero huecos.
+            for linea in rellenar_huecos(dsn, cripto):
                 log.append(f"huecos: {linea}")
     except Exception as err:  # noqa: BLE001 - sin relleno se sigue midiendo, solo que con menos
         log.append(f"error relleno de huecos: {err}")

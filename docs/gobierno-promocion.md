@@ -65,7 +65,23 @@ efectivos → el régimen invertido → **la promoción relativa**.
 
 Con una diferencia que importa: el optimizador es **el componente con más poder** sobre las
 decisiones, porque reescribe los pesos enteros. Y era el único que nunca había pasado por el
-gobierno que sí se exigió al meta-modelo, al Fundamental Score y a la cuarentena.
+gobierno que sí se exigió al Fundamental Score y a la cuarentena.
+
+### Corrección (0.58.0): el meta-modelo tampoco había pasado
+
+Esa frase decía «al meta-modelo» y era **falsa**. Auditado el 5-sep-2026, `metamodel.py` promovía
+con `filtered > baseline and kept >= 30 %`: puramente relativo, sin muestra mínima seria y sin
+control de azar. El mismo criterio que este documento declara inaceptable, vivo en el componente
+que atenúa o veta decisiones ya tomadas.
+
+Lo que dejaba pasar, medido: su tramo de prueba eran **134 filas repartidas en 6 días**, con cuatro
+activos que la propia plataforma calcula como 1,46 independientes. De ahí salía un AUC de 0,74 que
+nada comprobaba contra el azar.
+
+Desde 0.58.0 el meta-modelo llama a `promocion.decidir` con una nula por bloques de 24 h sobre los
+retornos del tramo de prueba. Las tres condiciones son las mismas para los dos componentes, y no
+hay ya ningún camino de decisión que se promocione a sí mismo comparándose solo con su versión
+anterior.
 
 ## El guardia
 

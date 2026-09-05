@@ -7,6 +7,82 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.58.0] — 2026-09-05
+
+> Cuatro parches salidos de auditar el despliegue real. Dos son fallos propios de los hitos
+> anteriores; los otros dos, promesas del registro de cambios que el código no cumplía.
+
+### Fixed — El relleno de huecos no llegaba a 1m ni a 5m
+
+- `huecos.rellenar` deriva las temporalidades de la **base de datos**, no de `cfg.intervals`, que
+  es la lista de lo que el piloto *decide* y no de lo que la api *guarda*.
+- Medido el 5-sep-2026: las cinco temporalidades de esa lista tenían **cero huecos** —el mecanismo
+  funcionaba— mientras `1m` y `5m` acumulaban **118.606 velas ausentes** y subiendo. BTCUSDT 1m
+  pasó de 24.938 velas ausentes el 24-ago a 40.256 el 5-sep.
+- El fallo no era el mecanismo sino su alcance, y venía de escribir la lista a mano en el sitio
+  equivocado. Preguntándoselo a la base, una temporalidad nueva entra sola.
+
+### Fixed — El meta-modelo pasa por el mismo gobierno que el optimizador
+
+- `metamodel.train_metamodel` llama a `promocion.decidir` con una nula por **bloques de 24 h**. El
+  criterio era `filtered > baseline and kept >= 30 %`: puramente relativo, sin muestra mínima seria
+  y sin control de azar — el mismo que 0.54.0 declaró inaceptable para Optuna, vivo en el
+  componente que atenúa o veta decisiones ya tomadas.
+- Lo que dejaba pasar: su tramo de prueba eran **134 filas repartidas en 6 días**, con cuatro
+  activos que la propia plataforma calcula como **1,46 independientes**. De ahí salía un AUC de
+  **0,74** que nada comprobaba contra el azar.
+- `docs/gobierno-promocion.md` afirmaba que el meta-modelo ya había pasado por ese gobierno.
+  Era falso y queda corregido en el propio documento.
+
+### Fixed — El informe del optimizador escribe por fin su veredicto
+
+`run_optimize` guarda el bloque `promocion` con el motivo. 0.54.0 lo prometió en este mismo registro
+y no llegó a escribirse: el optimizador lleva desde el 22 de agosto rechazando **20 de 20**
+promociones **sin dejar rastro auditable de por qué**, que era justo lo que ese hito decía resolver.
+
+### Changed — Reditum entra en sombra (peso 0)
+
+- `external_weights.tradingview` pasa de **2.0 a 0.0**, y el valor por defecto de `config.ts`
+  también: si la clave desapareciera del artefacto, un 2 cableado devolvería el peso más alto del
+  sistema sin que nadie lo decidiera.
+- Tenía el doble de peso que cualquier voto interno y **cero votos emitidos** en seis semanas:
+  `external_signals` vacía y ni uno de los 3.657 snapshots con `reditum_*_score`.
+- El voto se sigue registrando —es lo que permitirá medirlo— pero no empuja. Para reactivarlo:
+  0,5 y medir su aportación con nula por bloques, como al Fundamental Score.
+
+### Lo que se midió en la auditoría
+
+**El hallazgo direccional era, en parte, un artefacto de agregación propio.** La comparación
+«plataforma vs siempre largo» da resultados opuestos según la unidad:
+
+| unidad | resultado |
+|---|---|
+| por decisión (n=595) | plataforma +0,094 vs largo +0,649 → −0,555 R |
+| **por día (22 bloques)** | diferencia media **−0,069 R**, sd 0,866 → 0,37 SE de cero |
+
+Pierde en 8 días, gana en 7. **1.078 decisiones caen en 30 días** y dos jornadas concentran el
+29 %: promediar por decisión pondera por cuántas señales emitió ese día, no por evidencia. El
+hallazgo del 23-ago (+0,626 vs +0,035) arrastra el mismo problema y debe releerse con esta
+salvedad.
+
+**No hay desconexión backtest↔producción.** Diferencia media por clave **+0,127 R** con desviación
+0,807 sobre 10 claves: 0,5 errores estándar de cero. La dispersión (−0,97 a +1,52) es ruido de
+muestras de 26-202 decisiones, y confirma lo que ya concluyó 0.54.0.
+
+**Lo que sí es estructural:** 731 cortos frente a 606 largos en un mercado que subió, con los
+cortos perdiendo en todas las temporalidades relevantes (15m −0,537 · 30m −0,650 · 1h −0,467 ·
+1d −1,000). Y **6 de las 15** configuraciones publicadas siguen invirtiendo el régimen.
+
+**Lo que sí funcionó:** el backfill de funding llevó a BTCUSDT del 44 % al **100 %** de cobertura,
+los cuatro símbolos completos; y la muestra reproducible subió de 564 a **683**, en la dirección que
+predijo 0.57.0.
+
+### Verificado y no verificado
+
+- Verificado contra la base de datos de producción: las siete cifras de esta entrada.
+- Sin verificar: el ciclo del piloto con el alcance nuevo del relleno. Se verá en la línea
+  `huecos:` del log, que debe empezar a citar `1m` y `5m`.
+
 ## [0.57.0] — 2026-08-24
 
 > El histórico mezcla **tres** reglas de evaluación y cuatro consumidores se lo comían entero. Un

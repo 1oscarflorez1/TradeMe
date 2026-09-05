@@ -9,7 +9,9 @@ ENSEMBLE_PATH = pathlib.Path(__file__).parents[3] / "artifacts/ensemble.yaml"
 
 def test_real_ensemble_is_valid() -> None:
     data = load_ensemble(ENSEMBLE_PATH)
-    assert data["external_weights"]["tradingview"] == 2.0
+    # Reditum en sombra: 0 hasta que demuestre aportación con nula por bloques. Tenía 2.0 —el
+    # peso más alto del sistema— con cero votos emitidos en seis semanas.
+    assert data["external_weights"]["tradingview"] == 0.0
     assert data["temperature"] > 0
     assert data["risk"]["risk_pct"] == 0.01
 
