@@ -2,7 +2,14 @@
 
 Las estrategias privadas **Reditum** (suite de **Ingresarios**, academia de trading — reto.ingresarios.net) (SniperUltra = `reditum_sniper`, Geny Trend = `reditum_geny`, nuevoPOC = `reditum_poc`) viven
 en TradingView (Pine Script). Sus alertas envían un webhook a TradeMe (`POST /tv-hook`), que las
-convierte en votos del ensemble (peso 2×) y las registra para el backtest.
+convierte en votos del ensemble y las registra para el backtest.
+
+**Desde 0.58.0 su peso es 0: entra en sombra.** Tenía 2× —el más alto del sistema, el doble que
+cualquier voto interno— y **cero votos emitidos** en las seis semanas que lleva existiendo:
+`external_signals` vacía y ni uno de los 3.657 snapshots con `reditum_*_score`. Mientras no emite
+es inocuo, pero el día que empezara entraría a doble potencia sin haber demostrado nada, cuando al
+Fundamental Score —medido, t=2,95— se le exigió sombra al 0,5. Para reactivarlo: subirlo a 0,5 y
+medir su aportación con nula por bloques, como todo lo demás.
 
 ## 1. El endpoint
 
