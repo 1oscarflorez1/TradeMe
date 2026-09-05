@@ -127,18 +127,53 @@ def optimize_weights(
     min_trades: int = 10,
     complexity_penalty: float = 0.05,
     seed: int = 42,
+    coherencia_regimen: bool = True,
 ) -> dict[str, Any]:
-    """Busca pesos óptimos con Optuna y decide la promoción por hold-out."""
+    """Busca pesos óptimos con Optuna y decide la promoción por hold-out.
+
+    `coherencia_regimen` obliga a que la conmutación signifique lo que dice: en tendencia manda la
+    familia direccional, en rango la de reversión. Se puede apagar para comparar, que es como se
+    midió si aporta — ver `docs/optimizador-veredicto.md`.
+    """
     n = len(close)
     split = int(n * (1.0 - holdout))
     folds = make_folds(MIN_CANDLES, split, k_folds, embargo)
+
+    def sugerir_regimen(trial: optuna.Trial, params: dict[str, float]) -> None:
+        """Los multiplicadores por régimen, con o sin la coherencia que el yaml promete.
+
+        Sin restringir, `suggest_float(..., 0.0, 2.0)` permite que en régimen de **tendencia** pese
+        más la reversión que la tendencia. No es teórico: 6 de las 15 configuraciones publicadas lo
+        hacían, y de ahí salían cortos contra la tendencia — `regime_label` decía «tendencia» en
+        cada decisión guardada mientras el motor aplicaba lo contrario.
+
+        Restringido, la reversión en tendencia se muestrea dentro de `[0, max(trend, momentum)]` y
+        en rango al revés. Se hace **por construcción** y no rechazando trials: rechazar sesgaría la
+        búsqueda hacia las zonas donde es fácil cumplir la condición.
+        """
+        if not coherencia_regimen:
+            for reg, kind in REGIME_KEYS:
+                params[f"r_{reg}_{kind}"] = trial.suggest_float(f"r_{reg}_{kind}", 0.0, 2.0)
+            return
+        # Tendencia: manda la familia direccional; basta con que una de las dos lo haga.
+        tt = trial.suggest_float("r_trend_trend", 0.0, 2.0)
+        tm = trial.suggest_float("r_trend_momentum", 0.0, 2.0)
+        params["r_trend_trend"] = tt
+        params["r_trend_momentum"] = tm
+        params["r_trend_reversion"] = trial.suggest_float(
+            "r_trend_reversion", 0.0, max(tt, tm, 1e-6)
+        )
+        # Rango: manda la reversión.
+        rr = trial.suggest_float("r_range_reversion", 0.0, 2.0)
+        params["r_range_reversion"] = rr
+        params["r_range_trend"] = trial.suggest_float("r_range_trend", 0.0, max(rr, 1e-6))
+        params["r_range_momentum"] = trial.suggest_float("r_range_momentum", 0.0, max(rr, 1e-6))
 
     def objective(trial: optuna.Trial) -> float:
         params: dict[str, float] = {}
         for k in WEIGHT_KEYS:
             params[f"w_{k}"] = trial.suggest_float(f"w_{k}", 0.0, 2.0)
-        for reg, kind in REGIME_KEYS:
-            params[f"r_{reg}_{kind}"] = trial.suggest_float(f"r_{reg}_{kind}", 0.0, 2.0)
+        sugerir_regimen(trial, params)
         params["hold_band"] = trial.suggest_float("hold_band", 0.0, 0.25)
         params["temperature"] = trial.suggest_float("temperature", 0.2, 1.5)
         params["adx_lo"] = trial.suggest_float("adx_lo", 10.0, 25.0)
