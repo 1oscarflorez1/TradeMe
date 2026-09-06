@@ -7,6 +7,45 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.62.0] — 2026-09-05
+
+> Se apaga la reoptimización automática. No es un recorte de capacidad: es la consecuencia de que
+> **Optuna no gana a la configuración escrita a mano** ni con 40 trials (11/20, p = 0,412) ni con
+> 120 (10/20, p = 0,588).
+
+### Changed — El piloto deja de reoptimizar por su cuenta
+
+- `optimize_every_h = 0` por defecto, y ese valor apaga la optimización automática **entera**, no
+  solo la periódica.
+- Es deliberado que apague también la vía de **degradación**: las tres vías llaman al mismo
+  optimizador, y dejar viva esa reoptimizaría justo las claves que peor van — donde más tienta el
+  sobreajuste y donde menos muestra hay para distinguirlo.
+- `load_config` acepta ahora el 0 como valor válido para este parámetro. Para los demás sigue
+  exigiendo un valor positivo, porque allí un 0 significaría «cada ciclo» y no «nunca».
+
+### Por qué, con los números del estudio (PR #81)
+
+| comparación | 40 trials | 120 trials |
+|---|---|---|
+| Optuna libre gana a la **manual** | 11/20 (p = 0,412) | 10/20 (p = 0,588) |
+| Optuna coherente gana a la manual | 9/20 (p = 0,748) | 10/20 (p = 0,588) |
+| la activa gana a la manual | 12/20 (p = 0,252) | 12/20 (p = 0,252) |
+
+- Ninguna configuración —optimizada o activa— se distingue del `ensemble.yaml` de M3. Triplicar la
+  búsqueda no cambió eso.
+- Las dos configuraciones que pasaron el guardia con 120 trials **no son evidencia**: 20 claves × 2
+  condiciones son 40 pruebas contra un P95, y encontrar dos es lo que produce el azar. Ambas caían
+  en 4h, en cuarentena desde M10.5.
+- Optimizar cada semana algo que no mejora gasta ciclo y arriesga promocionar ruido.
+
+### Lo que NO se apaga
+
+- `POST /run-optimize` sigue lanzando una optimización a mano.
+- `run_optimizador_estudio` sigue disponible para rehacer la pregunta cuando cambie algo sustancial:
+  más historia, un indicador nuevo, otro espacio de búsqueda.
+- Subir `optimize_every_h` vuelve a encenderlo. Lo que se apaga es hacerlo cada semana **sin que
+  nadie mire el resultado**.
+
 ## [0.61.0] — 2026-09-05
 
 > Con los **40 trials que usa producción**, reoptimizar empeora (17/20, p = 0,0013). Con **120** el
