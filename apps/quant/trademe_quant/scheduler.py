@@ -27,7 +27,11 @@ class AutoConfig:
     symbols: list[str] = field(default_factory=lambda: ["BTCUSDT"])
     intervals: list[str] = field(default_factory=lambda: ["15m", "30m", "1h", "4h", "1d"])
     backtest_every_h: float = 6.0
-    optimize_every_h: float = 24.0 * 7
+    #: Horas entre optimizaciones de mantenimiento. **0 = apagado**, que es el valor desde 0.62.0:
+    #: el estudio de PR #81 no encontró ninguna ventaja de Optuna sobre la configuración manual, ni
+    #: con 40 trials ni con 120. Se conserva el parámetro porque la pregunta puede volver a hacerse
+    #: con más historia o con indicadores nuevos, y entonces bastará subirlo.
+    optimize_every_h: float = 0.0
     cooldown_h: float = 48.0
     trials: int = 40
     min_trades_degradation: int = 30
@@ -74,7 +78,10 @@ def load_config() -> AutoConfig:
             "calibrate_every_h",
             "metamodel_every_h",
         ):
-            if isinstance(o.get(k), (int, float)) and o[k] > 0:
+            # `optimize_every_h` admite 0 —apagado—; los demás siguen exigiendo un valor positivo,
+            # porque un 0 ahí significaría «cada ciclo» y no «nunca».
+            minimo = 0 if k == "optimize_every_h" else 1e-9
+            if isinstance(o.get(k), (int, float)) and o[k] >= minimo:
                 setattr(cfg, k, float(o[k]))
         if isinstance(o.get("trials"), int) and 5 <= o["trials"] <= 200:
             cfg.trials = o["trials"]
@@ -92,7 +99,7 @@ def config_from_env() -> AutoConfig:
         symbols=_list("AUTO_SYMBOLS", "BTCUSDT"),
         intervals=_list("AUTO_INTERVALS", "15m,30m,1h,4h,1d"),
         backtest_every_h=float(os.environ.get("AUTO_BACKTEST_EVERY_H", "6")),
-        optimize_every_h=float(os.environ.get("AUTO_OPTIMIZE_EVERY_H", str(24 * 7))),
+        optimize_every_h=float(os.environ.get("AUTO_OPTIMIZE_EVERY_H", "0")),
         cooldown_h=float(os.environ.get("AUTO_OPT_COOLDOWN_H", "48")),
         trials=int(os.environ.get("AUTO_TRIALS", "40")),
         calibrate_every_h=float(os.environ.get("AUTO_CALIBRATE_EVERY_H", str(24 * 7))),
@@ -114,7 +121,25 @@ def should_optimize(
     every_h: float,
     cooldown_h: float,
 ) -> tuple[bool, str]:
-    """Decide si toca optimizar y por qué (lógica pura, testeable)."""
+    """Decide si toca optimizar y por qué (lógica pura, testeable).
+
+    `every_h <= 0` apaga la optimización automática **entera**, no solo la periódica. Es
+    deliberado: las tres vías —primera vez, degradación y mantenimiento— llaman al mismo
+    optimizador, y lo que se midió es que ese optimizador no produce configuraciones mejores. Apagar
+    el mantenimiento y dejar viva la de degradación reoptimizaría justo las claves que peor van, que
+    es donde la tentación de sobreajustar es mayor.
+
+    Medido el 5-sep-2026 sobre las 20 claves con hold-outs de 56 a 562 operaciones: Optuna no gana a
+    la configuración escrita a mano ni con 40 trials (11/20, p = 0,412) ni con 120 (10/20,
+    p = 0,588). Ver `docs/optimizador-veredicto.md`.
+
+    No se borra nada: `POST /run-optimize` sigue lanzando una optimización a mano cuando cambie algo
+    sustancial —más histórico, un indicador nuevo—, y `run_optimizador_estudio` sigue ahí para
+    volver a hacer la pregunta con datos nuevos. Lo que se apaga es hacerlo **cada semana sin que
+    nadie mire el resultado**.
+    """
+    if every_h <= 0:
+        return False, ""
     if hours_since_opt is None:
         return True, "primera optimización de esta temporalidad"
     if hours_since_opt < cooldown_h:
