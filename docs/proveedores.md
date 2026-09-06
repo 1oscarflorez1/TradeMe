@@ -115,6 +115,22 @@ sin duplicados y sin una sola vela que Binance no tuviera.
 
 ### Twelve Data — acciones, divisas, índices y ETF
 
+#### El presupuesto cuenta créditos, no peticiones
+
+El plan gratuito da **800 créditos al día** y 8 por minuto. La palabra importa: Twelve Data cobra
+por **crédito**, y algunos endpoints valen más de uno. `RateBudget` contaba **peticiones**, que es
+algo parecido y no lo mismo.
+
+Medido el 6-sep-2026: con un límite local de 700 peticiones diarias, el proveedor había
+contabilizado **1.003 créditos** sobre 800. El cupo se agotaba mientras el guardia creía que sobraba
+margen — y **ARQQ llevaba 17 días sin velas nuevas**, gastando el cupo entero sin traer datos.
+
+La corrección no es afinar la estimación sino **dejar de estimar**. Cada respuesta trae
+`Api-Credits-Request` con lo que costó esa petición, y `RateBudget.ajustar()` lo aplica: `tryTake`
+reserva uno —el coste no se conoce hasta que responde— y el resto se apunta después. También se lee
+en las respuestas de error, porque una petición rechazada por cupo ya se ha contabilizado al otro
+lado.
+
 Se activa poniendo una clave gratuita en el `.env`:
 
 ```env
@@ -129,9 +145,13 @@ Límites del plan gratuito y cómo los respeta TradeMe:
 
 | Límite del plan | Cómo se respeta |
 |---|---|
-| 8 peticiones/minuto | Presupuesto interno fijado en **6/min** (margen de seguridad). |
-| 800 peticiones/día | Presupuesto interno fijado en **700/día**. |
+| 8 **créditos**/minuto | Presupuesto interno en **6/min** (margen de seguridad). |
+| 800 **créditos**/día | Presupuesto interno en **700/día**, y cada respuesta ajusta el consumo real con `Api-Credits-Request`. |
 | Sin WebSocket | Modo `poll` con cadencia derivada de la temporalidad. |
+
+El margen del presupuesto interno no basta por sí solo: lo que evita el desbordamiento es contar en
+la unidad correcta. Con 700 «peticiones» permitidas el proveedor llegó a contabilizar 1.003
+créditos, porque no todas valen lo mismo.
 
 Cuando el presupuesto se agota, el sondeo **se pospone** en vez de fallar: no se pierde el activo,
 solo llega la vela un poco más tarde. Presupuesto orientativo: un activo con 15m/1h/4h/1d consume

@@ -7,6 +7,38 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.66.0] — 2026-09-06
+
+> El presupuesto de Twelve Data contaba **peticiones** donde el proveedor cobra **créditos**. Con un
+> límite local de 700 diarias, el proveedor había contabilizado **1.003 créditos** sobre 800 — y
+> ARQQ llevaba **17 días sin datos nuevos**.
+
+### Fixed — El presupuesto cuenta créditos, no peticiones
+
+- `RateBudget.ajustar(costeReal)` corrige la reserva con lo que el proveedor dice que costó la
+  petición. `tryTake` reserva uno —el coste no se conoce hasta que responde— y `ajustar` apunta la
+  diferencia.
+- `TwelveDataProvider` lee la cabecera **`Api-Credits-Request`** de cada respuesta, también de las
+  de error: una petición rechazada por cupo ya se ha contabilizado al otro lado.
+- La corrección no es afinar la estimación, es **dejar de estimar**. El proveedor es la única fuente
+  de verdad sobre su propia contabilidad.
+
+### Lo que se descubrió al intentar el hito de DXY/VIX
+
+- La clave está configurada y es **válida**, pero la primera petición devolvió **429: «1003 API
+  credits used, current limit 800»**. El cupo diario estaba agotado.
+- **ARQQ, el único activo de Twelve Data, lleva 17 días sin velas nuevas** en 1m/5m/15m/30m/1h, 13
+  en 4h y 3 en 1d. Se gastaba el cupo entero sin obtener datos.
+- Twelve Data informa del consumo en cabeceras —`Api-Credits-Left`, `Api-Credits-Used`,
+  `Api-Credits-Request`—, que es lo que permite la corrección.
+
+### El hito de DXY/VIX queda pendiente
+
+- **No se ha podido verificar si el plan gratuito incluye DXY y VIX**: sin créditos no hay forma de
+  preguntarlo, y ese es el paso 1 del hito. Se comprobará tras el reset de las 00:00 UTC.
+- Es el mismo patrón que este proyecto ya ha corregido varias veces: un listón que mide algo
+  parecido a lo que dice medir, y la diferencia es justo por donde se escapa el fallo.
+
 ## [0.65.0] — 2026-09-06
 
 > Tres vectores nativo-precio, ortogonales de verdad a los ocho indicadores. **Ninguno aporta** — y
