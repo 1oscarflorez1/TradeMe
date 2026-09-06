@@ -7,6 +7,60 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.64.0] — 2026-09-06
+
+> Marco contrafactual para candidatos a alfa, y primer veredicto: el **momentum del funding no
+> aporta**. 1h se une a la cuarentena estructural.
+
+### Changed — 1h entra en cuarentena estructural
+
+- Con **−0,107 R netos** no hay negocio posible con los indicadores actuales. Quedan operando 4h
+  —marginal— y 1d, la única con expectancy neta positiva.
+- Vectores de paridad regenerados y el valor por defecto de `config.ts` alineado con el yaml.
+
+### Added — `alfa.py`, el marco de prueba para vectores nuevos
+
+- Mide **R neta**, no ΔAUC. `informacion.py` sigue siendo el criterio para admitir un voto en el
+  ensemble; este responde otra pregunta: si el vector mueve la expectancy lo suficiente para cubrir
+  el coste de operar.
+- La prueba es un **filtro contrafactual**: se descartan las operaciones donde el vector dice «no» y
+  las descartadas cuentan como **0 sobre el mismo `n`** — renunciar a operaciones ganadoras se paga.
+- Tres condiciones, y se exigen las tres: muestra a los dos lados, superar el P95 de una nula por
+  bloques de 24 h, y dejar una expectancy neta por encima de **+0,015 R**. Sin la tercera, el marco
+  aprobaría filtros que solo pierden más despacio — el fallo que 0.54.0 corrigió en el optimizador.
+- La nula usa `marcas_de_indices` y no `nula.marcas_de`: el backtest trabaja con índices, y pasarle
+  instantes los metería todos en el bloque 0, degenerando la nula a la simple.
+
+### Qué se puede medir, y qué no
+
+Comprobado contra la API de Binance:
+
+| fuente | histórico | ¿medible? |
+|---|---|---|
+| **funding rate** | **desde 2020** | **sí** |
+| open interest | 30 días | no |
+| long/short ratio | 30 días | no |
+| taker buy/sell | 30 días | no |
+| DXY, VIX | Twelve Data sin clave | pendiente |
+
+- Los **deltas de interés abierto** son una idea razonable y **no son medibles hoy**: 30 días son
+  unas 30 observaciones en 1d. La ingesta ya los guarda desde M11, así que dentro de un año habrá
+  con qué.
+
+### El primer candidato: momentum del funding
+
+- Mide la **variación** del funding respecto a su media semanal, no el nivel — que es lo que ya
+  hace el Fundamental Score. Son preguntas distintas: un funding alto y estable describe un mercado
+  apalancado en equilibrio; uno bajo pero subiendo, uno que se está cargando.
+- **Veredicto: no aporta.** De 16 pruebas (4 símbolos × 2 temporalidades × 2 reglas) una supera el
+  listón, y con un P95 el azar produce **0,8**. Encontrar una es lo esperado.
+- El único caso positivo es marginal por los dos lados: BNBUSDT:1d con lift +0,0791 sobre una nula
+  de +0,0672, y neta +0,0234 frente a un listón de +0,015.
+- **Anotado sin sobrevender:** en 1d, descartar el tercil alto da lift positivo en tres de las
+  cuatro claves. Tres de cuatro con una moneda justa sale el 31 % de las veces, así que no es un
+  hallazgo — es una dirección que merece volver a mirarse con más historia, y que no justifica
+  tocar nada hoy.
+
 ## [0.63.0] — 2026-09-06
 
 > El backtest medía en **bruto**. Con costes reales, la expectancy neta es negativa en todas las
