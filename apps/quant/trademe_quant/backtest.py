@@ -10,6 +10,7 @@ import statistics
 from collections.abc import Sequence
 from typing import Any
 
+from .costes import coste_en_r, desde_config
 from .decision import decidir_con_lecturas
 from .indicadores_series import readings_series
 
@@ -24,28 +25,54 @@ def evaluate_trade(
     future_high: Sequence[float],
     future_low: Sequence[float],
     future_close: Sequence[float],
+    coste_pct: float = 0.0,
 ) -> dict[str, Any]:
-    """Resultado de un trade sobre las velas futuras (primer toque, peor caso SL)."""
+    """Resultado de un trade sobre las velas futuras (primer toque, peor caso SL).
+
+    `coste_pct` es el round-trip en porcentaje del nocional —comisión de las dos patas más
+    deslizamiento— y se descuenta de **todos** los desenlaces, incluido el stop: cerrar en pérdida
+    también se paga. Con `coste_pct = 0` el resultado es idéntico al de siempre, bit a bit, y hay un
+    test que lo exige.
+
+    El coste se convierte a R con `|entry - stop|`, que ya es 1 R en precio. Ver `costes.py`: la
+    conversión importa más de lo que parece, porque cuanto más corta la temporalidad menos vale 1 R
+    en dinero y más pesa la misma comisión sobre él.
+
+    `r` es siempre **neto**. `r_bruto` viaja al lado para poder comparar las dos cosas sin repetir
+    el backtest, que es justo lo que este hito necesitaba medir.
+    """
     risk = abs(entry - stop)
+    coste = coste_en_r(entry, stop, coste_pct)
+
+    def cerrar(result: str, bruto: float, bars: int) -> dict[str, Any]:
+        return {
+            "result": result,
+            "r": bruto - coste,
+            "r_bruto": bruto,
+            "coste_r": coste,
+            "bars": bars,
+        }
+
     for i in range(len(future_high)):
         high = future_high[i]
         low = future_low[i]
         if direction == "LONG":
             if low <= stop:  # peor caso: SL antes que TP
-                return {"result": "sl", "r": -1.0, "bars": i + 1}
+                return cerrar("sl", -1.0, i + 1)
             if high >= take_profit:
-                return {"result": "tp", "r": (take_profit - entry) / risk, "bars": i + 1}
+                return cerrar("tp", (take_profit - entry) / risk, i + 1)
         else:  # SHORT
             if high >= stop:
-                return {"result": "sl", "r": -1.0, "bars": i + 1}
+                return cerrar("sl", -1.0, i + 1)
             if low <= take_profit:
-                return {"result": "tp", "r": (entry - take_profit) / risk, "bars": i + 1}
+                return cerrar("tp", (entry - take_profit) / risk, i + 1)
     # timeout: cierre al final del horizonte
     if len(future_close) > 0 and risk > 0:
         last = future_close[-1]
-        r = (last - entry) / risk if direction == "LONG" else (entry - last) / risk
-        return {"result": "timeout", "r": r, "bars": len(future_close)}
-    return {"result": "timeout", "r": 0.0, "bars": 0}
+        bruto = (last - entry) / risk if direction == "LONG" else (entry - last) / risk
+        return cerrar("timeout", bruto, len(future_close))
+    # Sin velas no hubo operación: tampoco se paga por ella.
+    return {"result": "timeout", "r": 0.0, "r_bruto": 0.0, "coste_r": 0.0, "bars": 0}
 
 
 def compute_metrics(trades: Sequence[dict[str, Any]]) -> dict[str, Any]:
@@ -116,6 +143,9 @@ def run_backtest(
     # doblar las velas. Las lecturas son idénticas —hay un test que lo comprueba vela a vela con
     # igualdad exacta—, así que esto no cambia ni una operación del backtest, solo lo que tarda.
     lecturas = readings_series(high, low, close)
+    # El round-trip sale de la configuración, así que medir en bruto o en neto es una decisión
+    # explícita del yaml y no un descuido. Sin sección `costs`, cero — el comportamiento de antes.
+    coste_pct = desde_config(config)
 
     t = MIN_CANDLES
     while t < n - 1:
@@ -141,6 +171,7 @@ def run_backtest(
                 high[t + 1 : end],
                 low[t + 1 : end],
                 close[t + 1 : end],
+                coste_pct=coste_pct,
             )
             trades.append(
                 {

@@ -62,7 +62,14 @@ def _backtest_de_referencia(
 
     Se conserva aquí como oráculo. Es O(N²) y por eso no está en producción, pero es la definición
     de «correcto» contra la que se juzga la rápida.
+
+    Cobra el mismo coste de transacción que `run_backtest` lee de la configuración: lo que este test
+    compara es la **vía de cálculo**, no la política de costes, y dejarlo en bruto convertiría una
+    diferencia de configuración en un falso fallo de paridad.
     """
+    from trademe_quant.costes import desde_config
+
+    coste_pct = desde_config(config)
     horizon = 20
     trades: list[dict[str, Any]] = []
     n = len(close)
@@ -80,6 +87,7 @@ def _backtest_de_referencia(
                 high[t + 1 : end],
                 low[t + 1 : end],
                 close[t + 1 : end],
+                coste_pct=coste_pct,
             )
             trades.append(
                 {
