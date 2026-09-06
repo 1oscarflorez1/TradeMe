@@ -196,3 +196,23 @@ def resumen(v: Veredicto) -> dict[str, Any]:
         "lift": round(v.lift, 4),
         "nula_p95": round(v.nula_p95, 4),
     }
+
+
+def p_falsos_positivos(aciertos: int, pruebas: int, alfa: float = 0.05) -> float:
+    """Probabilidad de ver `aciertos` o más entre `pruebas`, si todas fueran ruido.
+
+    El veredicto por clave usa un listón del percentil 95, así que **cada prueba tiene un 5 % de
+    salir positiva por azar**. Con 48 pruebas eso son 2,4 positivos esperados sin que exista ninguna
+    señal, y leer uno de ellos como hallazgo es el error clásico de la búsqueda de alfa.
+
+    Esto lo pone delante: con ocho claves por vector y regla hacen falta **tres** positivos para
+    bajar de 0,05, y uno solo sale el 34 % de las veces.
+    """
+    from math import comb
+
+    if pruebas <= 0:
+        return 1.0
+    return sum(
+        comb(pruebas, k) * (alfa**k) * ((1 - alfa) ** (pruebas - k))
+        for k in range(aciertos, pruebas + 1)
+    )
