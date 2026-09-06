@@ -44,6 +44,25 @@ regime:
     momentum: 0.8
     reversion: 1.5
 
+# Costes de transacción (M15). Hasta 0.63.0 el backtest medía en BRUTO, y con eso todos los
+# listones de gobierno estaban mal calibrados: se exigía +0,05 R de promoción en 15m cuando la
+# comisión se lleva 0,3 R por operación.
+#
+# La conversión a R es lo que importa: `1 R = atr_stop_mult x ATR`, así que cuanto más corta la
+# temporalidad menos vale 1 R en dinero y más pesa la misma comisión sobre él. Medido en BTCUSDT:
+# 1 R son 0,40 % del precio en 15m y 6,6 % en 1d — el mismo round-trip cuesta 0,30 R y 0,018 R.
+#
+# Mercado: Binance USDT-M Futuros. `round_trip = 2 x (comisión + deslizamiento)`, porque se paga al
+# abrir y al cerrar, y el deslizamiento se cuenta en las dos patas: en la de salida suele ser peor,
+# ya que un stop se ejecuta justo cuando el mercado va en contra.
+costs:
+  enabled: true
+  mode: 'taker' # taker | maker
+  taker_pct: 0.05 # por orden
+  maker_pct: 0.02 # por orden
+  slippage_pct: 0.01 # por orden, estimado
+  # taker -> 2 x (0,05 + 0,01) = 0,12 % round-trip · maker -> 0,06 %
+
 # Gestión de riesgo para el plan de acción (M4). El capital va por env (ACCOUNT_EQUITY).
 risk:
   atr_stop_mult: 1.5 # distancia del stop = 1.5 x ATR
@@ -71,7 +90,27 @@ evaluation:
 # vetados. Sigue vetada mientras su expediente sombra no demuestre lo contrario.
 # Se retira el permiso para operar, no la observación: el backtest sigue simulándola para saber
 # cuándo puede levantarse.
-quarantine_intervals: ['4h']
+# 15m y 30m entran por un motivo DISTINTO al de 4h: no es su expediente, es el coste estructural.
+# Medido sobre años de histórico y ~1.850 operaciones por clave, con costes de Binance USDT-M
+# Futuros (0,12 % round-trip):
+#
+#   tf    bruta   coste   neta(taker)  neta(maker)
+#   15m  +0,003   0,290     -0,265       -0,131
+#   30m  +0,003   0,173     -0,186       -0,094
+#   1h   +0,003   0,112     -0,107       -0,052
+#   4h   +0,010   0,041     -0,030       -0,010
+#   1d   +0,037   0,015     +0,020       +0,029
+#
+# La expectancy BRUTA es ≈0 en todas: el ensemble no tiene ventaja en ninguna temporalidad. Lo que
+# cambia entre ellas es cuánto pesa el coste, porque `1 R = atr_stop_mult x ATR` y en 15m 1 R son
+# 0,40 % del precio frente al 6,6 % de 1d. El mismo round-trip cuesta 0,29 R arriba y 0,015 abajo.
+#
+# Esto NO se arregla esperando ni afinando pesos: haría falta una ventaja bruta de +0,29 R en 15m
+# solo para empatar, y lo medido es +0,003. Por eso es cuarentena **estructural**.
+#
+# Se retira el permiso para operar, no la observación: el expediente sombra se sigue midiendo, y
+# ahora en NETO — así que solo saldrán si de verdad ganan después de pagar al exchange.
+quarantine_intervals: ['15m', '30m', '4h']
 
 # Sesgo fundamental macro (1w+): funding rate + tendencia semanal (EMA 1w).
 # Se inyecta en los logits del softmax; si el conflicto es fuerte, degrada a FLAT.

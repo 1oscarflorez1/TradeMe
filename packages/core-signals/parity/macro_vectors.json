@@ -321,7 +321,7 @@
       "expected": {
         "valid_candles": 4,
         "horizon": 20,
-        "quarantined": false
+        "quarantined": true
       }
     },
     {
@@ -329,7 +329,7 @@
       "expected": {
         "valid_candles": 4,
         "horizon": 20,
-        "quarantined": false
+        "quarantined": true
       }
     },
     {
