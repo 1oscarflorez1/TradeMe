@@ -141,6 +141,19 @@ que no mejora es gastar ciclo y arriesgar promociones de ruido.
 Lo que **no** es defendible es lo actual: seguir optimizando cada semana con 40 trials, que es la
 peor de las dos —el coste de (a) con el resultado de (b)—.
 
+### Decidido (0.62.0): la opción (b)
+
+`optimize_every_h = 0`, y ese valor apaga la optimización automática **entera**, no solo la
+periódica. Es deliberado: las tres vías —primera vez, degradación y mantenimiento— llaman al mismo
+optimizador, y apagar solo el mantenimiento dejaría viva la de degradación, que reoptimizaría justo
+las claves que peor van — donde más tienta el sobreajuste.
+
+**No se borra nada.** `POST /run-optimize` sigue lanzando una optimización a mano, y
+`run_optimizador_estudio` sigue disponible para rehacer la pregunta cuando cambie algo sustancial:
+más historia, un indicador nuevo, otro espacio de búsqueda. Subir el parámetro vuelve a encenderlo.
+
+Lo que se apaga es **hacerlo cada semana sin que nadie mire el resultado**.
+
 Lo que sí abre este resultado es una pregunta mejor: si el espacio de pesos no tiene nada más que
 dar, el margen no está en ajustar los votos sino en **qué se vota**. La plataforma sigue sin
 habilidad direccional demostrable, y ningún reparto de pesos sobre los mismos ocho indicadores va a
