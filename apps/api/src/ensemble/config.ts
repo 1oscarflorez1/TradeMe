@@ -193,11 +193,11 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
       '1M': 4,
     },
   },
-  // 15m y 30m entran por un motivo distinto al de 4h: no es su expediente, es el coste
+  // 15m, 30m y 1h entran por un motivo distinto al de 4h: no es su expediente, es el coste
   // estructural. Con `1 R = atrStopMult x ATR`, en 15m 1 R son ~0,40 % del precio y el round-trip
   // de Binance USDT-M Futuros (0,12 %) se lleva 0,29 R por operación — contra una expectancy bruta
   // medida de +0,003 R sobre ~1.850 operaciones. Ver `docs/costes.md`.
-  quarantineIntervals: ['15m', '30m', '4h'],
+  quarantineIntervals: ['15m', '30m', '1h', '4h'],
 };
 
 /** Frescura de la entrada, en velas, para una temporalidad. */

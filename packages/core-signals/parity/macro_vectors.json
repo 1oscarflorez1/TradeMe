@@ -337,7 +337,7 @@
       "expected": {
         "valid_candles": 3,
         "horizon": 18,
-        "quarantined": false
+        "quarantined": true
       }
     },
     {

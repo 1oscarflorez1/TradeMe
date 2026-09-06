@@ -97,7 +97,7 @@ evaluation:
 #   tf    bruta   coste   neta(taker)  neta(maker)
 #   15m  +0,003   0,290     -0,265       -0,131
 #   30m  +0,003   0,173     -0,186       -0,094
-#   1h   +0,003   0,112     -0,107       -0,052
+#   1h   +0,003   0,112     -0,107       -0,052   <- añadida en 0.64.0
 #   4h   +0,010   0,041     -0,030       -0,010
 #   1d   +0,037   0,015     +0,020       +0,029
 #
@@ -110,7 +110,7 @@ evaluation:
 #
 # Se retira el permiso para operar, no la observación: el expediente sombra se sigue midiendo, y
 # ahora en NETO — así que solo saldrán si de verdad ganan después de pagar al exchange.
-quarantine_intervals: ['15m', '30m', '4h']
+quarantine_intervals: ['15m', '30m', '1h', '4h']
 
 # Sesgo fundamental macro (1w+): funding rate + tendencia semanal (EMA 1w).
 # Se inyecta en los logits del softmax; si el conflicto es fuerte, degrada a FLAT.
