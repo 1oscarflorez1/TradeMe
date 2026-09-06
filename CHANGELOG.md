@@ -7,6 +7,66 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.63.0] — 2026-09-06
+
+> El backtest medía en **bruto**. Con costes reales, la expectancy neta es negativa en todas las
+> temporalidades salvo 1d — y 15m/30m entran en cuarentena **estructural**.
+
+### Added — Costes de transacción en el backtest
+
+- `costes.py` convierte comisión y deslizamiento a unidades R. `|entry − stop|` ya es 1 R en precio,
+  así que el cálculo es exacto y sigue valiendo si cambia `atr_stop_mult`.
+- `evaluate_trade` acepta `coste_pct` y lo descuenta de **todos** los desenlaces, el stop incluido:
+  cerrar en pérdida también se paga. Devuelve `r` (neto), `r_bruto` y `coste_r`.
+- Configuración en `ensemble.yaml`, mercado **Binance USDT-M Futuros**: taker 0,05 % más 0,01 % de
+  deslizamiento por orden, es decir **0,12 % de round-trip**; maker 0,06 %.
+- Sin sección `costs` el round-trip es cero y el comportamiento es el de antes. Hay un test que lo
+  exige: medir en neto es siempre una decisión explícita.
+
+### Changed — Todos los listones de gobierno miden en NETO
+
+- Cuarentena, meta-modelo, `meta_policy` y Fundamental Score descuentan el coste **al leer**.
+- El dato de la base **no se reescribe**: hacerlo mezclaría dos reglas en la misma columna, que es
+  el error que este proyecto arrastra desde M10.5 y que obligó a filtrar por reproducibilidad.
+  Además, así cambiar la comisión no exige recalcular ningún histórico.
+
+### Changed — 15m y 30m entran en cuarentena estructural
+
+- El motivo es **distinto** al de 4h. Aquella entró por su expediente; estas entran porque el coste
+  es estructural: haría falta una ventaja bruta de **+0,29 R** en 15m solo para empatar, y lo medido
+  es **+0,003 R** sobre 1.875 operaciones. Dos órdenes de magnitud.
+- Se retira el permiso para operar, no la observación: su expediente sombra se sigue midiendo, y
+  ahora en neto, así que solo saldrán si ganan después de pagar al exchange.
+- Vectores de paridad regenerados, y el valor por defecto de `config.ts` alineado con el yaml.
+
+### Lo que se midió
+
+Años de histórico, ~1.850 operaciones por clave, 20 claves (medianas):
+
+| tf | bruta | coste | neta (taker) | neta (maker) |
+|---|---|---|---|---|
+| 15m | +0,003 | 0,290 | **−0,265** | −0,131 |
+| 30m | +0,003 | 0,173 | **−0,186** | −0,094 |
+| 1h | +0,003 | 0,112 | **−0,107** | −0,052 |
+| 4h | +0,010 | 0,041 | −0,030 | −0,010 |
+| 1d | +0,037 | 0,015 | **+0,020** | +0,029 |
+
+- **La expectancy bruta es la misma en todas** —entre +0,003 y +0,037— y ninguna es una ventaja. El
+  ensemble no tiene señal direccional en ninguna temporalidad; lo único que las diferencia es cuánto
+  coste soportan, porque `1 R = atr_stop_mult × ATR` y 1 R vale 0,40 % del precio en 15m frente al
+  6,6 % en 1d.
+- Solo dos claves quedan claramente positivas en neto: **ETHUSDT:1d (+0,059)** y **SOLUSDT:1d
+  (+0,108)**. Las de 4h son marginales y solo con maker.
+- De paso quedó refutado que «los cortos» fueran el problema: sobre años, largos y cortos rinden
+  igual (BTCUSDT:1h, +0,001 y +0,002). La asimetría de producción —+0,511 frente a −0,292— era un
+  artefacto del tramo alcista de 45 días.
+
+### Pendiente de decidir
+
+- **1h también sale negativa** (−0,107 R) y 4h es marginal. Con el criterio aplicado a 15m y 30m,
+  1h debería seguir el mismo camino, y entonces solo quedaría 1d operando. Es una decisión de
+  alcance que este hito no toma.
+
 ## [0.62.0] — 2026-09-05
 
 > Se apaga la reoptimización automática. No es un recorte de capacidad: es la consecuencia de que

@@ -253,7 +253,7 @@ def fetch_rows(
         cur.execute("""SELECT * FROM (
                  SELECT DISTINCT ON (symbol, interval, candle_open)
                         id, symbol, action, fund_shadow_action, fund_penalty,
-                        outcome_return_r, captured_at
+                        outcome_return_r, captured_at, plan_entry, plan_stop
                    FROM snapshots
                   WHERE direction = 'LONG'
                     AND outcome_result IN ('tp','sl')
@@ -268,6 +268,8 @@ def fetch_rows(
             "fund_penalty",
             "outcome_return_r",
             "captured_at",
+            "plan_entry",
+            "plan_stop",
         ]
         filas = [dict(zip(columnas, r, strict=True)) for r in cur.fetchall()]
 
@@ -278,8 +280,20 @@ def fetch_rows(
 
         fiables = ids_reproducibles(dsn, horizons)
         filas = [f for f in filas if f["id"] in fiables]
+
+    # En NETO: el lift que decide si el Fundamental Score sale de sombra tiene que medirse sobre lo
+    # que se cobra, no sobre lo que sale antes de pagar al exchange.
+    from .costes import desde_config, neto
+    from .ensemble import artifacts_dir, load_ensemble
+
+    pct = desde_config(load_ensemble(artifacts_dir() / "ensemble.yaml"))
     for f in filas:
-        f.pop("id", None)
+        if pct > 0:
+            r = neto(f.get("outcome_return_r"), f.get("plan_entry"), f.get("plan_stop"), pct)
+            if r is not None:
+                f["outcome_return_r"] = r
+        for clave in ("id", "plan_entry", "plan_stop"):
+            f.pop(clave, None)
     return filas
 
 

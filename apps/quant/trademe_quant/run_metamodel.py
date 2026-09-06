@@ -70,19 +70,34 @@ def fetch_rows(
             #
             # El envoltorio devuelve el orden cronológico, que es el que necesita la división
             # temporal del entrenamiento (si no, se entrenaría con el futuro).
-            f"SELECT * FROM (SELECT DISTINCT ON (symbol, interval, candle_open) id, {cols} "  # noqa: S608
+            f"SELECT * FROM (SELECT DISTINCT ON (symbol, interval, candle_open) "  # noqa: S608
+            f"id, plan_entry, plan_stop, {cols} "
             "FROM snapshots WHERE outcome_result IN ('tp','sl') "
             "ORDER BY symbol, interval, candle_open, captured_at ASC) t ORDER BY captured_at ASC"
         )
-        filas = [dict(zip(["id", *SNAPSHOT_COLUMNS], r, strict=False)) for r in cur.fetchall()]
+        filas = [
+            dict(zip(["id", "plan_entry", "plan_stop", *SNAPSHOT_COLUMNS], r, strict=False))
+            for r in cur.fetchall()
+        ]
 
     if solo_reproducibles:
         from .evaluacion import ids_reproducibles
 
         fiables = ids_reproducibles(dsn, horizons)
         filas = [f for f in filas if f["id"] in fiables]
+    # Los listones del meta-modelo se miden en NETO desde 0.63.0: entrenar y decidir sobre R bruto
+    # con comisiones que se llevan 0,3 R en 15m era juzgar con un listón que no existe.
+    from .costes import desde_config, neto
+    from .ensemble import artifacts_dir, load_ensemble
+
+    pct = desde_config(load_ensemble(artifacts_dir() / "ensemble.yaml"))
     for f in filas:
-        f.pop("id", None)
+        if pct > 0:
+            r = neto(f.get("outcome_return_r"), f.get("plan_entry"), f.get("plan_stop"), pct)
+            if r is not None:
+                f["outcome_return_r"] = r
+        for clave in ("id", "plan_entry", "plan_stop"):
+            f.pop(clave, None)
     return filas
 
 
@@ -97,19 +112,31 @@ def fetch_shadow_rows(dsn: str, limit: int = 500) -> list[dict[str, Any]]:
 
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
-            """SELECT meta_confidence, outcome_return_r, captured_at FROM snapshots
+            """SELECT meta_confidence, outcome_return_r, captured_at, plan_entry, plan_stop
+               FROM snapshots
                WHERE meta_confidence IS NOT NULL AND outcome_result IN ('tp','sl')
                ORDER BY captured_at DESC LIMIT %s""",
             (limit,),
         )
-        return [
+        crudas = cur.fetchall()
+
+    # En NETO, como el entrenamiento: `meta_policy` decide con esto si el filtro sale de sombra, y
+    # medir su lift en bruto lo compararía contra una línea base que nadie puede cobrar.
+    from .costes import desde_config, neto
+    from .ensemble import load_ensemble
+
+    pct = desde_config(load_ensemble(artifacts_dir() / "ensemble.yaml"))
+    filas: list[dict[str, Any]] = []
+    for mc, r_bruto, capturada, p_en, p_st in crudas:
+        r = neto(r_bruto, p_en, p_st, pct) if pct > 0 else float(r_bruto)
+        filas.append(
             {
-                "meta_confidence": float(r[0]),
-                "outcome_return_r": float(r[1]),
-                "captured_at": r[2],
+                "meta_confidence": float(mc),
+                "outcome_return_r": float(r if r is not None else r_bruto),
+                "captured_at": capturada,
             }
-            for r in cur.fetchall()
-        ]
+        )
+    return filas
 
 
 def train_and_publish(dsn: str | None = None) -> dict[str, Any]:

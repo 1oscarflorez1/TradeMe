@@ -355,12 +355,20 @@ def fetch_expedientes(
         # De la más reciente a la más antigua: el expediente se queda con las primeras, porque lo
         # que describe al sistema de hoy es lo que ha hecho últimamente, no su historia entera.
         cur.execute("""
-            SELECT id, symbol, interval, captured_at, outcome_return_r, shadow_outcome_return_r
+            SELECT id, symbol, interval, captured_at, outcome_return_r, shadow_outcome_return_r,
+                   plan_entry, plan_stop, shadow_entry, shadow_stop
               FROM snapshots
              WHERE outcome_return_r IS NOT NULL OR shadow_outcome_return_r IS NOT NULL
              ORDER BY captured_at DESC
             """)
         crudas = cur.fetchall()
+
+        # La cuarentena decide quién opera, así que debe decidirlo sobre lo que se gana de verdad.
+        # Su límite (-0,15 R) se fijó en bruto, cuando en 15m la comisión ya se lleva 0,3 R.
+        from .costes import desde_config, neto
+        from .ensemble import artifacts_dir, load_ensemble
+
+        pct_coste = desde_config(load_ensemble(artifacts_dir() / "ensemble.yaml"))
 
         fiables_real: set[Any] | None = None
         fiables_sombra: set[Any] | None = None
@@ -370,7 +378,10 @@ def fetch_expedientes(
             fiables_real = ids_reproducibles(dsn, horizons, rama="real")
             fiables_sombra = ids_reproducibles(dsn, horizons, rama="sombra")
 
-        for sid, symbol, interval, capturada, real, sombra in crudas:
+        for sid, symbol, interval, capturada, real, sombra, p_en, p_st, s_en, s_st in crudas:
+            if pct_coste > 0:
+                real = neto(real, p_en, p_st, pct_coste)
+                sombra = neto(sombra, s_en, s_st, pct_coste)
             # Cada rama se descarta por su cuenta: una fila puede tener el desenlace real fiable y
             # el de sombra no, y viceversa.
             if fiables_real is not None and sid not in fiables_real:
