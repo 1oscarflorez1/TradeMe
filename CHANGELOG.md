@@ -7,6 +7,75 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.65.0] — 2026-09-06
+
+> Tres vectores nativo-precio, ortogonales de verdad a los ocho indicadores. **Ninguno aporta** — y
+> el marco frenó cuatro filtros que un criterio peor habría aprobado.
+
+### Added — Tres vectores derivados del precio
+
+- **`asimetria_mechas`** — `(mecha superior − inferior) / rango`. Proxy de rechazo en el nivel.
+- **`ratio_parkinson`** — volatilidad de rango frente a la de cierre-cierre. Distingue agitación sin
+  dirección de tendencia ordenada, que es lo que ni el ATR ni los osciladores separan.
+- **`compresion_atr`** — `ATR(5) / ATR(30)`. Reutiliza `atr_series` en vez de redefinir el ATR: una
+  segunda definición podría divergir de la primera sin que nadie lo notase.
+- `velas.series_ohlc` añade la apertura —hace falta para separar cuerpo de mechas— con caché aparte,
+  para no engordar la entrada que el backtest pide veinte veces por ciclo.
+- Hay un test que comprueba que **ninguno mira al futuro**: el valor en `t` sobre la serie truncada
+  en `t` debe ser idéntico al de la serie entera. Es la condición que `alfa.py` exige y no puede
+  verificar por sí mismo.
+
+### Added — El criterio de comparaciones múltiples que faltaba
+
+- `alfa.p_falsos_positivos`. Son **48 pruebas** contra un listón del percentil 95, así que el azar
+  produce **2,4 positivos** y el primero que salga parece un hallazgo.
+- Con ocho claves por vector y regla: uno solo sale el **34 %** de las veces, dos el 5,7 %, y hacen
+  falta **tres** para bajar de 0,05. Un vector que gana en una clave no ha demostrado nada.
+
+### La ortogonalidad, comprobada antes de juzgar
+
+Era una hipótesis, no una premisa. Sobre BTCUSDT:1d (3.308 velas), correlación máxima con un voto
+existente: mechas **0,10**, Parkinson **0,17**, compresión **0,17**. Los tres describen algo que el
+ensemble no mira.
+
+### Resultados
+
+| vector | descartar bajos | descartar altos | veredicto |
+|---|---|---|---|
+| asimetría de mechas | 1/8 (p = 0,337) | 1/8 (p = 0,337) | **ruido** |
+| ratio de Parkinson | 0/8 | 0/8 | **ruido** |
+| compresión ATR | 1/8 (p = 0,337) | 1/8 (p = 0,337) | **ruido** |
+
+- **48 pruebas, 4 positivos, 2,4 esperados por azar. p de que todo sea ruido = 0,218.**
+- Ningún vector+regla llega a los tres positivos necesarios, y los cuatro que salen están repartidos
+  entre vectores y reglas distintas, sin patrón — si hubiera señal, se concentrarían.
+- El más limpio en su negativa es el **ratio de Parkinson**: 0 de 16.
+
+### Lo que el marco frenó, y por qué importa
+
+De las 48 pruebas, **8 superaron la nula por bloques**. De esas ocho, la tercera condición —ser
+viable— frenó **cuatro**:
+
+| clave | vector | base → filtrada |
+|---|---|---|
+| SOLUSDT:4h | asimetría de mechas | −0,105 → **−0,052** |
+| SOLUSDT:4h | ratio de Parkinson | −0,105 → **−0,063** |
+| SOLUSDT:4h | compresión ATR | −0,105 → **−0,051** |
+| BNBUSDT:4h | asimetría de mechas | −0,078 → **−0,030** |
+
+Las cuatro están en las claves que peor van: ahí cualquier filtro «mejora», porque quitar
+operaciones de una serie perdedora sube la media hacia cero. Con un criterio de solo dos condiciones
+habríamos aprobado cuatro filtros que únicamente pierden más despacio — el mismo fallo que 0.54.0
+corrigió en el optimizador, parado esta vez por construcción.
+
+### Dónde no está el alfa
+
+Sumando los dos estudios —funding y precio—: **no aparece ventaja en ninguna dirección explorada**.
+Ni en el apalancamiento, ni en la forma de la vela, ni en el estado de la volatilidad. Queda sin
+explorar por falta de **datos**, no de ideas: interés abierto y long/short (la ingesta los acumula
+desde M11), DXY/VIX (exigen `TWELVEDATA_API_KEY`) y la microestructura, que Binance no publica con
+histórico.
+
 ## [0.64.0] — 2026-09-06
 
 > Marco contrafactual para candidatos a alfa, y primer veredicto: el **momentum del funding no
