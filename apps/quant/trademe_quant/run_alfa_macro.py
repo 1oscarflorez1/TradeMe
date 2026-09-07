@@ -1,27 +1,24 @@
-"""¿Aporta alguno de los tres vectores nativo-precio? Estudio bajo el marco de `alfa.py`.
+"""¿Aporta el contexto macro? Estudio de UUP y VXX bajo el marco de `alfa.py`.
 
-Uso: python -m trademe_quant.run_alfa_precio
+Uso: python -m trademe_quant.run_alfa_macro   (requiere haber ejecutado antes descargar_macro)
 
-El problema que hay que resolver antes de mirar ningún resultado
------------------------------------------------------------------
-Son **3 vectores × 2 reglas × 4 símbolos × 2 temporalidades = 48 pruebas**, cada una contra un
-listón del percentil 95. Sin más, el azar produce **2,4 positivos** y el primero que salga parecerá
-un hallazgo.
+Qué se prueba y contra qué
+---------------------------
+Son **2 vectores x 2 reglas x 4 símbolos x 2 temporalidades = 32 pruebas**, cada una contra un
+listón del percentil 95. Sin corrección, el azar produce **1,6 positivos** y el primero que salga
+parecerá un hallazgo. Por eso el veredicto vuelve a tener dos niveles y solo cuenta el segundo: con
+ocho claves por vector y regla hacen falta **tres** positivos para bajar de 0,05.
 
-Por eso el veredicto tiene dos niveles y solo cuenta el segundo:
+Lo que este estudio tiene y los anteriores no
+-----------------------------------------------
+Los vectores de precio se calculaban sobre la misma serie que la decisión, así que estaban alineados
+por construcción. Estos vienen de un mercado que **cierra por las noches y los fines de semana**, y
+alinearlos es la mitad del trabajo: `series_macro.alinear` empareja cada vela con el último cierre
+que ya se conocía cuando esa vela empezó, arrastrándolo mientras el mercado americano estaba
+cerrado. Un fallo ahí no daría un resultado malo, daría uno **bueno y falso**.
 
-- **Por clave** — el de `alfa.juzgar`: muestra, superar la nula y ser viable.
-- **Por vector y regla** — cuántas de las ocho claves lo pasan, contrastado con la binomial de
-  falsos positivos. Con ocho pruebas al 5 %, **uno solo sale el 34 % de las veces** y hacen falta
-  **tres** para bajar de 0,05.
-
-Un vector que gana en una clave no ha demostrado nada. Uno que gana en tres, sí.
-
-Ortogonalidad: hipótesis, no premisa
--------------------------------------
-Se mide la correlación de cada vector con los votos que ya están dentro antes de juzgarlo. Un
-candidato muy correlacionado con `supertrend` o con `atr14` no puede aportar información nueva
-aunque gane la prueba — y saberlo cambia cómo se lee el resultado.
+Y una diferencia que conviene tener delante al leer el resultado: **VXX solo llega a 2018**, así que
+sus pruebas cubren menos historia que las de UUP. La columna `cob` lo hace visible.
 """
 
 from __future__ import annotations
@@ -37,8 +34,10 @@ from .backtest import run_backtest
 from .ensemble import artifacts_dir, load_active_ensemble
 from .indicadores_series import atr_series, readings_series
 from .market.normalize import interval_ms
-from .vectores_precio import asimetria_mechas, compresion_atr, correlacion_con, ratio_parkinson
-from .velas import series_ohlc
+from .series_macro import Serie, alinear, cargar
+from .vectores_macro import estres_volatilidad, tendencia_dolar
+from .vectores_precio import correlacion_con
+from .velas import aperturas, series
 
 SIMBOLOS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]
 #: 1d es la única que opera; 4h está en cuarentena estructural desde 0.63.0 pero sigue midiéndose
@@ -47,22 +46,25 @@ SIMBOLOS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]
 INTERVALOS = ["4h", "1d"]
 HORIZONTES = {"4h": 15, "1d": 10}
 REGLAS = ("descartar_bajos", "descartar_altos")
+NOMBRES = ("tendencia_dolar", "estres_volatilidad")
 
 
-def _vectores(
-    o: list[float], h: list[float], lo: list[float], c: list[float]
-) -> dict[str, dict[int, float]]:
+def _por_sesion(macro: dict[str, Serie]) -> dict[str, dict[str, float]]:
+    """Los dos vectores, cada uno sobre su propia serie y todavía en fechas de sesión."""
     return {
-        "asimetria_mechas": asimetria_mechas(o, h, lo, c),
-        "ratio_parkinson": ratio_parkinson(h, lo, c),
-        "compresion_atr": compresion_atr(h, lo, c),
+        "tendencia_dolar": tendencia_dolar(macro["UUP"]),
+        "estres_volatilidad": estres_volatilidad(macro["VXX"]),
     }
 
 
 def _ortogonalidad(
     valores: dict[int, float], h: list[float], lo: list[float], c: list[float]
 ) -> dict[str, float]:
-    """Correlación con los votos que ya están dentro, para saber si el candidato es nuevo."""
+    """Correlación con los votos que ya están dentro, para saber si el candidato es nuevo.
+
+    Aquí se espera baja casi por construcción —son series de otro mercado— pero medirlo cuesta poco,
+    y una correlación alta sería la señal de que la alineación está mal hecha.
+    """
     lecturas = readings_series(h, lo, c)
     fuera: dict[str, float] = {}
     for voto in ("supertrend", "ema_cross", "rsi14", "bbands"):
@@ -75,8 +77,11 @@ def _ortogonalidad(
     return fuera
 
 
-def estudiar(symbol: str, interval: str) -> list[dict[str, Any]]:
-    o, h, lo, c = series_ohlc(symbol, interval)
+def estudiar(
+    symbol: str, interval: str, por_sesion: dict[str, dict[str, float]]
+) -> list[dict[str, Any]]:
+    h, lo, c = series(symbol, interval)
+    t0 = aperturas(symbol, interval)
     cfg = load_active_ensemble(symbol, interval)
     trades = run_backtest(h, lo, c, cfg, horizon=HORIZONTES.get(interval, 15))["trades"]
     if not trades:
@@ -84,8 +89,10 @@ def estudiar(symbol: str, interval: str) -> list[dict[str, Any]]:
     velas_dia = max(1, round(86_400_000 / interval_ms(interval)))
 
     filas: list[dict[str, Any]] = []
-    for nombre, valores in _vectores(o, h, lo, c).items():
+    for nombre in NOMBRES:
+        valores = alinear(t0, por_sesion[nombre])
         corr = _ortogonalidad(valores, h, lo, c)
+        cobertura = len([t for t in trades if int(t["index"]) in valores]) / len(trades)
         for regla in REGLAS:
             v = evaluar_vector(trades, valores, velas_por_bloque=velas_dia, regla=regla)
             filas.append(
@@ -94,6 +101,7 @@ def estudiar(symbol: str, interval: str) -> list[dict[str, Any]]:
                     "symbol": symbol,
                     "interval": interval,
                     "regla": regla,
+                    "cobertura": round(cobertura, 3),
                     "correlaciones": corr,
                     **resumen(v),
                 }
@@ -102,13 +110,11 @@ def estudiar(symbol: str, interval: str) -> list[dict[str, Any]]:
 
 
 def informe(filas: list[dict[str, Any]]) -> None:
-    print("=" * 108)
-    print(
-        "VECTORES NATIVO-PRECIO  (listón por clave: R neta > +0,015 y superar la nula por bloques)"
-    )
-    print("=" * 108)
+    print("=" * 112)
+    print("VECTORES MACRO  (listón por clave: R neta > +0,015 y superar la nula por bloques)")
+    print("=" * 112)
 
-    for nombre in ("asimetria_mechas", "ratio_parkinson", "compresion_atr"):
+    for nombre in NOMBRES:
         del_vector = [f for f in filas if f["vector"] == nombre]
         if not del_vector:
             continue
@@ -118,13 +124,16 @@ def informe(filas: list[dict[str, Any]]) -> None:
             f"\n  {nombre.upper()}  (correlación máxima con un voto existente: "
             f"{peor[0]} {peor[1]:+.3f})"
         )
-        cab = f"    {'clave':14}{'regla':18}{'n':>5}{'desc':>6}{'base':>9}"
-        print(f"{cab}{'filtrada':>10}{'lift':>9}{'nula':>9}  ")
+        cab = "    " + "clave".ljust(14) + "regla".ljust(18) + "cob".rjust(6)
+        cab += "n".rjust(5) + "desc".rjust(6) + "base".rjust(9)
+        print(cab + "filtrada".rjust(10) + "lift".rjust(9) + "nula".rjust(9) + "  ")
         for f in del_vector:
             marca = "APORTA" if f["aporta"] else ""
+            clave = f["symbol"] + ":" + f["interval"]
             print(
-                f"    {f['symbol'] + ':' + f['interval']:14}{f['regla']:18}{f['n']:>5}"
-                f"{f['n_descartadas']:>6}{f['base_neta']:>9.4f}{f['filtrada_neta']:>10.4f}"
+                f"    {clave:14}{f['regla']:18}"
+                f"{f['cobertura']:>6.0%}{f['n']:>5}{f['n_descartadas']:>6}"
+                f"{f['base_neta']:>9.4f}{f['filtrada_neta']:>10.4f}"
                 f"{f['lift']:>9.4f}{f['nula_p95']:>9.4f}  {marca}"
             )
         for regla in REGLAS:
@@ -137,22 +146,30 @@ def informe(filas: list[dict[str, Any]]) -> None:
     total = len(filas)
     aciertos = sum(1 for f in filas if f["aporta"])
     print()
-    print("=" * 108)
+    print("=" * 112)
     print(f"  pruebas: {total} · positivos: {aciertos} · esperados por azar: {0.05 * total:.1f}")
     print(f"  p de que TODO sea ruido: {p_falsos_positivos(aciertos, total):.4f}")
 
 
 def main() -> None:
+    por_sesion = _por_sesion(cargar(artifacts_dir()))
+    for nombre, valores in por_sesion.items():
+        fechas = sorted(valores)
+        print(
+            f"  {nombre:20} {len(valores):5} sesiones  {fechas[0]} - {fechas[-1]}",
+            file=sys.stderr,
+        )
+
     filas: list[dict[str, Any]] = []
     for symbol in SIMBOLOS:
         for interval in INTERVALOS:
             try:
-                filas.extend(estudiar(symbol, interval))
+                filas.extend(estudiar(symbol, interval, por_sesion))
                 print(f"  ...{symbol}:{interval} listo", file=sys.stderr)
             except Exception as err:  # noqa: BLE001 - una clave que falla no tumba el estudio
                 print(f"  {symbol}:{interval} ERROR {err}", file=sys.stderr)
     informe(filas)
-    destino = artifacts_dir() / "alfa_vectores_precio.json"
+    destino = artifacts_dir() / "alfa_vectores_macro.json"
     destino.write_text(json.dumps(filas, indent=2, default=str), encoding="utf8")
     print(f"\n  informe: {destino}")
 

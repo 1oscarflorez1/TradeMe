@@ -50,7 +50,8 @@ el 6-sep-2026:
 | open interest (`openInterestHist`) | 30 días | no |
 | long/short ratio | 30 días | no |
 | taker buy/sell volume | 30 días | no |
-| DXY, VIX | Twelve Data, sin clave configurada | pendiente |
+| DXY, VIX (los índices) | **no existen** en el plan gratuito de Twelve Data: 404 | no |
+| UUP, VXX (sus réplicas ETF) | 4.911 y 2.165 sesiones diarias | **sí** — ver [vectores-macro](vectores-macro.md) |
 
 Los **deltas de interés abierto** son una idea razonable y **no son medibles hoy**: 30 días son unas
 30 observaciones en 1d, y cualquier veredicto sobre esa muestra sería ruido. Para poder usarlos

@@ -7,6 +7,80 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.67.0] — 2026-09-07
+
+> Tercera y última dirección de la búsqueda de alfa externa: el **contexto macro**. Los índices DXY
+> y VIX **no existen** en el plan gratuito de Twelve Data, así que se midieron sus réplicas ETF.
+> **32 pruebas, 1 positivo, 1,6 esperados por azar (p = 0,806): ruido.** Y el único positivo cae en
+> una temporalidad que está en cuarentena.
+
+### Added — Series macro y dos vectores de sesgo
+
+- `series_macro.py` trae `UUP` (réplica del DXY, 4.911 sesiones desde 2007) y `VXX` (futuros del VIX
+  a corto, 2.165 desde 2018), los guarda en `artifacts/macro_series.json` y los alinea con las velas
+  de cripto. `descargar_macro` se lanza **a mano**: son series diarias y pedirlas cada ciclo gastaría
+  cupo para traer el mismo dato.
+- `vectores_macro.py` — **tendencia del dólar** (z-score de UUP a 20 sesiones) y **estrés de
+  volatilidad** (cambio logarítmico de VXX a 5 sesiones). Solo dos, y a propósito: un tercer vector
+  poco motivado no aumenta la probabilidad de encontrar algo, aumenta la de encontrar ruido con
+  aspecto de algo.
+- `velas.aperturas()` expone el instante de apertura de cada barra, cacheado junto a las series para
+  no pagar una segunda descarga. El backtest trabaja con índices y nunca lo necesitó; alinear con
+  otro mercado, sí.
+- `run_alfa_macro` publica el informe en `artifacts/alfa_vectores_macro.json`.
+
+### El nivel de VXX no es el nivel del VIX
+
+- Su cierre pasa de **1.770 a 17,72** en ocho años: un 99 % de decaimiento que no es un fallo de
+  datos, es el coste de renovar futuros de volatilidad. Un vector sobre su nivel mediría el paso del
+  tiempo.
+- Sus **variaciones** sí siguen al VIX: sus cinco saltos de más del 25 % en un día son Volmageddon,
+  el COVID, junio de 2020, Ómicron y el desarme del carry del yen. Por eso el vector es un cambio
+  logarítmico, y hay un test que lo fija: duplicar toda la serie no cambia ni un valor.
+
+### La alineación, que era la mitad del trabajo
+
+- UUP y VXX cotizan en horario americano; el cripto, 24/7. **La sesión del día D se declara
+  disponible a las 00:00 UTC del día D+1** — el cierre real es a las 20:00 o 21:00 UTC, así que sobra
+  margen y no hay que razonar sobre husos horarios, que es donde se cometen estos errores.
+- Sin dato fresco se arrastra el último conocido, que es lo que tiene delante quien opera un domingo.
+  **No se interpola**: inventaría sesiones que no existieron.
+- Coste medido sobre el calendario real: antigüedad media de **1,49 días** (68,9 % a un día, 15,0 %
+  a dos, 14,3 % a tres). Irrelevante sobre ventanas de veinte sesiones, pero medido y no supuesto.
+- Verificado contra datos reales antes de mirar ningún resultado: 3.309 velas de BTCUSDT:1d, 100 % de
+  cobertura y **0 discrepancias** en ~400 velas comprobadas una a una. Un fallo aquí no habría dado un
+  resultado malo: habría dado uno **bueno y falso**.
+
+### Resultados — ninguno de los dos aporta
+
+- **Tendencia del dólar**: 0/8 con cada regla. **Estrés de volatilidad**: 0/8 descartando bajos, 1/8
+  descartando altos (p = 0,337).
+- **Global: 32 pruebas, 1 positivo, 1,6 esperados por azar. p de que todo sea ruido = 0,806.**
+- El único positivo está en `BTCUSDT:4h`, **en cuarentena estructural desde 0.63.0**. Aunque fuera
+  real, sería un hallazgo sobre decisiones que hoy no se toman. En 1d, la única temporalidad que
+  opera, **no hay ni un positivo en 16 pruebas**.
+- La ortogonalidad sí se confirmó —correlación máxima de **−0,171** con un voto existente, frente al
+  0,17 de los vectores de precio—: es información genuinamente nueva que no sirve para nada.
+- De las 32 pruebas, 4 superaron la nula por bloques y **la tercera condición frenó tres**, todas en
+  4h y dos de ellas en las claves que peor van. Con un criterio de solo dos condiciones habríamos
+  aprobado tres filtros que pierden menos dinero, no que lo ganen.
+
+### El hallazgo acumulado de los tres estudios
+
+- Funding, precio y macro: **seis vectores, 96 pruebas, 12 veredictos**. No aparece ventaja en
+  ninguna dirección.
+- Eso deja de ser una serie de negativos sueltos. **El problema no es que falte una variable**: la
+  expectancy bruta del ensemble es ≈0 en todas las temporalidades, y filtrar entradas de un motor sin
+  ventaja no crea ventaja — reparte la misma nada entre menos operaciones.
+
+### Changed
+
+- `TWELVEDATA_API_KEY` llega también al contenedor `quant` en el compose de producción, solo para la
+  descarga manual de las series macro. El piloto no la usa.
+- Corregida una afirmación falsa que arrastraba el estudio de vectores de precio: 4h **no** es una
+  temporalidad «que sigue operando», está en cuarentena desde 0.63.0.
+- `docs/vectores-macro.md` nuevo; `docs/alfa-ortogonal.md` y `docs/vectores-precio.md` al día.
+
 ## [0.66.0] — 2026-09-06
 
 > El presupuesto de Twelve Data contaba **peticiones** donde el proveedor cobra **créditos**. Con un

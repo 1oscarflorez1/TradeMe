@@ -6,8 +6,8 @@
 ## Por qué del precio
 
 Los candidatos externos se agotaron por falta de datos: interés abierto y long/short solo dan
-**30 días** de histórico en Binance, y DXY/VIX exigen una clave de Twelve Data que no está
-configurada. El precio, en cambio, tiene todo el histórico — hasta 2017 en 1d.
+**30 días** de histórico en Binance, y DXY/VIX no tenían entonces clave de Twelve Data. El precio,
+en cambio, tiene todo el histórico — hasta 2017 en 1d.
 
 La apuesta: los ocho indicadores actuales describen **dirección** (EMA, MACD, Supertrend) y
 **posición en un rango** (RSI, Bollinger, Estocástico). Ninguno describe la **forma** de la vela ni
@@ -105,8 +105,8 @@ no de ideas:
 
 - **Interés abierto y long/short**: la ingesta los acumula desde M11; dentro de un año habrá
   histórico para medirlos.
-- **DXY, VIX y macro**: exigen `TWELVEDATA_API_KEY`, y habría que comprobar su histórico antes de
-  contar con ellos.
+- **DXY, VIX y macro**: explorados en 0.67.0 con la clave ya configurada. Los índices no existen en
+  el plan gratuito; se midieron sus réplicas ETF. Ver [vectores-macro](vectores-macro.md).
 - **Microestructura** (libro de órdenes, flujo de agresores): Binance no la publica con histórico.
 
 ## Cómo reproducirlo
