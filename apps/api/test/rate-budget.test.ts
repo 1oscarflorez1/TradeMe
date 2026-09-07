@@ -83,3 +83,44 @@ describe('ProviderError', () => {
     expect(proximoResetUtc(Date.UTC(2026, 7, 31, 23, 59))).toBe('2026-09-01T00:00:00.000Z');
   });
 });
+
+describe('el presupuesto cuenta créditos, no peticiones', () => {
+  it('una petición que vale tres créditos consume tres', () => {
+    const t = 0;
+    const b = new RateBudget(10, 100, () => t);
+    b.tryTake();
+    b.ajustar(3);
+    expect(b.status().dia).toBe(3);
+    expect(b.status().restanteDia).toBe(97);
+  });
+
+  it('un coste de uno o menos no cambia nada: tryTake ya lo apuntó', () => {
+    const t = 0;
+    const b = new RateBudget(10, 100, () => t);
+    b.tryTake();
+    b.ajustar(1);
+    b.ajustar(0);
+    expect(b.status().dia).toBe(1);
+  });
+
+  it('el cupo se agota antes si las peticiones son caras', () => {
+    // El fallo real: con 700 peticiones permitidas, el proveedor contó 1.003 créditos.
+    const t = 0;
+    const b = new RateBudget(1000, 10, () => t);
+    for (let i = 0; i < 5; i += 1) {
+      expect(b.tryTake()).toBe(true);
+      b.ajustar(2); // cada una vale dos
+    }
+    expect(b.agotadoDia).toBe(true);
+    expect(b.tryTake()).toBe(false);
+  });
+
+  it('un coste absurdo o no numérico no rompe la contabilidad', () => {
+    const t = 0;
+    const b = new RateBudget(10, 100, () => t);
+    b.tryTake();
+    b.ajustar(Number.NaN);
+    b.ajustar(-5);
+    expect(b.status().dia).toBe(1);
+  });
+});

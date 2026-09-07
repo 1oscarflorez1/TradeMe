@@ -1,6 +1,18 @@
 /**
- * Presupuesto de peticiones. Los planes gratuitos de datos de mercado limitan por minuto y por día;
- * esto evita que TradeMe los agote y quede bloqueado sin datos.
+ * Presupuesto de **créditos**. Los planes gratuitos de datos de mercado limitan por minuto y por
+ * día; esto evita que TradeMe los agote y quede bloqueado sin datos.
+ *
+ * Contaba **peticiones**, no créditos, y no es lo mismo: Twelve Data cobra por endpoint y algunos
+ * valen más de uno. Medido el 6-sep-2026, con un presupuesto local de 700 peticiones diarias el
+ * proveedor había contabilizado **1.003 créditos** sobre un límite de 800 — el cupo se agotaba
+ * mientras el guardia creía que sobraba margen, y ARQQ llevaba **17 días sin datos nuevos**.
+ *
+ * Es el mismo patrón que este proyecto ya ha corregido varias veces: un listón que mide algo
+ * parecido a lo que dice medir, y la diferencia es justo por donde se escapa el fallo.
+ *
+ * La corrección no es afinar la estimación sino dejar de estimar: cada respuesta de Twelve Data
+ * trae `Api-Credits-Request` con lo que costó **esa** petición, y `ajustar()` lo aplica. El
+ * proveedor es la única fuente de verdad sobre su propia contabilidad.
  *
  * El cupo diario se cuenta **por día natural UTC**, no en ventana deslizante de 24 horas, porque es
  * así como lo cuentan los proveedores: Twelve Data repone a las 00:00 UTC. Con ventana deslizante
@@ -42,7 +54,12 @@ export class RateBudget {
     return this.dayHits.length >= this.perDay;
   }
 
-  /** Consume una petición si queda cupo. Devuelve false cuando toca esperar. */
+  /** Reserva un crédito si queda cupo. Devuelve false cuando toca esperar.
+   *
+   * Reserva **uno** porque el coste real no se conoce hasta que responde el proveedor. Reservar de
+   * menos y corregir después es preferible a reservar de más: lo segundo desperdiciaría cupo en
+   * cada petición barata.
+   */
   tryTake(): boolean {
     const t = this.now();
     this.prune(t);
@@ -51,6 +68,23 @@ export class RateBudget {
     this.minuteHits.push(t);
     this.dayHits.push(t);
     return true;
+  }
+
+  /**
+   * Corrige la reserva con el coste real que informa el proveedor.
+   *
+   * `tryTake` ya apuntó un crédito, así que aquí solo se añaden los que falten. Un coste de 0 o 1
+   * no cambia nada; uno de 3 apunta los dos restantes. Sin esto, una petición que vale tres se
+   * contaba como una y el desfase crecía en silencio hasta el 429.
+   */
+  ajustar(costeReal: number): void {
+    const extra = Math.floor(costeReal) - 1;
+    if (!Number.isFinite(extra) || extra <= 0) return;
+    const t = this.now();
+    for (let i = 0; i < extra; i += 1) {
+      this.minuteHits.push(t);
+      this.dayHits.push(t);
+    }
   }
 
   status(): { minuto: number; dia: number; restanteMinuto: number; restanteDia: number } {

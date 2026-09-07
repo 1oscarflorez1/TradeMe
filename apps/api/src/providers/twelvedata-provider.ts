@@ -113,6 +113,10 @@ export class TwelveDataProvider extends PollingProvider {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     url.searchParams.set('apikey', this.apiKey);
     const res = await fetch(url);
+    // Lo que costó DE VERDAD esta petición, según el proveedor. `tryTake` reservó uno; si valía
+    // más, aquí se apunta la diferencia. Se lee también en las respuestas de error, porque una
+    // petición rechazada por cupo ya se ha contabilizado igualmente al otro lado.
+    this.budget.ajustar(Number(res.headers.get('api-credits-request') ?? 1));
     if (!res.ok) throw this.traduce(res.status, `${path} respondió ${res.status}`);
     const body = (await res.json()) as T & { status?: string; message?: string; code?: number };
     // Twelve Data responde 200 con `{status:"error", code:429}` cuando se agota el cupo. Sin esta
