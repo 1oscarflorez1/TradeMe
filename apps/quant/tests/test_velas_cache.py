@@ -79,3 +79,33 @@ def test_devuelve_las_tres_series_alineadas(monkeypatch: Any) -> None:
     high, low, close = velas.series("BTCUSDT", "15m", 30)
     assert len(high) == len(low) == len(close) == 30
     assert all(h >= c >= lo for h, lo, c in zip(high, low, close, strict=True))
+
+
+def test_las_aperturas_van_alineadas_con_las_series(monkeypatch: Any) -> None:
+    """Los vectores macro emparejan por instante, así que un desfase de un índice los falsearía."""
+
+    def fake(symbol: str, interval: str, objetivo: int, **kw: Any) -> list[list[Any]]:
+        return _filas(30)
+
+    velas.limpiar_cache()
+    monkeypatch.setattr(velas, "historico", fake)
+    high, _, _ = velas.series("BTCUSDT", "15m", 30)
+    t0 = velas.aperturas("BTCUSDT", "15m", 30)
+    assert len(t0) == len(high) == 30
+    assert t0 == [i * 900_000 for i in range(30)]
+
+
+def test_las_aperturas_reaprovechan_la_descarga_de_las_series(monkeypatch: Any) -> None:
+    """Pedirlas después de las series no puede costar una segunda descarga de 20.000 velas."""
+    descargas = {"n": 0}
+
+    def fake(symbol: str, interval: str, objetivo: int, **kw: Any) -> list[list[Any]]:
+        descargas["n"] += 1
+        return _filas(30)
+
+    velas.limpiar_cache()
+    monkeypatch.setattr(velas, "historico", fake)
+    velas.series("BTCUSDT", "15m", 30)
+    velas.aperturas("BTCUSDT", "15m", 30)
+    velas.series_ohlc("BTCUSDT", "15m", 30)
+    assert descargas["n"] == 1
