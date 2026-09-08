@@ -40,9 +40,11 @@ import {
   effectiveMacro,
   forInterval,
   fusionarOptimizada,
+  vetadaEfectiva,
   loadEnsemble,
   type EnsembleConfig,
 } from './ensemble/config.js';
+import { desdeConfig } from './ensemble/costes.js';
 import { Independence } from './ensemble/independence.js';
 import { QuarantinePolicy } from './ensemble/quarantine.js';
 import { buildSignal } from './ensemble/signal.js';
@@ -128,10 +130,18 @@ async function main(): Promise<void> {
         : ensemble;
     // Se especializa aquí, una sola vez por símbolo+TF: validez del plan, cuarentena y factor de
     // independencia quedan resueltos y ningún punto de llamada tiene que acordarse de aplicarlos.
-    const vetada = quarantine.isQuarantined(
+    // Dos vetos independientes que se suman. La lista blanca restringe y nunca habilita: una clave
+    // incluida en ella pero vetada por su expediente sigue vetada, que es lo que evita que la
+    // concentración se convierta en una puerta trasera al gobierno de la cuarentena.
+    const vetada = vetadaEfectiva(
+      base,
       symbol,
       interval,
-      (base.quarantineIntervals ?? []).includes(interval),
+      quarantine.isQuarantined(
+        symbol,
+        interval,
+        (base.quarantineIntervals ?? []).includes(interval),
+      ),
     );
     const cfg = forInterval(
       base,
@@ -266,7 +276,12 @@ async function main(): Promise<void> {
       ? (signal, interval, levels, note) => snapshotsRepo.record(signal, interval, levels, note)
       : undefined,
     listSnapshots: snapshotsRepo ? (symbol, limit) => snapshotsRepo.list(symbol, limit) : undefined,
-    snapshotStats: snapshotsRepo ? (symbol: string) => snapshotsRepo.stats(symbol) : undefined,
+    // La expectancy del panel se descuenta la comisión, igual que hace quant. Hasta 0.70.0 salía
+    // BRUTA mientras todo el gobierno del proyecto razonaba en neto: en 1d eso son ~0,015 R de
+    // optimismo por operación, el orden de magnitud de la propia ventaja que se mide.
+    snapshotStats: snapshotsRepo
+      ? (symbol: string) => snapshotsRepo.stats(symbol, desdeConfig(ensemble))
+      : undefined,
     deleteSnapshot: snapshotsRepo ? (id) => snapshotsRepo.delete(id) : undefined,
     createAlert: alertsRepo ? (a) => alertsRepo.create(a) : undefined,
     listAlerts: alertsRepo ? (limit) => alertsRepo.list(limit) : undefined,

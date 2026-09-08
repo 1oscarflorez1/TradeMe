@@ -532,3 +532,35 @@ def test_la_entrada_no_distingue_estructural() -> None:
     ev = evaluate_real(_real(50, -0.5))
     ev["nula_p95"] = 9.0
     assert decide_quarantine(False, ev, estructural=True)[0] is True
+
+
+# --- La lista blanca cuenta como veto para elegir expediente -------------------------------------
+
+
+def test_una_clave_fuera_de_la_lista_blanca_se_juzga_por_su_sombra() -> None:
+    """Si esto fallara, se reproduciría el fallo del 22-ago-2026 con otro nombre.
+
+    Una clave que no opera solo genera desenlace **sombra**, así que su expediente real se congela
+    en las decisiones de antes. Si `estado_previo` no supiera de la lista blanca, el gobierno la
+    seguiría juzgando con ese expediente viejo cada ciclo, y nunca llegaría a la puerta de salida.
+    """
+    politica: dict[str, Any] = {"intervals": {}}
+    lista = ["ETHUSDT:1d", "SOLUSDT:1d"]
+    assert estado_previo(politica, "BTCUSDT:1d", "1d", [], lista) is True
+    assert estado_previo(politica, "ETHUSDT:1d", "1d", [], lista) is False
+
+
+def test_sin_lista_blanca_nada_cambia() -> None:
+    """El comportamiento anterior a 0.70.0, que es el que sigue valiendo si la lista está vacía."""
+    politica: dict[str, Any] = {"intervals": {}}
+    assert estado_previo(politica, "BTCUSDT:1d", "1d", []) is False
+    assert estado_previo(politica, "BTCUSDT:1d", "1d", [], []) is False
+    assert estado_previo(politica, "BTCUSDT:1d", "1d", [], None) is False
+
+
+def test_la_lista_blanca_no_levanta_una_cuarentena() -> None:
+    """Estar autorizado a operar no borra un veto puesto con evidencia. Los vetos se suman."""
+    politica: dict[str, Any] = {"intervals": {"ETHUSDT:1d": {"quarantined": True}}}
+    assert estado_previo(politica, "ETHUSDT:1d", "1d", [], ["ETHUSDT:1d"]) is True
+    # Y tampoco levanta la del yaml, que es el suelo.
+    assert estado_previo(politica, "ETHUSDT:15m", "15m", ["15m"], ["ETHUSDT:15m"]) is True

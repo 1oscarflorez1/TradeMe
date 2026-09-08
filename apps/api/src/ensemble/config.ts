@@ -130,7 +130,36 @@ export interface EnsembleConfig {
    *
    * Se desactivan por bandera y no se borran: la decisión es reversible y queda auditable.
    */
+  /**
+   * Lo que cuesta operar, para poder medir en R **neta**. Sin la sección, cero.
+   *
+   * La api nunca leyó este bloque —lo declaraba el yaml desde 0.63.0 y solo lo consumía quant—, así
+   * que la expectancy del panel salía bruta mientras todo el gobierno razonaba en neto. Ver
+   * `costes.ts`.
+   */
+  costs: {
+    enabled: boolean;
+    mode: 'taker' | 'maker';
+    takerPct: number;
+    makerPct: number;
+    slippagePct: number;
+  };
   useOptimizedConfigs: boolean;
+  /**
+   * Claves `SÍMBOLO:intervalo` autorizadas a emitir señal. Vacía o ausente = no restringe nada.
+   *
+   * **Restringe, nunca habilita.** Una clave que esté en la lista pero además en cuarentena sigue
+   * vetada: este filtro se suma a los que ya hay, no los sustituye. Escrito así a propósito —una
+   * lista blanca que pudiera levantar una cuarentena sería una puerta trasera al gobierno.
+   *
+   * Desde 0.70.0 vive aquí la concentración en `ETHUSDT:1d` y `SOLUSDT:1d`. La justificación no es
+   * «son las dos mejores» —eso, dicho sobre el mismo histórico con el que se midieron, sería
+   * selección post-hoc— sino un walk-forward de la propia regla: sobre 21 trimestres, seleccionar
+   * las dos mejores con lo anterior y operarlas en el siguiente da **+0,044 R por trimestre** frente
+   * a operar las cuatro. Ver `docs/lista-blanca.md`, que incluye también lo que esa cifra no
+   * demuestra.
+   */
+  activeKeys: string[];
   /** Resuelto por temporalidad en `forInterval`. */
   quarantined?: boolean;
   /** Resuelto por símbolo+temporalidad en `forInterval` (1 = sin desinflar). */
@@ -209,7 +238,9 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
   // de Binance USDT-M Futuros (0,12 %) se lleva 0,29 R por operación — contra una expectancy bruta
   // medida de +0,003 R sobre ~1.850 operaciones. Ver `docs/costes.md`.
   quarantineIntervals: ['15m', '30m', '1h', '4h'],
+  costs: { enabled: false, mode: 'taker', takerPct: 0.05, makerPct: 0.02, slippagePct: 0.01 },
   useOptimizedConfigs: false,
+  activeKeys: [],
 };
 
 /** Frescura de la entrada, en velas, para una temporalidad. */
@@ -297,6 +328,39 @@ export function fusionarOptimizada(
 }
 
 /**
+ * ¿Esta clave está fuera de la lista blanca? Con la lista vacía, nadie lo está.
+ *
+ * Devuelve **un veto más**, que el llamante combina con la cuarentena mediante un OR. No sustituye a
+ * ninguno de los que ya hay: una clave puede estar en la lista blanca y seguir vetada por su
+ * expediente, y así debe ser.
+ */
+export function fueraDeListaBlanca(
+  cfg: EnsembleConfig,
+  symbol: string,
+  interval: string,
+): boolean {
+  const lista = cfg.activeKeys ?? [];
+  if (lista.length === 0) return false;
+  return !lista.includes(`${symbol.toUpperCase()}:${interval}`);
+}
+
+/**
+ * El veto efectivo de una clave: cuarentena **o** fuera de la lista blanca.
+ *
+ * Vive aquí y no suelto en `server.ts` porque es una regla, no un detalle de cableado: los vetos se
+ * **suman**, nunca se sustituyen. Estar en la lista blanca no levanta una cuarentena puesta con
+ * evidencia, y estar en cuarentena no se salva por aparecer en una lista.
+ */
+export function vetadaEfectiva(
+  cfg: EnsembleConfig,
+  symbol: string,
+  interval: string,
+  enCuarentena: boolean,
+): boolean {
+  return enCuarentena || fueraDeListaBlanca(cfg, symbol, interval);
+}
+
+/**
  * Especializa la configuración para un símbolo y temporalidad concretos.
  *
  * Deja resueltos los tres ajustes que dependen de la temporalidad —validez del plan, cuarentena y
@@ -342,6 +406,14 @@ interface RawConfig {
   evaluation?: { horizon?: number; horizon_by_tf?: Record<string, number> };
   quarantine_intervals?: string[];
   use_optimized_configs?: boolean;
+  active_keys?: string[];
+  costs?: {
+    enabled?: boolean;
+    mode?: string;
+    taker_pct?: number;
+    maker_pct?: number;
+    slippage_pct?: number;
+  };
   macro?: {
     enabled?: boolean;
     w_macro?: number;
@@ -420,6 +492,14 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
     },
     quarantineIntervals: raw.quarantine_intervals ?? d.quarantineIntervals,
     useOptimizedConfigs: raw.use_optimized_configs ?? d.useOptimizedConfigs,
+    activeKeys: raw.active_keys ?? d.activeKeys,
+    costs: {
+      enabled: raw.costs?.enabled ?? d.costs.enabled,
+      mode: raw.costs?.mode === 'maker' ? 'maker' : 'taker',
+      takerPct: raw.costs?.taker_pct ?? d.costs.takerPct,
+      makerPct: raw.costs?.maker_pct ?? d.costs.makerPct,
+      slippagePct: raw.costs?.slippage_pct ?? d.costs.slippagePct,
+    },
   };
 }
 
