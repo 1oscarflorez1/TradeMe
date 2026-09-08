@@ -237,16 +237,12 @@ export function effectiveMacro(cfg: EnsembleConfig): MacroConfig {
 }
 
 /**
- * Lo ÚNICO que Optuna busca, y por tanto lo único que una configuración optimizada puede aportar.
- * Coincide con los `trial.suggest_*` de `optimize.py` y con `CAMPOS_OPTIMIZABLES` en
- * `apps/quant/trademe_quant/ensemble.py`.
- *
- * Es una lista **blanca** a propósito: lo que no esté aquí viene de la base, así que una sección
- * nueva del yaml queda protegida por defecto en vez de quedar olvidada hasta que alguien note que
- * no se aplica.
- */
-/**
  * Aplica sobre la base **solo lo que Optuna optimiza**. Todo lo demás manda la base.
+ *
+ * Lo que viaja coincide con los `trial.suggest_*` de `optimize.py` y con `CAMPOS_OPTIMIZABLES` en
+ * `apps/quant/trademe_quant/ensemble.py`. Es una lista **blanca** a propósito: lo que no esté aquí
+ * viene de la base, así que una sección nueva del yaml queda protegida por defecto en vez de quedar
+ * olvidada hasta que alguien note que no se aplica.
  *
  * El fallo que esto corrige (7 sep 2026)
  * --------------------------------------
