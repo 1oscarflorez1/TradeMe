@@ -63,16 +63,52 @@ Años de histórico, ~1.850 operaciones por clave, 20 claves (medianas de las cu
 | 4h | +0,010 | 0,041 | −0,030 | −0,010 |
 | 1d | +0,037 | 0,015 | **+0,020** | +0,029 |
 
+> ⚠️ **La fila de 1d está medida sobre la configuración que no opera.** Ver más abajo: con la que
+> de verdad opera, 1d da **−0,019 R**. El resto de la tabla se mantiene.
+
 **Lo que esto dice, y conviene leerlo entero:** la expectancy bruta es prácticamente la misma en
 todas —entre +0,003 y +0,037— y ninguna es una ventaja. El ensemble de ocho indicadores no tiene
 señal direccional en ninguna temporalidad. Lo único que las diferencia es cuánto coste soportan.
 
 Por clave, solo dos quedan claramente positivas en neto: **ETHUSDT:1d (+0,059)** y **SOLUSDT:1d
-(+0,108)**. Las de 4h son marginales y solo con maker.
+(+0,108)**. Las de 4h son marginales y solo con maker. **Las dos cifras de 1d resultaron ser de la
+configuración base y no de la que opera** — ver la corrección de abajo.
 
 De paso quedó refutado que «los cortos» fueran el problema: sobre años, largos y cortos rinden igual
 (BTCUSDT:1h da +0,001 y +0,002). La asimetría de producción —+0,511 frente a −0,292— era un
 artefacto del tramo alcista de 45 días.
+
+## Corrección: la fila de 1d medía la configuración equivocada (7 sep 2026)
+
+Al preparar el hito de gestión de riesgo se reprodujo esta tabla y **1d no cuadraba**. La causa
+resultó estar fuera del estudio de costes:
+
+`load_active_ensemble` y `getEnsembleFor` cargaban la configuración optimizada de una clave
+**entera**, sustituyendo la base. Como el optimizador publica una copia completa del yaml, las
+quince configuraciones optimizadas —todas de agosto— **no tenían sección `costs`**: se medían en
+bruto. Tres de las cuatro claves de 1d son de esas. El fallo y su arreglo están en
+`ensemble.fusionar_optimizada`.
+
+Este estudio, en cambio, midió con la configuración **base**. Reproducido el 7 de septiembre:
+
+| configuración medida | bruta | coste | neta |
+|---|---|---|---|
+| base (lo que midió esta tabla) | +0,0367 | 0,0148 | **+0,0198** |
+| la que **opera**, con sus costes aplicados | −0,0035 | 0,0154 | **−0,0193** |
+
+Por clave, con lo que opera: BTC **−0,026** · ETH **+0,007** · SOL **−0,013** · BNB **−0,044**.
+
+Se juntan dos cosas, y conviene separarlas porque son independientes:
+
+1. **Las configuraciones optimizadas de agosto son peores en bruto que la base.** SOLUSDT:1d cae de
+   +0,117 a −0,002 y ETHUSDT:1d de +0,073 a +0,022. Es coherente con lo que ya se sabía del
+   optimizador —reoptimizar no aporta—, pero mucho más marcado de lo que se había medido.
+2. **Encima se medían sin descontar comisiones**, que es el fallo de la fusión.
+
+**La conclusión de fondo de este documento no cambia: se refuerza.** La expectancy bruta del
+ensemble sigue siendo ≈0 en todas las temporalidades y lo único que las diferencia es cuánto coste
+soportan. Lo que cambia es que **ya no queda ninguna temporalidad claramente viable**: 1d era la
+excepción y lo era por un error de medición.
 
 ## La cuarentena estructural de 15m y 30m
 

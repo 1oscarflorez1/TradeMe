@@ -7,6 +7,176 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.68.0] — 2026-09-07
+
+> Las configuraciones optimizadas **sustituían** el yaml entero en vez de fusionarse con él. Como el
+> optimizador publica una copia completa pero solo busca doce parámetros, quince claves llevaban
+> desde agosto operando con la cuarentena, los costes y el peso de Reditum de entonces. Nada fallaba:
+> una configuración vieja se aplicaba correctamente.
+
+### Fixed — La configuración activa es una fusión, no una sustitución
+
+- `ensemble.fusionar_optimizada` (quant) y `fusionarOptimizada` (api) aplican sobre la base **solo**
+  lo que Optuna optimiza: `temperature`, `hold_band`, `weights`, los cuatro campos optimizables de
+  `regime` y la `version` —esta última porque es la identidad del artefacto que decidió—.
+- Es una lista **blanca**, no negra: una sección nueva del yaml queda protegida por defecto en vez de
+  nacer desatendida. Hay un test que se romperá el día que alguien añada una y la fusión la deje
+  pasar; que falle entonces es lo que se busca.
+- Lo que las quince configuraciones de agosto revertían sin avisar: **sin sección `costs`** (se medían
+  en bruto), `quarantine_intervals: ['4h']` (la cuarentena estructural de 15m/30m/1h no les llegaba)
+  y `external_weights.tradingview: 2.0` cuando la base lo puso a 0 en 0.62.0. Lo de Reditum era
+  latente —hay 0 filas en `external_signals`— pero habría empujado la decisión en cuanto se
+  configurase el webhook.
+
+### Changed — El número que anclaba el proyecto estaba medido sobre la configuración que no opera
+
+- `docs/costes.md` concluyó que 1d era la única temporalidad viable con **+0,020 R netos**. Ese
+  número sale de la configuración **base**; reproducido el 7-sep da exactamente +0,0198. Con la que
+  **de verdad opera**, y aplicándole los costes que le faltaban, 1d da **−0,0193 R**.
+- Por clave: BTC **−0,026** · ETH **+0,007** · SOL **−0,013** · BNB **−0,044**. **No queda ninguna
+  temporalidad claramente viable**: 1d era la excepción y lo era por un error de medición.
+- Se juntaban dos cosas independientes: las configuraciones optimizadas de agosto son **peores en
+  bruto** que la base (SOLUSDT:1d cae de +0,117 a −0,002), y encima se medían sin comisiones.
+- `UMBRAL_VIABILIDAD` de `alfa.py` **no cambia de valor**, y merece decirse por qué: responde a
+  «¿cubre esto el coste de operar?», que es una pregunta sobre el peaje del exchange y no sobre lo
+  bien que le vaya hoy al ensemble. Bajarlo para que algo lo pasara sería el fallo que ese marco
+  existe para evitar. Lo que se corrige es su justificación.
+
+### Fixed — Cuarentena estructural: el percentil lo elige la pregunta
+
+- `umbral_salida` distingue ahora las cuarentenas **estructurales** (por coste) de las de
+  **expediente**. Las primeras exigen superar el **P95** de la nula además del listón de siempre.
+- No es una excepción a la regla del cupo de v0.48.0, es la misma regla: con un mal tramo detrás,
+  volver es «¿merezco competir con las demás?» y el P95 sería un cupo del 5 %; con un veredicto sobre
+  1.875 operaciones detrás, volver es **«¿esto aporta algo o es azar?»**, que es justo la pregunta
+  para la que este proyecto ya dice que el P95 es el listón correcto.
+- Tres claves habían vuelto a operar con expectancies **por debajo del P95 de su propia nula**:
+  `BTCUSDT:1h` (+0,119 vs 0,499), `SOLUSDT:15m` (+0,388 vs 0,472) y `BNBUSDT:1h` (+0,297 vs 0,470).
+  El número que las desmentía estaba calculado y guardado en su expediente, sin que nadie lo mirase.
+- Comprobado sobre los 17 expedientes reales: cambian **exactamente esas tres**. Las de 4h no se
+  mueven porque 4h entró por expediente, no por coste — y `BTCUSDT:4h`, que salió con +1,143 R,
+  supera incluso el P95, así que habría salido con cualquiera de los dos listones.
+- Se declaran en `quarantine_structural` del `ensemble.yaml`. Sin esa lista, todas se tratan como de
+  expediente: el comportamiento anterior.
+
+### Los tres estudios de alfa, repetidos sobre la base corregida
+
+Sus bases de 1d se habían medido sin descontar comisiones en tres de las cuatro claves. El sesgo iba
+en la dirección **laxa** —bases infladas hacen más fácil que un filtro parezca aportar—, así que
+había que rehacerlos para saber si alguna conclusión dependía del fallo. **Ninguna cambia.**
+
+| estudio | antes | ahora |
+|---|---|---|
+| macro (UUP/VXX) | 1 positivo de 32, p = 0,806 | **0 positivos**, p = 1,000 |
+| precio (mechas, Parkinson, ATR) | 4 positivos de 48, p = 0,218 | **2 positivos**, p = 0,699 |
+| funding | 1 positivo de 16, p = 0,560 | **1 positivo**, p = 0,560 (sin cambios) |
+| **acumulado** | 6 de 96, p = 0,348 | **3 de 96, p = 0,864** |
+
+- El positivo del estudio macro era `BTCUSDT:4h` **medido sin costes**: al aplicarlos, desaparece.
+- Los dos que quedan en el de precio caen en la **misma clave** (`SOLUSDT:1d`), así que ni siquiera
+  son observaciones independientes.
+- El de funding **no se mueve ni un decimal**, y es la comprobación que da confianza en el resto:
+  su única clave positiva es `BNBUSDT:1d`, la **única de las cuatro sin configuración optimizada**,
+  así que ya se medía con costes. Lo que tenía que cambiar cambió y lo que no, no.
+- El veredicto no cambia en ninguno. El margen con que se sostiene, sí: de 6 positivos sobre 4,8
+  esperados por azar se pasa a **3 sobre 4,8** — ahora hay *menos* positivos de los que el azar
+  produciría.
+
+### Medido de paso: retirar las configuraciones optimizadas devolvería 1d a +0,020
+
+| clave | con la optimizada | con la base | diferencia |
+|---|---|---|---|
+| BTCUSDT:1d | −0,026 | −0,020 | +0,006 |
+| ETHUSDT:1d | +0,007 | +0,059 | +0,052 |
+| SOLUSDT:1d | −0,013 | **+0,106** | **+0,119** |
+| **mediana** | **−0,019** | **+0,020** | **+0,039** |
+
+La salvedad apunta en la dirección contraria a la que parece: desde que cada configuración se generó
+solo han pasado **2 a 4 operaciones** por clave, así que la comparación es casi toda *in-sample para
+las optimizadas*. **Pierden incluso en los datos con los que se ajustaron**, contra una configuración
+manual que nunca se ajustó a nada.
+
+**Retirarlas es una decisión aparte y este PR no la toma.** Queda la medición hecha.
+
+### Added
+
+- `docs/configuracion-activa.md` — qué configuración decide exactamente, y por qué la lista es blanca.
+- Tests: 13 de fusión en quant, 7 espejo en api, 5 de cuarentena estructural.
+
+## [0.67.0] — 2026-09-07
+
+> Tercera y última dirección de la búsqueda de alfa externa: el **contexto macro**. Los índices DXY
+> y VIX **no existen** en el plan gratuito de Twelve Data, así que se midieron sus réplicas ETF.
+> **32 pruebas, 1 positivo, 1,6 esperados por azar (p = 0,806): ruido.** Y el único positivo cae en
+> una temporalidad que está en cuarentena.
+
+### Added — Series macro y dos vectores de sesgo
+
+- `series_macro.py` trae `UUP` (réplica del DXY, 4.911 sesiones desde 2007) y `VXX` (futuros del VIX
+  a corto, 2.165 desde 2018), los guarda en `artifacts/macro_series.json` y los alinea con las velas
+  de cripto. `descargar_macro` se lanza **a mano**: son series diarias y pedirlas cada ciclo gastaría
+  cupo para traer el mismo dato.
+- `vectores_macro.py` — **tendencia del dólar** (z-score de UUP a 20 sesiones) y **estrés de
+  volatilidad** (cambio logarítmico de VXX a 5 sesiones). Solo dos, y a propósito: un tercer vector
+  poco motivado no aumenta la probabilidad de encontrar algo, aumenta la de encontrar ruido con
+  aspecto de algo.
+- `velas.aperturas()` expone el instante de apertura de cada barra, cacheado junto a las series para
+  no pagar una segunda descarga. El backtest trabaja con índices y nunca lo necesitó; alinear con
+  otro mercado, sí.
+- `run_alfa_macro` publica el informe en `artifacts/alfa_vectores_macro.json`.
+
+### El nivel de VXX no es el nivel del VIX
+
+- Su cierre pasa de **1.770 a 17,72** en ocho años: un 99 % de decaimiento que no es un fallo de
+  datos, es el coste de renovar futuros de volatilidad. Un vector sobre su nivel mediría el paso del
+  tiempo.
+- Sus **variaciones** sí siguen al VIX: sus cinco saltos de más del 25 % en un día son Volmageddon,
+  el COVID, junio de 2020, Ómicron y el desarme del carry del yen. Por eso el vector es un cambio
+  logarítmico, y hay un test que lo fija: duplicar toda la serie no cambia ni un valor.
+
+### La alineación, que era la mitad del trabajo
+
+- UUP y VXX cotizan en horario americano; el cripto, 24/7. **La sesión del día D se declara
+  disponible a las 00:00 UTC del día D+1** — el cierre real es a las 20:00 o 21:00 UTC, así que sobra
+  margen y no hay que razonar sobre husos horarios, que es donde se cometen estos errores.
+- Sin dato fresco se arrastra el último conocido, que es lo que tiene delante quien opera un domingo.
+  **No se interpola**: inventaría sesiones que no existieron.
+- Coste medido sobre el calendario real: antigüedad media de **1,49 días** (68,9 % a un día, 15,0 %
+  a dos, 14,3 % a tres). Irrelevante sobre ventanas de veinte sesiones, pero medido y no supuesto.
+- Verificado contra datos reales antes de mirar ningún resultado: 3.309 velas de BTCUSDT:1d, 100 % de
+  cobertura y **0 discrepancias** en ~400 velas comprobadas una a una. Un fallo aquí no habría dado un
+  resultado malo: habría dado uno **bueno y falso**.
+
+### Resultados — ninguno de los dos aporta
+
+- **Tendencia del dólar**: 0/8 con cada regla. **Estrés de volatilidad**: 0/8 descartando bajos, 1/8
+  descartando altos (p = 0,337).
+- **Global: 32 pruebas, 1 positivo, 1,6 esperados por azar. p de que todo sea ruido = 0,806.**
+- El único positivo está en `BTCUSDT:4h`, **en cuarentena estructural desde 0.63.0**. Aunque fuera
+  real, sería un hallazgo sobre decisiones que hoy no se toman. En 1d, la única temporalidad que
+  opera, **no hay ni un positivo en 16 pruebas**.
+- La ortogonalidad sí se confirmó —correlación máxima de **−0,171** con un voto existente, frente al
+  0,17 de los vectores de precio—: es información genuinamente nueva que no sirve para nada.
+- De las 32 pruebas, 4 superaron la nula por bloques y **la tercera condición frenó tres**, todas en
+  4h y dos de ellas en las claves que peor van. Con un criterio de solo dos condiciones habríamos
+  aprobado tres filtros que pierden menos dinero, no que lo ganen.
+
+### El hallazgo acumulado de los tres estudios
+
+- Funding, precio y macro: **seis vectores, 96 pruebas, 12 veredictos**. No aparece ventaja en
+  ninguna dirección.
+- Eso deja de ser una serie de negativos sueltos. **El problema no es que falte una variable**: la
+  expectancy bruta del ensemble es ≈0 en todas las temporalidades, y filtrar entradas de un motor sin
+  ventaja no crea ventaja — reparte la misma nada entre menos operaciones.
+
+### Changed
+
+- `TWELVEDATA_API_KEY` llega también al contenedor `quant` en el compose de producción, solo para la
+  descarga manual de las series macro. El piloto no la usa.
+- Corregida una afirmación falsa que arrastraba el estudio de vectores de precio: 4h **no** es una
+  temporalidad «que sigue operando», está en cuarentena desde 0.63.0.
+- `docs/vectores-macro.md` nuevo; `docs/alfa-ortogonal.md` y `docs/vectores-precio.md` al día.
+
 ## [0.66.0] — 2026-09-06
 
 > El presupuesto de Twelve Data contaba **peticiones** donde el proveedor cobra **créditos**. Con un

@@ -3,8 +3,11 @@
 Por qué del precio
 -------------------
 Los candidatos externos se agotaron por falta de datos: el interés abierto y el long/short solo dan
-30 días de histórico, y DXY/VIX exigen una clave que no está configurada. El precio, en cambio,
+30 días de histórico, y DXY/VIX estaban entonces sin clave de Twelve Data. El precio, en cambio,
 tiene todo el histórico disponible — hasta 2017 en 1d.
+
+(La vía macro se exploró después, en 0.67.0: los índices no existen en el plan gratuito y hubo que
+usar sus réplicas ETF. Está en `series_macro` y `vectores_macro`.)
 
 La apuesta es que los ocho indicadores actuales describen **dirección** (EMA, MACD, Supertrend) y
 **posición en un rango** (RSI, Bollinger, Estocástico), y ninguno describe la **forma** de la

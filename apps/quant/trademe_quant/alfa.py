@@ -7,9 +7,21 @@ para admitir un voto en el ensemble, y sigue siéndolo.
 
 No es la pregunta de este hito. Un vector puede ordenar algo mejor —AUC 0,52— y no mover la
 expectancy lo suficiente para cubrir el coste de operar. Desde 0.63.0 sabemos cuánto es «lo
-suficiente»: en 1d, la única temporalidad que queda operando, el round-trip cuesta **0,018 R**, y la
-expectancy neta del ensemble es **+0,020 R**. Un candidato que no supere ese orden de magnitud no
-cambia nada aunque tenga señal estadística.
+suficiente»: en 1d, la única temporalidad que queda operando, el round-trip cuesta del orden de
+**0,015 R**. Un candidato que no supere esa magnitud no cambia nada aunque tenga señal estadística.
+
+Corrección del anclaje (7 sep 2026)
+------------------------------------
+Este listón se justificó además con «y la expectancy neta del ensemble en 1d es +0,020 R». **Ese
+número estaba mal medido**: salía de la configuración *base*, y tres de las cuatro claves de 1d
+operan con una configuración optimizada que ni siquiera descontaba comisiones — el fallo que
+corrige `ensemble.fusionar_optimizada`. Con lo que de verdad opera, 1d da **−0,019 R de mediana**.
+
+El valor del listón **no cambia**, y merece decirse por qué. `UMBRAL_VIABILIDAD` responde a «¿cubre
+esto el coste de operar?», que es una pregunta sobre el peaje del exchange y no sobre lo bien que le
+vaya hoy al ensemble. Bajarlo para que algo lo pasara sería exactamente el fallo que este marco
+existe para evitar. Lo que cambia es la lectura: hoy **ninguna clave lo cumple por sí sola**, así
+que un vector que quisiera aportar tendría que llevar su clave hasta ahí desde números negativos.
 
 Así que aquí se mide **R neta**, directamente, y contra un listón absoluto.
 
@@ -49,9 +61,10 @@ import numpy as np
 from .nula import PERMUTACIONES_ESTUDIO, p95_seleccion
 from .promocion import marcas_de_indices
 
-#: Expectancy neta mínima que debe alcanzar el filtro para que operar tenga sentido. Es el orden de
-#: lo que hoy da la única temporalidad viable (1d, +0,020 R neta) y de lo que cuesta su round-trip
-#: (0,018 R): por debajo de aquí, la ventaja no paga el peaje.
+#: Expectancy neta mínima que debe alcanzar el filtro para que operar tenga sentido: el orden de lo
+#: que cuesta el round-trip en 1d (0,011 a 0,020 R según la clave). Por debajo de aquí, la ventaja
+#: no paga el peaje. Es un listón sobre el **coste**, no sobre el rendimiento actual del ensemble —
+#: ver la corrección del anclaje en la cabecera.
 UMBRAL_VIABILIDAD = 0.015
 
 #: Operaciones mínimas a cada lado del filtro. Sin descartes no hay nada que medir; sin

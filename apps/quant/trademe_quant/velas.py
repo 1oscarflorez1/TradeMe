@@ -33,6 +33,7 @@ MAX_ENTRADAS = 40
 
 _cache: dict[tuple[str, str, int], tuple[float, Series]] = {}
 _cache_ohlc: dict[tuple[str, str, int], tuple[float, SeriesOHLC]] = {}
+_cache_tiempos: dict[tuple[str, str, int], tuple[float, list[int]]] = {}
 
 
 def series(
@@ -45,9 +46,10 @@ def series(
     if guardado is not None and ahora - guardado[0] < ttl_s:
         return guardado[1]
 
-    o, h, lo, c = _descargar(symbol, interval, velas)
+    (o, h, lo, c), tiempos = _descargar(symbol, interval, velas)
     datos: Series = (h, lo, c)
     _cache_ohlc[clave] = (ahora, (o, h, lo, c))
+    _cache_tiempos[clave] = (ahora, tiempos)
     if len(_cache) >= MAX_ENTRADAS:
         # Fuera la más vieja. Con un tope tan alto esto casi nunca ocurre; está para que «casi
         # nunca» no se convierta en «nunca se comprobó».
@@ -72,25 +74,52 @@ def series_ohlc(
     if guardado is not None and ahora - guardado[0] < ttl_s:
         return guardado[1]
 
-    datos = _descargar(symbol, interval, velas)
+    datos, tiempos = _descargar(symbol, interval, velas)
     if len(_cache_ohlc) >= MAX_ENTRADAS:
         _cache_ohlc.pop(min(_cache_ohlc, key=lambda k: _cache_ohlc[k][0]), None)
     _cache_ohlc[clave] = (ahora, datos)
+    _cache_tiempos[clave] = (ahora, tiempos)
     return datos
 
 
-def _descargar(symbol: str, interval: str, velas: int) -> SeriesOHLC:
+def aperturas(
+    symbol: str, interval: str, velas: int = VELAS_POR_DEFECTO, *, ttl_s: float = TTL_S
+) -> list[int]:
+    """Instante de apertura (ms UTC) de cada barra, alineado índice a índice con `series`.
+
+    El backtest trabaja con índices y nunca necesitó saber *cuándo* ocurrió cada vela. Los vectores
+    macro sí: hay que emparejar cada decisión con el último dato de un mercado que cierra por las
+    noches y los fines de semana, y sin el instante real no hay forma de hacerlo sin mirar al
+    futuro. Se cachea junto a las series para no pagar una segunda descarga.
+    """
+    clave = (symbol.upper(), interval, velas)
+    ahora = time.time()
+    guardado = _cache_tiempos.get(clave)
+    if guardado is not None and ahora - guardado[0] < ttl_s:
+        return guardado[1]
+
+    datos, tiempos = _descargar(symbol, interval, velas)
+    if len(_cache_tiempos) >= MAX_ENTRADAS:
+        _cache_tiempos.pop(min(_cache_tiempos, key=lambda k: _cache_tiempos[k][0]), None)
+    _cache_ohlc[clave] = (ahora, datos)
+    _cache_tiempos[clave] = (ahora, tiempos)
+    return tiempos
+
+
+def _descargar(symbol: str, interval: str, velas: int) -> tuple[SeriesOHLC, list[int]]:
     filas = historico(symbol, interval, velas)
     candles = [normalize_rest_kline(symbol, interval, r) for r in filas]
-    return (
+    series_ohlc_: SeriesOHLC = (
         [c.open for c in candles],
         [c.high for c in candles],
         [c.low for c in candles],
         [c.close for c in candles],
     )
+    return series_ohlc_, [c.open_time for c in candles]
 
 
 def limpiar_cache() -> None:
     """Vacía la caché. Para los tests y para forzar una relectura si alguna vez hace falta."""
     _cache.clear()
     _cache_ohlc.clear()
+    _cache_tiempos.clear()

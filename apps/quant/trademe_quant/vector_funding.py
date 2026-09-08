@@ -16,8 +16,8 @@ Los deltas de interés abierto son una idea razonable y **no son medibles**: 30 
 observaciones en 1d, la única temporalidad que queda operando. Cualquier veredicto sobre esa muestra
 sería ruido, y este proyecto ya sabe lo que cuesta confundir las dos cosas.
 
-DXY y VIX exigirían Twelve Data, que sigue sin clave configurada, y habría que comprobar su
-histórico antes de contar con ellos.
+DXY y VIX exigirían Twelve Data, que entonces seguía sin clave configurada, y habría que comprobar
+su histórico antes de contar con ellos. (Se hizo en 0.67.0: ver `series_macro`.)
 
 Qué mide, y en qué se diferencia del Fundamental Score
 -------------------------------------------------------

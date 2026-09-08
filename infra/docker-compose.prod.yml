@@ -93,6 +93,9 @@ services:
     environment:
       MLFLOW_TRACKING_URI: file:./mlruns
       DATABASE_URL: postgresql://trademe:${POSTGRES_PASSWORD}@postgres:5432/trademe
+      # Solo para `python -m trademe_quant.descargar_macro`, que se lanza a mano. El piloto no la
+      # usa: las series macro son diarias y se descargan una vez, no en cada ciclo.
+      TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
     volumes:
       - ../artifacts:/app/artifacts
     healthcheck:

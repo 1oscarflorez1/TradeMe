@@ -50,7 +50,8 @@ el 6-sep-2026:
 | open interest (`openInterestHist`) | 30 días | no |
 | long/short ratio | 30 días | no |
 | taker buy/sell volume | 30 días | no |
-| DXY, VIX | Twelve Data, sin clave configurada | pendiente |
+| DXY, VIX (los índices) | **no existen** en el plan gratuito de Twelve Data: 404 | no |
+| UUP, VXX (sus réplicas ETF) | 4.911 y 2.165 sesiones diarias | **sí** — ver [vectores-macro](vectores-macro.md) |
 
 Los **deltas de interés abierto** son una idea razonable y **no son medibles hoy**: 30 días son unas
 30 observaciones en 1d, y cualquier veredicto sobre esa muestra sería ruido. Para poder usarlos
@@ -77,6 +78,12 @@ la última semana — si el apalancamiento se está cargando, no si está cargad
 **Veredicto: no aporta.** Una prueba de 16 supera el listón, y con un P95 el azar produce **0,8**.
 Encontrar una es exactamente lo esperado. El propio informe imprime esa cifra al lado del recuento
 para que no se lea de otra forma.
+
+> **Recalculado el 7-sep-2026 y sin cambios**, ni un decimal. Los estudios de precio y macro sí se
+> movieron al corregir el fallo de `ensemble.fusionar_optimizada` —sus bases se medían sin
+> comisiones—, y este no lo hace porque su única clave positiva, `BNBUSDT:1d`, es la única de las
+> cuatro **sin configuración optimizada**: ya se medía en neto. Que cambie lo que tenía que cambiar y
+> no lo que no, es la comprobación que da confianza en las otras dos.
 
 Y el caso positivo es además marginal por los dos lados: el lift (+0,0791) apenas supera su nula
 (+0,0672), y la neta resultante (+0,0234) apenas supera el listón (+0,015).
