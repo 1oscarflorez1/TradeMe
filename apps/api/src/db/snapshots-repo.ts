@@ -180,8 +180,18 @@ export class SnapshotsRepo {
    * generaba hasta 12 registros de la misma vela de 4h. Contarlos por separado fingía tener doce
    * observaciones independientes cuando en realidad era una sola.
    */
-  async stats(symbol: string): Promise<SnapshotStats> {
+  /**
+   * `costeRoundTripPct` descuenta la comisión al leer, igual que hace quant.
+   *
+   * La columna `outcome_return_r` guarda el R **bruto** y no se reescribe: hacerlo mezclaría dos
+   * reglas en la misma columna, que es el error que este proyecto ya arrastra desde M10.5. Así,
+   * cambiar la comisión no obliga a recalcular ningún histórico.
+   *
+   * Con 0 —el valor por defecto— el resultado es exactamente el de antes.
+   */
+  async stats(symbol: string, costeRoundTripPct = 0): Promise<SnapshotStats> {
     const sym = symbol.toUpperCase();
+    const pct = costeRoundTripPct;
     const res = await this.pool.query<{
       total: number; tp: number; sl: number; timeout: number;
       abiertos: number; sin_plan: number; no_trade: number; expectancy: string | null;
@@ -204,15 +214,23 @@ export class SnapshotsRepo {
               -- La expectancy solo mira lo que tuvo desenlace. Un NO TRADE nunca lo tiene (no hay
               -- plan que evaluar), así que registrar los descartes no mueve ni un decimal de estas
               -- cifras: solo llena el hueco que tenía el dataset.
-              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy,
+              AVG((outcome_return_r - CASE WHEN $2::float8 > 0 AND plan_entry IS NOT NULL
+                              AND plan_stop IS NOT NULL AND plan_entry <> plan_stop
+                         THEN ($2::float8 / 100.0) * abs(plan_entry)
+                              / abs(plan_entry - plan_stop)
+                         ELSE 0 END)) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy,
               -- Expediente sombra, en columnas propias: lo que una temporalidad en cuarentena
               -- habría hecho. Va aparte de la expectancy porque NO se operó, y contarlo como
               -- rendimiento sería apuntarse un dinero que nadie ganó.
               COUNT(*) FILTER (WHERE shadow_outcome_result IS NOT NULL)::int AS sombra_evaluadas,
-              AVG(shadow_outcome_return_r) FILTER (WHERE shadow_outcome_result IS NOT NULL)
+              AVG((shadow_outcome_return_r - CASE WHEN $2::float8 > 0 AND plan_entry IS NOT NULL
+                              AND plan_stop IS NOT NULL AND plan_entry <> plan_stop
+                         THEN ($2::float8 / 100.0) * abs(plan_entry)
+                              / abs(plan_entry - plan_stop)
+                         ELSE 0 END)) FILTER (WHERE shadow_outcome_result IS NOT NULL)
                 AS sombra_expectancy
          FROM una_por_vela`,
-      [sym],
+      [sym, pct],
     );
     const porTf = await this.pool.query<{
       interval: string; total: number; tp: number; sl: number;
@@ -231,9 +249,13 @@ export class SnapshotsRepo {
               COUNT(*) FILTER (WHERE outcome_result IS NULL
                                AND direction IN ('LONG','SHORT')
                                AND plan_entry IS NOT NULL)::int AS abiertos,
-              AVG(outcome_return_r) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
+              AVG((outcome_return_r - CASE WHEN $2::float8 > 0 AND plan_entry IS NOT NULL
+                              AND plan_stop IS NOT NULL AND plan_entry <> plan_stop
+                         THEN ($2::float8 / 100.0) * abs(plan_entry)
+                              / abs(plan_entry - plan_stop)
+                         ELSE 0 END)) FILTER (WHERE outcome_result IS NOT NULL) AS expectancy
          FROM una_por_vela GROUP BY interval`,
-      [sym],
+      [sym, pct],
     );
     const fila = res.rows[0];
     const num = (v: string | null): number | null => (v === null ? null : Number(v));
