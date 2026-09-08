@@ -220,7 +220,7 @@ def evaluate_real(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_ENTRADA)
     return _resumen(rs)
 
 
-def umbral_salida(ev: dict[str, Any]) -> float:
+def umbral_salida(ev: dict[str, Any], estructural: bool = False) -> float:
     """Expectancy que hay que demostrar para volver a operar.
 
     **No-inferioridad al mercado**: `mediana de la nula + MIN_EXPECTANCY_SALIDA`, con el fijo como
@@ -253,11 +253,39 @@ def umbral_salida(ev: dict[str, Any]) -> float:
 
     Y el suelo se mantiene: por muy malo que fuera el mercado —mediana negativa— nunca se sale con
     menos de `MIN_EXPECTANCY_SALIDA`. Volver a operar con 0,00 R sigue sin valer.
+
+    La excepción: cuarentena ESTRUCTURAL (7 sep 2026)
+    -------------------------------------------------
+    Todo lo anterior vale cuando una temporalidad fue vetada **por su expediente**: un mal tramo, y
+    la pregunta al volver es «¿merece competir con las demás?». Contra competidores homogéneos, el
+    P95 sería un cupo.
+
+    Una cuarentena **estructural** es otra cosa. 15m, 30m y 1h no entraron por un mal tramo, sino
+    porque el coste hace imposible ganar —haría falta una ventaja bruta de **+0,29 R** en 15m y lo
+    medido sobre 1.875 operaciones es **+0,003**—. Ahí ya hay un veredicto sobre miles de
+    operaciones, y la pregunta al volver deja de ser «¿merece competir?» para ser exactamente la
+    otra: **«¿esto aporta algo o es azar?»**, con evidencia previa fuerte en contra.
+
+    Esa es, palabra por palabra, la pregunta para la que este mismo módulo dice que el P95 **sí** es
+    el percentil correcto —como en `meta_policy` y `fundamental_policy`—. Así que para las
+    estructurales se exige superar `nula_p95`, y no deja de ser el mismo criterio: el percentil lo
+    elige la pregunta, no la costumbre.
+
+    Lo que costaba no distinguirlas, medido el 7 de septiembre de 2026: tres claves habían salido de
+    una cuarentena estructural con expectancies **por debajo del P95 de su propia nula** —
+    `BTCUSDT:1h` con +0,119 frente a 0,499, `SOLUSDT:15m` con +0,388 frente a 0,472 y `BNBUSDT:1h`
+    con +0,297 frente a 0,470—. El número que las desmentía estaba calculado y guardado en su propio
+    expediente, sin que nadie lo mirase.
     """
-    return max(MIN_EXPECTANCY_SALIDA, float(ev.get("nula_mediana", 0.0)) + MIN_EXPECTANCY_SALIDA)
+    suelo = max(MIN_EXPECTANCY_SALIDA, float(ev.get("nula_mediana", 0.0)) + MIN_EXPECTANCY_SALIDA)
+    if not estructural:
+        return suelo
+    return max(suelo, float(ev.get("nula_p95", 0.0)))
 
 
-def decide_quarantine(en_cuarentena: bool, ev: dict[str, Any]) -> tuple[bool, str]:
+def decide_quarantine(
+    en_cuarentena: bool, ev: dict[str, Any], estructural: bool = False
+) -> tuple[bool, str]:
     """Decide si la temporalidad debe estar en cuarentena, y por qué.
 
     Devuelve `(en_cuarentena, motivo)`. El motivo se muestra en la interfaz y se guarda en el
@@ -273,10 +301,15 @@ def decide_quarantine(en_cuarentena: bool, ev: dict[str, Any]) -> tuple[bool, st
             return True, (
                 f"sigue en cuarentena: {n}/{MIN_SAMPLES_SALIDA} decisiones sombra evaluadas"
             )
-        exigido = umbral_salida(ev)
+        exigido = umbral_salida(ev, estructural)
         if exp < exigido:
             detalle = f"se exige ≥{exigido:+.3f} R"
-            if exigido > MIN_EXPECTANCY_SALIDA:
+            if estructural and exigido >= float(ev.get("nula_p95", 0.0)) > MIN_EXPECTANCY_SALIDA:
+                detalle += (
+                    ", el percentil 95 del azar: la cuarentena es estructural (por coste) y"
+                    " volver exige demostrar que no es una racha"
+                )
+            elif exigido > MIN_EXPECTANCY_SALIDA:
                 detalle += (
                     f", que es {MIN_EXPECTANCY_SALIDA} por encima del tramo típico del mercado"
                     f" en este periodo ({float(ev.get('nula_mediana', 0.0)):+.3f} R)"
@@ -441,14 +474,25 @@ def estado_previo(politica: dict[str, Any], clave: str, interval: str, actuales:
     return bool(entrada.get("quarantined")) if isinstance(entrada, dict) else False
 
 
-def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
+def publish(
+    artifacts: Path,
+    dsn: str,
+    actuales: list[str],
+    estructurales: list[str] | None = None,
+) -> dict[str, Any]:
     """Revisa cada temporalidad y publica `quarantine.json`.
 
     `actuales` son las temporalidades vetadas según `ensemble.yaml`, pero el estado real de cada
     clave sale de `estado_previo`: el yaml es el suelo y el artefacto manda por encima. De eso
     depende a qué expediente se mira — si está vetada, al sombra (lo que habría hecho); si opera, al
     real (lo que hizo)— y equivocarse ahí deja claves condenadas para siempre.
+
+    `estructurales` son las que entraron **por coste** y no por expediente. Su puerta de salida es
+    más dura —el P95 de la nula en vez de la mediana— porque la pregunta que responden al volver es
+    otra. Ver `umbral_salida`. Sin la lista, todas se tratan como de expediente: el comportamiento
+    anterior, que es el conservador respecto a este cambio.
     """
+    estructural_set = set(estructurales or [])
     datos, poblacion = fetch_expedientes(dsn)
     politica = load_policy(artifacts)
     decisiones: dict[str, dict[str, Any]] = {}
@@ -463,7 +507,7 @@ def publish(artifacts: Path, dsn: str, actuales: list[str]) -> dict[str, Any]:
             if vetada
             else evaluate_real(filas, MIN_SAMPLES_ENTRADA)
         )
-        nueva, motivo = decide_quarantine(vetada, ev)
+        nueva, motivo = decide_quarantine(vetada, ev, interval in estructural_set)
         decisiones[clave] = {
             "interval": interval,
             "quarantined": nueva,

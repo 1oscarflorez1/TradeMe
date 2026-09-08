@@ -472,3 +472,63 @@ def test_la_entrada_sigue_sin_mirar_la_nula() -> None:
     ev["nula_mediana"] = 5.0
     ev["nula_p95"] = 9.0
     assert decide_quarantine(False, ev)[0] is True
+
+
+# --- Cuarentena estructural: el percentil lo elige la pregunta -----------------------------------
+
+
+def test_la_estructural_exige_el_p95_y_la_de_expediente_no() -> None:
+    """Misma evidencia, dos puertas distintas, porque no responden a la misma pregunta.
+
+    Con un mal tramo detrás, volver es «¿merezco competir con las demás?» y el P95 sería un cupo del
+    5 %. Con un veredicto sobre 1.875 operaciones detrás, volver es «¿esto aporta algo o es azar?»,
+    que es justo la pregunta para la que el P95 es el listón correcto.
+    """
+    ev = evaluate_shadow(_sombra(60, 0.30), poblacion=_poblacion([0.4, -0.4, 0.2, -0.2, 0.0]))
+    assert umbral_salida(ev, estructural=False) < umbral_salida(ev, estructural=True)
+    assert umbral_salida(ev, estructural=True) >= ev["nula_p95"]
+
+
+def test_el_caso_real_que_lo_motivo() -> None:
+    """`BTCUSDT:1h` salió con +0,119 R teniendo un P95 de 0,499 en su propio expediente.
+
+    El número que la desmentía estaba calculado y guardado, sin que nadie lo mirase. Con la
+    distinción, la misma evidencia la mantiene vetada.
+    """
+    ev = {
+        "n": 40,
+        "expectancy": 0.119,
+        "win_rate": 0.425,
+        "nula_mediana": -0.0416,
+        "nula_p95": 0.4987,
+    }
+    assert decide_quarantine(True, ev, estructural=False)[0] is False
+    vetada, motivo = decide_quarantine(True, ev, estructural=True)
+    assert vetada is True
+    assert "estructural" in motivo
+
+
+def test_una_estructural_con_evidencia_de_verdad_sale_igual() -> None:
+    """El listón es más duro, no infranqueable: no es una condena perpetua encubierta."""
+    ev = {
+        "n": 40,
+        "expectancy": 1.143,
+        "win_rate": 0.825,
+        "nula_mediana": -0.1481,
+        "nula_p95": 0.388,
+    }
+    assert decide_quarantine(True, ev, estructural=True)[0] is False
+
+
+def test_por_defecto_nada_cambia() -> None:
+    """Sin declarar estructurales, el comportamiento es el de antes — el conservador aquí."""
+    ev = {"n": 40, "expectancy": 0.30, "win_rate": 0.5, "nula_mediana": -0.10, "nula_p95": 0.47}
+    assert decide_quarantine(True, ev)[0] is decide_quarantine(True, ev, estructural=False)[0]
+    assert decide_quarantine(True, ev)[0] is False
+
+
+def test_la_entrada_no_distingue_estructural() -> None:
+    """La asimetría vive solo en la puerta de salida: entrar cuesta lo mismo siempre."""
+    ev = evaluate_real(_real(50, -0.5))
+    ev["nula_p95"] = 9.0
+    assert decide_quarantine(False, ev, estructural=True)[0] is True

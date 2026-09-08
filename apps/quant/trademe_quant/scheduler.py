@@ -485,7 +485,9 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
 
         base = load_ensemble(artifacts_dir() / "ensemble.yaml")
         vetadas = [str(x) for x in base.get("quarantine_intervals", [])]
-        qtn = publish_quarantine(artifacts_dir(), dsn, vetadas)
+        # Las estructurales entraron por coste, no por expediente, y salen con un listón más duro.
+        estructurales = [str(x) for x in base.get("quarantine_structural", [])]
+        qtn = publish_quarantine(artifacts_dir(), dsn, vetadas, estructurales)
         cambios = [v for v in qtn["intervals"].values() if v["changed"]]
         for c in cambios:
             estado = "entra en" if c["quarantined"] else "sale de"
