@@ -119,9 +119,13 @@ async function main(): Promise<void> {
     // Fusión, no sustitución: Optuna solo aporta los doce parámetros que busca y el resto lo manda
     // siempre la base. Ver `fusionarOptimizada` — cargar la optimizada entera congelaba cada clave
     // en el estado de gobierno del día en que se generó.
-    const base = existsSync(p)
-      ? fusionarOptimizada(ensemble, loadEnsembleSafe(p, (m) => console.warn(m)))
-      : ensemble;
+    //
+    // Y desde 0.69.0 la fusión casi nunca llega a ocurrir: `useOptimizedConfigs` está en false
+    // porque las quince configuraciones rendían peor que la base. Ver el campo en `config.ts`.
+    const base =
+      ensemble.useOptimizedConfigs && existsSync(p)
+        ? fusionarOptimizada(ensemble, loadEnsembleSafe(p, (m) => console.warn(m)))
+        : ensemble;
     // Se especializa aquí, una sola vez por símbolo+TF: validez del plan, cuarentena y factor de
     // independencia quedan resueltos y ningún punto de llamada tiene que acordarse de aplicarlos.
     const vetada = quarantine.isQuarantined(

@@ -128,14 +128,43 @@ def fusionar_optimizada(base: dict[str, Any], opt: dict[str, Any]) -> dict[str, 
     return fusionada
 
 
+def usa_optimizadas(base: dict[str, Any]) -> bool:
+    """¿Se aplican las configuraciones de Optuna? Por defecto sí; desde 0.69.0 el yaml dice que no.
+
+    Retiradas el 7 de septiembre de 2026 tras medirlas contra la base en R netas sobre 1d:
+
+    ==============  ==================  =============  ============
+    clave           con la optimizada   con la base    diferencia
+    ==============  ==================  =============  ============
+    BTCUSDT:1d      −0,026              −0,020         +0,006
+    ETHUSDT:1d      +0,007              +0,059         +0,052
+    SOLUSDT:1d      −0,013              **+0,106**     +0,119
+    mediana         −0,019              +0,020         +0,039
+    ==============  ==================  =============  ============
+
+    Y la salvedad apunta en su contra, no a favor: desde que cada una se generó solo han pasado de
+    2 a 4 operaciones, así que la comparación es casi toda *in-sample para ellas*. **Pierden incluso
+    en los datos con los que se ajustaron**, contra una configuración manual que nunca se ajustó a
+    nada.
+
+    Se desactivan por bandera y **no se borran**, a propósito: la decisión es reversible, queda
+    auditable, y los ficheros siguen ahí para poder rehacer la comparación cuando haya más histórico
+    posterior a su fecha.
+    """
+    return bool(base.get("use_optimized_configs", True))
+
+
 def load_active_ensemble(symbol: str, interval: str) -> dict[str, Any]:
     """Config ACTIVA para un símbolo+temporalidad: la base, con lo optimizado de esa clave encima.
 
     Es la misma regla que aplica la API en vivo: así el backtest mide exactamente lo que decide el
     sistema para esa temporalidad. Ver `fusionar_optimizada` para por qué es una fusión y no una
-    sustitución — lo era hasta el 7 de septiembre de 2026, y salía caro.
+    sustitución — lo era hasta el 7 de septiembre de 2026, y salía caro— y `usa_optimizadas` para
+    por qué hoy la fusión casi nunca llega a ocurrir.
     """
     base = load_ensemble(artifacts_dir() / "ensemble.yaml")
+    if not usa_optimizadas(base):
+        return base
     opt = artifacts_dir() / "optimized" / f"ensemble.{symbol.upper()}.{interval}.yaml"
     if not opt.exists():
         return base

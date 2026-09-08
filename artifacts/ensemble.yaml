@@ -110,6 +110,24 @@ evaluation:
 #
 # Se retira el permiso para operar, no la observación: el expediente sombra se sigue midiendo, y
 # ahora en NETO — así que solo saldrán si de verdad ganan después de pagar al exchange.
+# ¿Se aplican las configuraciones que publica Optuna en artifacts/optimized/? Desde 0.69.0, NO.
+#
+# Medidas contra la base en R netas sobre 1d el 7-sep-2026:
+#
+#   clave         con la optimizada   con la base   diferencia
+#   BTCUSDT:1d          -0,026          -0,020        +0,006
+#   ETHUSDT:1d          +0,007          +0,059        +0,052
+#   SOLUSDT:1d          -0,013          +0,106        +0,119
+#   mediana             -0,019          +0,020        +0,039
+#
+# La salvedad apunta en su contra, no a favor: desde que cada una se genero solo han pasado de 2 a 4
+# operaciones, asi que la comparacion es casi toda in-sample PARA ELLAS. Pierden incluso en los datos
+# con los que se ajustaron, contra una configuracion manual que nunca se ajusto a nada.
+#
+# No se borran los ficheros a proposito: la decision es reversible, queda auditable, y siguen ahi
+# para rehacer la comparacion cuando haya mas historico posterior a su fecha.
+use_optimized_configs: false
+
 quarantine_intervals: ['15m', '30m', '1h', '4h']
 
 # De las anteriores, cuáles entraron por COSTE y no por expediente. La distinción cambia su puerta
