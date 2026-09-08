@@ -39,6 +39,7 @@ import {
   DEFAULT_ENSEMBLE,
   effectiveMacro,
   forInterval,
+  fusionarOptimizada,
   loadEnsemble,
   type EnsembleConfig,
 } from './ensemble/config.js';
@@ -115,7 +116,12 @@ async function main(): Promise<void> {
     const hit = ensembleCache.get(key);
     if (hit) return hit;
     const p = join(artifactsDir, 'optimized', `ensemble.${symbol.toUpperCase()}.${interval}.yaml`);
-    const base = existsSync(p) ? loadEnsembleSafe(p, (m) => console.warn(m)) : ensemble;
+    // Fusión, no sustitución: Optuna solo aporta los doce parámetros que busca y el resto lo manda
+    // siempre la base. Ver `fusionarOptimizada` — cargar la optimizada entera congelaba cada clave
+    // en el estado de gobierno del día en que se generó.
+    const base = existsSync(p)
+      ? fusionarOptimizada(ensemble, loadEnsembleSafe(p, (m) => console.warn(m)))
+      : ensemble;
     // Se especializa aquí, una sola vez por símbolo+TF: validez del plan, cuarentena y factor de
     // independencia quedan resueltos y ningún punto de llamada tiene que acordarse de aplicarlos.
     const vetada = quarantine.isQuarantined(

@@ -237,6 +237,58 @@ export function effectiveMacro(cfg: EnsembleConfig): MacroConfig {
 }
 
 /**
+ * Lo ÚNICO que Optuna busca, y por tanto lo único que una configuración optimizada puede aportar.
+ * Coincide con los `trial.suggest_*` de `optimize.py` y con `CAMPOS_OPTIMIZABLES` en
+ * `apps/quant/trademe_quant/ensemble.py`.
+ *
+ * Es una lista **blanca** a propósito: lo que no esté aquí viene de la base, así que una sección
+ * nueva del yaml queda protegida por defecto en vez de quedar olvidada hasta que alguien note que
+ * no se aplica.
+ */
+/**
+ * Aplica sobre la base **solo lo que Optuna optimiza**. Todo lo demás manda la base.
+ *
+ * El fallo que esto corrige (7 sep 2026)
+ * --------------------------------------
+ * El optimizador publica una **copia completa** del yaml, pero solo busca doce cosas: los seis
+ * pesos, `hold_band`, `temperature`, `adx_lo`, `adx_width` y los multiplicadores de régimen. Y
+ * quien la consumía —aquí y en `load_active_ensemble`— la cargaba **entera**, sustituyendo la base.
+ *
+ * El resultado es que cada clave con configuración optimizada quedaba **congelada en el estado de
+ * gobierno del día en que se generó**. Las quince que había el 7 de septiembre de 2026 eran de
+ * agosto, y por tanto aplicaban:
+ *
+ * - **sin sección `costs`** — se medían en bruto, tres de las cuatro claves de 1d incluidas;
+ * - `quarantine_intervals: ['4h']` — la cuarentena estructural de 15m, 30m y 1h no les llegaba;
+ * - `external_weights.tradingview: 2.0` — cuando la base lo puso a 0 (sombra) en 0.62.0.
+ *
+ * Lo caro no fue lo que hacía, sino lo que hizo creer: `docs/costes.md` daba **+0,020 R netos**
+ * para 1d, y ese número sale de medir la configuración **base**. Con la que de verdad opera, y
+ * aplicándole los costes que le faltaban, 1d da **−0,019 R**.
+ */
+export function fusionarOptimizada(
+  base: EnsembleConfig,
+  opt: EnsembleConfig,
+): EnsembleConfig {
+  return {
+    ...base,
+    // La versión sí viaja: es la identidad del artefacto que se está aplicando, y la interfaz y los
+    // informes la muestran para saber qué configuración produjo cada decisión.
+    version: opt.version,
+    temperature: opt.temperature,
+    holdBand: opt.holdBand,
+    weights: opt.weights,
+    regime: {
+      ...base.regime,
+      adxLo: opt.regime.adxLo,
+      adxHi: opt.regime.adxHi,
+      trend: opt.regime.trend,
+      range: opt.regime.range,
+    },
+  };
+}
+
+/**
  * Especializa la configuración para un símbolo y temporalidad concretos.
  *
  * Deja resueltos los tres ajustes que dependen de la temporalidad —validez del plan, cuarentena y
