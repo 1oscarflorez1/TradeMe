@@ -120,6 +120,17 @@ export interface EnsembleConfig {
    * poder demostrar que merece volver.
    */
   quarantineIntervals: string[];
+  /**
+   * ¿Se aplican las configuraciones de Optuna? Por defecto sí; desde 0.69.0 el yaml dice que no.
+   *
+   * Retiradas el 7 de septiembre de 2026 tras medirlas contra la base en R netas sobre 1d: la
+   * mediana pasa de −0,019 con ellas a +0,020 sin ellas, y SOLUSDT:1d de −0,013 a +0,106. La
+   * salvedad apunta en su contra: desde que se generaron solo han pasado de 2 a 4 operaciones, así
+   * que **pierden incluso en los datos con los que se ajustaron**.
+   *
+   * Se desactivan por bandera y no se borran: la decisión es reversible y queda auditable.
+   */
+  useOptimizedConfigs: boolean;
   /** Resuelto por temporalidad en `forInterval`. */
   quarantined?: boolean;
   /** Resuelto por símbolo+temporalidad en `forInterval` (1 = sin desinflar). */
@@ -198,6 +209,7 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
   // de Binance USDT-M Futuros (0,12 %) se lleva 0,29 R por operación — contra una expectancy bruta
   // medida de +0,003 R sobre ~1.850 operaciones. Ver `docs/costes.md`.
   quarantineIntervals: ['15m', '30m', '1h', '4h'],
+  useOptimizedConfigs: false,
 };
 
 /** Frescura de la entrada, en velas, para una temporalidad. */
@@ -329,6 +341,7 @@ interface RawConfig {
   plan?: { valid_candles?: number; valid_candles_by_tf?: Record<string, number> };
   evaluation?: { horizon?: number; horizon_by_tf?: Record<string, number> };
   quarantine_intervals?: string[];
+  use_optimized_configs?: boolean;
   macro?: {
     enabled?: boolean;
     w_macro?: number;
@@ -406,6 +419,7 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
       horizonByTf: raw.evaluation?.horizon_by_tf ?? d.evaluation.horizonByTf,
     },
     quarantineIntervals: raw.quarantine_intervals ?? d.quarantineIntervals,
+    useOptimizedConfigs: raw.use_optimized_configs ?? d.useOptimizedConfigs,
   };
 }
 

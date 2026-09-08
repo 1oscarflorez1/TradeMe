@@ -7,6 +7,85 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.69.0] — 2026-09-07
+
+> Las quince configuraciones de Optuna quedan **retiradas**: 1d pasa de −0,019 a **+0,020 R** de
+> mediana. Y la gestión de la salida —ocho planes— **no aporta**, con un mecanismo que explica por
+> qué: el trailing salva 29 stops y corta 32 take-profits.
+
+### Changed — Retiradas las configuraciones optimizadas
+
+- `use_optimized_configs: false` en `ensemble.yaml`. Las cuatro claves de 1d vuelven a
+  `ens-m3-2026-07-07` y la mediana pasa a **+0,0196 R**, comprobado tras el cambio.
+- **No se borran los ficheros.** La decisión es reversible, queda auditable, y las quince siguen ahí
+  para rehacer la comparación cuando haya histórico posterior a su fecha — que es justo lo que falta.
+- Salvedad sobre lo que cabe esperar: **+0,106 R en SOL es +0,106 ± 0,061** sobre 271 operaciones. La
+  dirección está clara y la decisión también, pero no es un ingreso asegurado. Se retiran porque
+  rinden peor, no porque la base garantice ese número.
+
+### Added — Gestión de la salida, medida sobre 1d
+
+- `salidas.py`: breakeven, arrastre del stop (con distancia en R o con el ATR corriente), cierre por
+  decaimiento de la señal y renuncia al take-profit. Todo desactivado por defecto.
+- `sizing.py`: pesos por volatilidad inversa **normalizados a media 1**, y métricas de curva
+  invariantes a la escala.
+- `run_salidas` y `run_sizing` publican sus informes en `artifacts/`.
+
+### El look-ahead que había que evitar antes de medir
+
+- En 1d una vela es un día y **nadie sabe si el máximo ocurrió antes o después del mínimo**. En cada
+  vela se comprueba **primero** si el stop vigente se toca y **solo después** se actualiza con esa
+  vela ya cerrada. Hay un test con una vela que sube a +1 R y baja al stop en el mismo periodo.
+- Y el que sostiene toda comparación: **sin plan, el resultado es idéntico bit a bit**, comprobado
+  sobre 50 series aleatorias en las dos direcciones.
+
+### Resultados — 32 pruebas, 0 positivos
+
+Ocho planes × cuatro claves. Ninguno supera las tres condiciones. El control del azar cambia de
+forma respecto a los estudios de alfa, y es deliberado: un plan de salida no **elige** operaciones,
+**cambia el desenlace** de las que toca, así que se usa un **bootstrap por bloques de 24 h** y se
+exige que el percentil 5 del lift remuestreado siga siendo positivo.
+
+**Por qué falla**, descomponiendo el trailing de 1 R:
+
+| transición | n | Δ R medio | Δ total |
+|---|---|---|---|
+| **take-profit → gestión** | 32 | **−1,411** | **−45,1 R** |
+| stop → gestión | 29 | +1,273 | +36,9 R |
+| timeout → gestión | 138 | −0,059 | −8,2 R |
+| **neto** | | | **−16,4 R** sobre 1.108 operaciones |
+
+Salva 29 stops y **corta 32 take-profits**. Y no es cuestión de calibrar: con el TP fijo a 2 R,
+cualquier arrastre que se active por debajo puede cortar una ganadora y uno que se active por encima
+llega tarde. **No hay hueco.**
+
+- **Los timeouts tampoco eran capturables.** Su MFE mediano es +1,13 R y cobran +0,63 R; un trailing
+  a 1 R por detrás saldría en +0,13 R. **El MFE mide lo que el precio llegó a ofrecer, no lo que un
+  mecanismo causal podría haber cobrado.**
+- Lo único anotado, sin sobrevenderlo: sin TP y arrastrando con ATR, el drawdown baja en 3 de 4
+  claves y el Sharpe sube en 3 de 4. Con una moneda al aire, 3 de 4 sale el 31 % de las veces.
+
+### El sizing por volatilidad inversa ya estaba hecho, y repetirlo empeora
+
+- El stop está a `atr_stop_mult × ATR`, así que **1 R es siempre 1 % del capital con cualquier ATR**:
+  la normalización por volatilidad ya está dentro de la unidad en que mide todo el proyecto.
+- Variar además el porcentaje de capital **mejora en 1 de 4 claves**, y la única que mejora es la que
+  pierde dinero. En ETH y SOL —las que ganan— empeora, y el drawdown de ETH **sube un 57 %**.
+- Es una **doble corrección**: ponderar por `1/volatilidad` sobre una unidad que ya es riesgo
+  constante no neutraliza la volatilidad, la sobre-corrige, y concentra el riesgo en los periodos
+  tranquilos — que en cripto son los que preceden a las rupturas.
+
+### La conclusión acumulada, ahora en cuatro direcciones
+
+Entrada (funding, precio, macro), salida y tamaño. **La expectancy bruta del ensemble es ≈0 y
+ninguna reorganización de lo que ya hace la cambia**: los filtros reparten la misma nada entre menos
+operaciones, la gestión de salidas mueve valor de las ganadoras a las perdedoras, y el sizing
+redistribuye riesgo sin crear retorno. Son transformaciones de una serie sin ventaja.
+
+### Added
+
+- `docs/gestion-salidas.md`. Tests: 62 de salidas, 10 de sizing, 4 de configuración activa.
+
 ## [0.68.0] — 2026-09-07
 
 > Las configuraciones optimizadas **sustituían** el yaml entero en vez de fusionarse con él. Como el
