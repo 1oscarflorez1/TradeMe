@@ -62,17 +62,25 @@ Por eso el veredicto tiene dos niveles y solo cuenta el segundo (`alfa.p_falsos_
 
 | vector | descartar bajos | descartar altos | veredicto |
 |---|---|---|---|
-| asimetría de mechas | 1/8 (p = 0,337) | 1/8 (p = 0,337) | **ruido** |
+| asimetría de mechas | 0/8 | 1/8 (p = 0,337) | **ruido** |
 | ratio de Parkinson | 0/8 | 0/8 | **ruido** |
-| compresión ATR | 1/8 (p = 0,337) | 1/8 (p = 0,337) | **ruido** |
+| compresión ATR | 0/8 | 1/8 (p = 0,337) | **ruido** |
 
-**Global: 48 pruebas, 4 positivos, 2,4 esperados por azar. p de que todo sea ruido = 0,218.**
+**Global: 48 pruebas, 2 positivos, 2,4 esperados por azar. p de que todo sea ruido = 0,699.**
 
-Ningún vector+regla llega a los tres positivos que harían falta. Y los cuatro que salen están
-repartidos entre vectores y reglas distintas, sin patrón — si hubiera señal real, se concentrarían.
+Ningún vector+regla llega a los tres positivos que harían falta. Y los dos que salen caen en la
+**misma clave** —`SOLUSDT:1d`, con las dos reglas de descartar altos—, así que ni siquiera son dos
+observaciones independientes: es una clave, mirada dos veces.
 
-El más limpio en su negativa es el **ratio de Parkinson**: 0 de 16 pruebas. La hipótesis de que
-distinguir agitación de tendencia ayudase a filtrar entradas queda descartada con claridad.
+> **Recalculado el 7-sep-2026.** La primera medición daba **4 positivos** y p = 0,218. Estaba hecha
+> sobre bases que no descontaban comisiones en las claves con configuración optimizada — el fallo
+> que corrige `ensemble.fusionar_optimizada`. Con los costes aplicados las bases bajan, la condición
+> de viabilidad se endurece y dos de los cuatro positivos desaparecen. **El veredicto no cambia; el
+> margen con que se sostiene, sí.**
+
+El más limpio en su negativa sigue siendo el **ratio de Parkinson**: 0 de 16 pruebas en las dos
+mediciones. La hipótesis de que distinguir agitación de tendencia ayudase a filtrar entradas queda
+descartada con claridad.
 
 ## Lo que el marco frenó, y por qué importa
 

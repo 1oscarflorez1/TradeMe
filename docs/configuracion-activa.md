@@ -73,16 +73,29 @@ configuración activa, y su equivalencia está cubierta por tests espejo a cada 
 
 ## Qué NO arregla esto
 
-**Las configuraciones optimizadas siguen siendo peores que la base.** Con la fusión aplicada, en 1d:
+**Las configuraciones optimizadas siguen siendo peores que la base.** Con la fusión aplicada y en
+R **netas**, sobre 1d:
 
-| clave | bruta con la optimizada | bruta con la base |
-|---|---|---|
-| BTCUSDT:1d | −0,006 | −0,000 |
-| ETHUSDT:1d | +0,022 | +0,073 |
-| SOLUSDT:1d | −0,002 | **+0,117** |
-| BNBUSDT:1d | −0,028 | −0,028 (no tiene optimizada) |
+| clave | con la optimizada | con la base | diferencia |
+|---|---|---|---|
+| BTCUSDT:1d | −0,026 | −0,020 | +0,006 |
+| ETHUSDT:1d | +0,007 | +0,059 | +0,052 |
+| SOLUSDT:1d | −0,013 | **+0,106** | **+0,119** |
+| BNBUSDT:1d | −0,044 | −0,044 | — (no tiene optimizada) |
+| **mediana** | **−0,019** | **+0,020** | **+0,039** |
+
+Es decir: **retirarlas devolvería 1d justo al +0,020 que se creía tener.**
+
+Conviene leer bien la salvedad, porque apunta en la dirección contraria a la que parece. Desde que
+cada configuración se generó solo han pasado **entre 2 y 4 operaciones** por clave, así que esta
+comparación es casi toda *in-sample para las optimizadas* — son los datos con los que se ajustaron.
+**Pierden incluso ahí**, contra una configuración manual que nunca se ajustó a nada. Eso es
+sobreajuste de manual: parámetros que iban bien en su ventana de validación y mal en general.
 
 Es coherente con lo que ya se sabía —la reoptimización periódica se desactivó en 0.62.0 justamente
-porque no aportaba— pero más marcado de lo que se había medido. **Retirar las quince configuraciones
-optimizadas es una decisión aparte**, con su propia medición pendiente: aquí solo se ha arreglado que
-no arrastren consigo el gobierno de agosto.
+porque no aportaba— pero mucho más marcado de lo que se había medido, porque hasta ahora se comparaba
+sobre hold-outs de 22 a 26 operaciones.
+
+**Retirar las quince es una decisión aparte y no la toma este documento.** Aquí solo se ha arreglado
+que no arrastren consigo el gobierno de agosto. Lo que sí deja dicho es que la medición para tomarla
+ya está hecha, y que el efecto sería mayor que el de cualquier ajuste de la operativa.

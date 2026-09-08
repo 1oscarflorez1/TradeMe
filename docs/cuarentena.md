@@ -135,7 +135,8 @@ el mejor de los cuatro: no estima variabilidad ninguna.
 
 | Puerta | Regla | Efecto |
 |---|---|---|
-| **Salir** de cuarentena | `expectancy ≥ max(0,05 R, mediana de la nula + 0,05 R)` | Ajustado al régimen |
+| **Salir**, cuarentena de expediente | `expectancy ≥ max(0,05 R, mediana de la nula + 0,05 R)` | Ajustado al régimen |
+| **Salir**, cuarentena **estructural** | lo anterior **y además** `≥ P95 de la nula` | Exige evidencia fuerte |
 | **Entrar** en cuarentena | `expectancy ≤ −0,15 R` (sin cambios) | Igual de fácil dejar de operar |
 
 **La nula solo se usa en la salida.** Aplicarla también a la entrada dejaría operando temporalidades
@@ -146,6 +147,42 @@ población. El fallo es estructuralmente imposible.
 Cuando la nula no se puede estimar —población corta, menos de 5 bloques— el listón vuelve al 0,05 R
 de siempre. Y por muy malo que sea el mercado, ese 0,05 R es un **suelo**: salir con 0,00 R sigue sin
 valer.
+
+### Estructural o de expediente: el percentil lo elige la pregunta (7 sep 2026)
+
+Las dos filas de «salir» no son una excepción a la regla del cupo, sino la misma regla aplicada a dos
+preguntas distintas.
+
+Una cuarentena **de expediente** la provoca un mal tramo. Al volver, la pregunta es *«¿merezco
+competir con las demás?»*, con muchos competidores homogéneos — y ahí el P95 de una nula muestreada
+de la propia plataforma es un cupo del 5 %, como se explica justo debajo.
+
+Una cuarentena **estructural** es otra cosa. 15m, 30m y 1h no entraron por un mal tramo: entraron
+porque **el coste hace imposible ganar**. Haría falta una ventaja bruta de +0,29 R en 15m y lo medido
+sobre 1.875 operaciones es +0,003. Con ese veredicto detrás, volver ya no es «¿merezco competir?»
+sino exactamente la otra pregunta: ***«¿esto aporta algo o es azar?»***, con evidencia previa fuerte
+en contra. Y esa es, palabra por palabra, la pregunta para la que este mismo proyecto dice que el P95
+**sí** es el percentil correcto, como en `meta_policy` y `fundamental_policy`.
+
+**Lo que costaba no distinguirlas.** El 7 de septiembre de 2026, tres claves habían vuelto a operar
+desde una cuarentena estructural con expectancies **por debajo del P95 de su propia nula**:
+
+| clave | expectancy sombra (40 decisiones) | P95 de su nula |
+|---|---|---|
+| `BTCUSDT:1h` | +0,119 | **0,499** |
+| `SOLUSDT:15m` | +0,388 | **0,472** |
+| `BNBUSDT:1h` | +0,297 | **0,470** |
+
+El número que las desmentía estaba calculado y guardado en su propio expediente, sin que nadie lo
+mirase. Con la distinción, las tres vuelven a cuarentena.
+
+**4h no es estructural** y conserva su puerta de siempre: entró por expediente (−0,485 R en 89
+decisiones). Comprobado sobre los expedientes reales, el criterio las separa solo: las tres de arriba
+vuelven a estar vetadas y las de 4h no se mueven. `BTCUSDT:4h`, que salió con +1,143 R, supera
+incluso el P95 (0,388) — habría salido con cualquiera de los dos listones.
+
+Las estructurales se declaran en `quarantine_structural` del `ensemble.yaml`. Sin esa lista, todas se
+tratan como de expediente, que es el comportamiento anterior.
 
 ### La corrección del día siguiente: un listón no es un cupo (v0.48.0)
 

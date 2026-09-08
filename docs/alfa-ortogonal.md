@@ -79,6 +79,12 @@ la última semana — si el apalancamiento se está cargando, no si está cargad
 Encontrar una es exactamente lo esperado. El propio informe imprime esa cifra al lado del recuento
 para que no se lea de otra forma.
 
+> **Recalculado el 7-sep-2026 y sin cambios**, ni un decimal. Los estudios de precio y macro sí se
+> movieron al corregir el fallo de `ensemble.fusionar_optimizada` —sus bases se medían sin
+> comisiones—, y este no lo hace porque su única clave positiva, `BNBUSDT:1d`, es la única de las
+> cuatro **sin configuración optimizada**: ya se medía en neto. Que cambie lo que tenía que cambiar y
+> no lo que no, es la comprobación que da confianza en las otras dos.
+
 Y el caso positivo es además marginal por los dos lados: el lift (+0,0791) apenas supera su nula
 (+0,0672), y la neta resultante (+0,0234) apenas supera el listón (+0,015).
 

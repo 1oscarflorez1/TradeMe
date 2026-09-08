@@ -1,7 +1,7 @@
 # Vectores macro: dólar y volatilidad implícita
 
 > La vía externa se agotó. Dos vectores de otro mercado, genuinamente ortogonales, y **ninguno
-> aporta**: 32 pruebas, 1 positivo, 1,6 esperados por azar.
+> aporta**: 32 pruebas, **0 positivos**, 1,6 esperados por azar.
 
 ## Lo primero: los índices no existen en el plan gratuito
 
@@ -86,31 +86,35 @@ sigue es el resultado de que esa información, siendo nueva, no sirva para nada.
 | vector | descartar bajos | descartar altos | veredicto |
 |---|---|---|---|
 | tendencia del dólar | 0/8 | 0/8 | **ruido** |
-| estrés de volatilidad | 0/8 | 1/8 (p = 0,337) | **ruido** |
+| estrés de volatilidad | 0/8 | 0/8 | **ruido** |
 
-**Global: 32 pruebas, 1 positivo, 1,6 esperados por azar. p de que todo sea ruido = 0,806.**
+**Global: 32 pruebas, 0 positivos, 1,6 esperados por azar. p de que todo sea ruido = 1,000.**
 
-Ningún vector+regla se acerca a los tres positivos que harían falta. Y hay algo peor que el número:
+No hay ni un positivo en las 32 pruebas, cuando el azar solo produce cero el 19 % de las veces.
 
-**El único positivo está en `BTCUSDT:4h`, que lleva en cuarentena estructural desde 0.63.0.** Aunque
-fuera real —y con 1 de 8 no lo es—, sería un hallazgo sobre decisiones que hoy no se toman. En 1d,
-la única temporalidad que opera, **no hay ni un solo positivo en las 16 pruebas**.
+### La primera medición daba un positivo, y era un artefacto
+
+Cuando este estudio se corrió por primera vez salía **1 positivo**: `BTCUSDT:4h` con el estrés de
+volatilidad, descartando altos, de +0,022 a +0,039 R. Ya entonces se leyó como ruido —1 de 8 sale el
+34 % de las veces— y además caía en una temporalidad en cuarentena.
+
+Resultó ser algo más concreto que ruido: **estaba medido sin descontar comisiones**. `BTCUSDT:4h`
+tiene configuración optimizada y, por el fallo que corrige `ensemble.fusionar_optimizada`, esas
+configuraciones no traían la sección `costs`. Con los costes aplicados, la base cae y el filtro deja
+de superar el listón de viabilidad. El positivo desaparece.
+
+Es un buen recordatorio de por qué el veredicto tiene dos niveles: el criterio de falsos positivos ya
+lo había descartado antes de saber que además estaba mal medido.
 
 ## Lo que el marco volvió a frenar
 
-De las 32 pruebas, **4 superaron la nula por bloques**. De esas cuatro, la tercera condición —ser
-viable— frenó **tres**:
+Con los costes ya aplicados, **ninguna de las 32 pruebas supera la nula por bloques y llega a ser
+viable a la vez**. En la primera medición, cuatro superaban la nula y la tercera condición —ser
+viable— frenaba a tres, todas en 4h y dos en las claves que peor van. Ese patrón es el de siempre: en
+una serie perdedora cualquier filtro «mejora», porque quitar operaciones sube la media hacia cero.
 
-| clave | vector | base → filtrada | lift vs nula |
-|---|---|---|---|
-| SOLUSDT:4h | tendencia del dólar | −0,105 → **−0,062** | +0,043 > 0,041 |
-| BNBUSDT:4h | estrés de volatilidad | −0,074 → **−0,040** | +0,034 > 0,033 |
-| ETHUSDT:4h | estrés de volatilidad | −0,005 → **+0,010** | +0,0154 > 0,0145 |
-
-Las tres en 4h, y las dos primeras en las claves que peor van. Es el patrón de siempre: en una serie
-perdedora cualquier filtro «mejora», porque quitar operaciones sube la media hacia cero. Con un
-criterio de solo dos condiciones habríamos aprobado tres filtros que pierden menos dinero, no que lo
-ganen.
+Con la base corregida el efecto es más limpio todavía: las bases son más negativas, así que la
+condición de viabilidad es más difícil y no queda ni un candidato en pie.
 
 ## Qué queda después de tres estudios
 
