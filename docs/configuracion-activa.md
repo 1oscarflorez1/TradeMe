@@ -96,6 +96,17 @@ Es coherente con lo que ya se sabía —la reoptimización periódica se desacti
 porque no aportaba— pero mucho más marcado de lo que se había medido, porque hasta ahora se comparaba
 sobre hold-outs de 22 a 26 operaciones.
 
-**Retirar las quince es una decisión aparte y no la toma este documento.** Aquí solo se ha arreglado
-que no arrastren consigo el gobierno de agosto. Lo que sí deja dicho es que la medición para tomarla
-ya está hecha, y que el efecto sería mayor que el de cualquier ajuste de la operativa.
+## Retiradas en 0.69.0
+
+Con esa medición delante se desactivaron, mediante `use_optimized_configs: false` en el
+`ensemble.yaml`. Las cuatro claves de 1d vuelven a `ens-m3-2026-07-07` y la mediana pasa a **+0,0196
+R**, comprobado tras el cambio.
+
+**No se borran los ficheros, a propósito.** La decisión es reversible, queda auditable, y las quince
+configuraciones siguen ahí para rehacer la comparación cuando haya histórico suficiente posterior a
+su fecha — que es justo lo que hoy falta. Hay un test que fija el estado desplegado, para que un
+cambio silencioso rompa algo.
+
+Una salvedad sobre lo que cabe esperar: **+0,106 R en SOL es +0,106 ± 0,061** sobre 271 operaciones.
+La dirección está clara y la decisión también, pero no es un ingreso asegurado hacia adelante. Se
+retiran porque rinden peor, no porque la base garantice ese número.
