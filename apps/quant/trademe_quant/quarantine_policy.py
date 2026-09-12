@@ -439,8 +439,14 @@ def fetch_expedientes(
     return agrupado, Poblacion(pob_rs, pob_ts)
 
 
-def estado_previo(politica: dict[str, Any], clave: str, interval: str, actuales: list[str]) -> bool:
-    """¿Está vetada esta clave AHORA MISMO? Yaml (por temporalidad) ∪ artefacto (por clave).
+def estado_previo(
+    politica: dict[str, Any],
+    clave: str,
+    interval: str,
+    actuales: list[str],
+    lista_blanca: list[str] | None = None,
+) -> bool:
+    """¿Está vetada esta clave AHORA MISMO? Yaml ∪ artefacto ∪ lista blanca.
 
     El fallo que esto corrige (22 ago 2026)
     ----------------------------------------
@@ -467,8 +473,20 @@ def estado_previo(politica: dict[str, Any], clave: str, interval: str, actuales:
     hiciera falta, es borrar la entrada del artefacto.
 
     Sin artefacto, o con uno ilegible, manda el yaml: exactamente el comportamiento anterior.
+
+    La lista blanca cuenta como veto (0.70.0)
+    ------------------------------------------
+    Desde que existe `active_keys`, una clave puede no operar **sin estar en cuarentena**. Y eso,
+    si esta función no lo supiera, reproduciría el fallo que documenta el párrafo anterior:
+    una clave que no opera solo genera desenlace **sombra**, así que su expediente real se congela
+    y el gobierno la seguiría juzgando con ese expediente viejo cada ciclo.
+
+    No es una cuarentena —no aparece en `quarantine.json` ni se levanta con evidencia— pero para
+    decidir **a qué expediente mirar** se comporta igual, y eso es lo único que se pregunta aquí.
     """
     if interval in actuales:
+        return True
+    if lista_blanca and clave not in lista_blanca:
         return True
     entrada = (politica.get("intervals") or {}).get(clave)
     return bool(entrada.get("quarantined")) if isinstance(entrada, dict) else False
@@ -479,6 +497,7 @@ def publish(
     dsn: str,
     actuales: list[str],
     estructurales: list[str] | None = None,
+    lista_blanca: list[str] | None = None,
 ) -> dict[str, Any]:
     """Revisa cada temporalidad y publica `quarantine.json`.
 
@@ -498,7 +517,7 @@ def publish(
     decisiones: dict[str, dict[str, Any]] = {}
     for clave, filas in datos.items():
         interval = clave.split(":", 1)[1]
-        vetada = estado_previo(politica, clave, interval, actuales)
+        vetada = estado_previo(politica, clave, interval, actuales, lista_blanca)
         # Cada caso mira su propio expediente y su propia ventana: la de salida es más larga porque
         # volver a operar exige más pruebas que dejar de hacerlo. Y solo la de salida recibe la
         # población: la nula no puede afectar a la entrada ni por accidente.

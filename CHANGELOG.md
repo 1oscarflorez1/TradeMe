@@ -7,6 +7,88 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.70.0] — 2026-09-08
+
+> Solo emiten **`ETHUSDT:1d`** y **`SOLUSDT:1d`**. Y de paso aparecieron dos cosas que llevaban
+> tiempo calladas: **la expectancy del panel salía bruta** mientras todo el gobierno razonaba en
+> neto, y el yaml declaraba un filtro `min_interval` **que no lee nadie**.
+
+### Added — Lista blanca de claves operables
+
+- `active_keys` en el `ensemble.yaml`. **Restringe, nunca habilita**: una clave incluida pero en
+  cuarentena sigue vetada, porque una lista blanca capaz de levantar un veto sería una puerta
+  trasera al gobierno. Hay un test que lo fija.
+- Estado efectivo comprobado de extremo a extremo sobre el yaml desplegado: emiten **solo esas dos**.
+  Nota: **1m y 5m nunca estuvieron en cuarentena** y ahora quedan vetadas por la lista.
+- `quarantine_policy.estado_previo` sabe de la lista blanca. Sin eso se habría reproducido el fallo
+  del 22-ago-2026 con otro nombre: una clave que no opera solo genera sombra, su expediente real se
+  congela, y el gobierno la juzgaría con datos viejos cada ciclo.
+
+### Por qué esas dos, y qué no demuestra
+
+Decir «son las dos mejores» sobre el mismo histórico con el que se midieron sería selección
+post-hoc. Se probó la **regla** con walk-forward de 21 cortes trimestrales (`run_lista_blanca`):
+
+| K | seleccionadas | operar las 4 | media por trimestre |
+|---|---|---|---|
+| 1 | +0,0385 R | −0,0130 R | +0,0252 |
+| **2** | **+0,0388 R** | −0,0130 R | **+0,0431** |
+| 3 | −0,0032 R | −0,0130 R | +0,0039 |
+
+K=2 es el óptimo y la regla es **estable**: eligió SOL y ETH en los 21 trimestres sin rotar una vez.
+
+**Lo que no demuestra**, dicho con la misma claridad: el bootstrap por trimestres da **P5 = −0,015**,
+así que la ventaja **no alcanza significancia**; 14 de 21 trimestres a favor sale el 9,5 % de las
+veces por azar; y el ranking no es estable — en la segunda mitad del histórico **BTC (+0,028) supera
+a ETH (+0,016)**.
+
+El argumento que sí se sostiene no es «elegimos las mejores» sino **«excluimos BNBUSDT, que pierde en
+todos los tramos»** (−0,001 y −0,086). BTCUSDT:1d es el caso frontera y la clave a revisar primero si
+esto se reabre. **Concentrar no crea ventaja: evita pérdida esperada.**
+
+### Fixed — La telemetría mostraba R bruta
+
+- `snapshots-repo` calculaba la expectancy con `AVG(outcome_return_r)` **a secas**. Desde 0.63.0 el
+  backtest, la cuarentena, el meta-modelo y el Fundamental Score descuentan el coste al leer; **la
+  interfaz no se enteró**, y la api ni siquiera leía la sección `costs` del yaml.
+- Nuevo `apps/api/src/ensemble/costes.ts`, espejo de `costes.py` con tests espejo, y `EnsembleConfig`
+  gana el bloque `costs`. El descuento se aplica **al leer**: la columna sigue guardando bruto, así
+  que cambiar la comisión no obliga a recalcular ningún histórico.
+- Efecto medido contra la base de producción en 1d: **0,023 a 0,034 R por operación**. `SOLUSDT:1d`
+  pasaba de un aparente 0,0000 a **−0,0231** — cambiaba de signo.
+
+### Fixed — Un instrumento de observabilidad escrito y no conectado
+
+- `db.bloqueadas_por_hueco` cuenta las decisiones cuya ventana venció con velas ausentes dentro: no
+  se evaluarán ya nunca. Existía desde el hito de cobertura y **no la llamaba nadie**. Su propio
+  docstring decía que era «lo que nadie estaba mirando», y seguía sin mirarse.
+- Ahora la llama el ciclo del piloto y su cifra sale en `datos:`, junto al relleno de huecos. Una
+  cifra que crece delata que la ingesta pierde velas más deprisa de lo que el relleno las repara.
+
+### Removed — Un parámetro que describía un comportamiento inexistente
+
+- `macro.min_interval: '1w'` **no lo leía ni un `.py` ni un `.ts`**, y el título del bloque decía
+  «(1w+)». El filtro por temporalidad del sesgo macro **no existe**.
+- Hoy es inocuo porque `MACRO_ENABLED=false`, pero al reactivar el macro en M11–M14 se inyectaría en
+  todas las temporalidades y quien leyera el yaml se habría creído protegido. Se retira el parámetro,
+  se corrige el título y queda anotado en la deuda técnica de `CLAUDE.md`.
+
+### Saneamiento: lo que se revisó y se decidió NO tocar
+
+El barrido de código sin referencias dio cuatro candidatos y tres **no** son basura:
+
+- `inference.scaled_w_macro` — espejo de paridad con `inference.ts` y scaffold documentado en
+  `CLAUDE.md` para reactivar el macro.
+- `external_signals.load_external_signals` — replay de Reditum, que se activa con `TV_WEBHOOK_SECRET`.
+- `db.bloqueadas_por_hueco` — no sobraba: **faltaba conectarla**, y es lo que se ha hecho.
+
+Del yaml, una sola clave huérfana en todo el fichero: `macro.min_interval`.
+
+### Added
+
+- `docs/lista-blanca.md` y `run_lista_blanca` para reproducir la medición.
+- Tests: 17 nuevos en api (lista blanca y espejo de costes), 3 en quant.
+
 ## [0.69.0] — 2026-09-07
 
 > Las quince configuraciones de Optuna quedan **retiradas**: 1d pasa de −0,019 a **+0,020 R** de

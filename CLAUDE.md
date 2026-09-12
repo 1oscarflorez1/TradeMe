@@ -129,7 +129,10 @@ tiene la cuenta (usuario de papel, compartir suscripciones de datos, permisos de
 profesional, y consultar a IBKR sobre redistribución en un portal de equipo).
 
 **M11–M14** — análisis fundamental, según `TradeMe_Analisis_Fundamental.docx`. Al reactivar el
-sesgo macro, usar el escalado por temporalidad que ya existe desactivado por bandera.
+sesgo macro, usar el escalado por temporalidad que ya existe desactivado por bandera. **Y tener
+presente que el filtro `min_interval` no existe**: el yaml lo declaraba y nadie lo leía, así que
+se retiró en 0.70.0. Si el sesgo debe aplicarse solo en 1w+, hay que implementarlo — hoy se
+inyectaría en todas las temporalidades.
 
 ---
 

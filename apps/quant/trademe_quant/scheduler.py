@@ -249,6 +249,37 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin relleno se sigue midiendo, solo que con menos
         log.append(f"error relleno de huecos: {err}")
 
+    # El daño que el relleno NO puede reparar, contado (0.70.0). `bloqueadas_por_hueco` existía
+    # desde el hito de cobertura y no la llamaba nadie: un instrumento escrito y no conectado, que
+    # es la forma más silenciosa de no tener observabilidad. Su propio docstring decía que era «lo
+    # que nadie estaba mirando», y seguía sin mirarse.
+    #
+    # Cuenta las decisiones cuya ventana de evaluación venció con velas ausentes dentro: no se
+    # pueden evaluar ya nunca, porque el momento pasó. Una cifra que crece delata que la ingesta
+    # está perdiendo velas más deprisa de lo que el relleno las repara.
+    try:
+        from .db import bloqueadas_por_hueco
+        from .ensemble import load_ensemble
+
+        horizontes = {
+            str(k): int(v)
+            for k, v in (
+                load_ensemble(artifacts_dir() / "ensemble.yaml")
+                .get("evaluation", {})
+                .get("horizon_by_tf", {})
+            ).items()
+        }
+        n_bloqueadas = bloqueadas_por_hueco(dsn, horizontes)
+        if n_bloqueadas:
+            log.append(
+                f"datos: {n_bloqueadas} decisiones nunca se evaluarán "
+                "(su ventana venció con velas ausentes dentro)"
+            )
+        else:
+            log.append("datos: ninguna decisión bloqueada por huecos")
+    except Exception as err:  # noqa: BLE001 - contar es diagnóstico, no puede tumbar el ciclo
+        log.append(f"error contando bloqueadas por hueco: {err}")
+
     for symbol in symbols:
         for iv in cfg.intervals:
             try:
@@ -487,7 +518,10 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
         vetadas = [str(x) for x in base.get("quarantine_intervals", [])]
         # Las estructurales entraron por coste, no por expediente, y salen con un listón más duro.
         estructurales = [str(x) for x in base.get("quarantine_structural", [])]
-        qtn = publish_quarantine(artifacts_dir(), dsn, vetadas, estructurales)
+        # La lista blanca no es cuarentena, pero una clave fuera de ella tampoco opera: hay que
+        # decírselo o su expediente real se congelaría y el gobierno la juzgaría con datos viejos.
+        lista_blanca = [str(x) for x in base.get("active_keys", [])]
+        qtn = publish_quarantine(artifacts_dir(), dsn, vetadas, estructurales, lista_blanca)
         cambios = [v for v in qtn["intervals"].values() if v["changed"]]
         for c in cambios:
             estado = "entra en" if c["quarantined"] else "sale de"
