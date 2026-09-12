@@ -63,6 +63,12 @@ Siempre `--build` y **sin nombres de servicio**, o algún contenedor se queda en
 Después, `Ctrl+Shift+R` en el navegador. Si `quant` no recoge los cambios:
 `build --no-cache quant`.
 
+Verificación tras desplegar (solo lectura; qué significa cada check en `docs/salud-1d.md`):
+
+```
+Get-Content infra\salud-1d.sql | docker exec -i trademe-prod-postgres-1 psql -U trademe -d trademe
+```
+
 ---
 
 ## Arquitectura
