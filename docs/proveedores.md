@@ -102,16 +102,45 @@ Desde 0.56.0 el piloto lo compensa (`huecos.py`): detecta los tramos que faltan,
 por REST acotando `startTime`/`endTime`, y los guarda con el mismo upsert idempotente de siempre.
 Tres decisiones que conviene conocer:
 
-- **Solo huecos interiores**, entre la primera y la última vela que ya existen. Extender la serie
-  hacia atrás es otra cosa: alargar la ventana tiene un coste que hay que medir antes, porque el
-  backtest crece con el **cuadrado** del número de velas.
+- **Huecos interiores y, desde 0.71.0, la cola**: de la última vela guardada a la última
+  **cerrada**. Nunca hacia atrás —alargar la ventana tiene un coste que hay que medir antes, porque
+  el backtest crece con el **cuadrado** del número de velas— y nunca la vela que se está formando.
 - **Solo símbolos de Binance**, leído de `watchlist.provider`. En una acción un hueco no es un
   fallo, es que la bolsa estaba cerrada, y rellenarlo inventaría sesiones que no existieron.
-- **Con presupuesto por ciclo** (20 peticiones), atacando primero los huecos más grandes, que son
-  los que más evaluaciones bloquean. Ponerse al día desde cero costaba unas 66 peticiones.
+- **Con presupuesto por ciclo** (20 peticiones). Primero las colas, de la temporalidad más larga a
+  la más corta; después los huecos interiores, de mayor a menor. Ponerse al día desde cero costaba
+  unas 66 peticiones.
 
 Verificado contra la API real: el hueco mayor —4.266 velas, 2 días y 23 horas— se recupera entero,
 sin duplicados y sin una sola vela que Binance no tuviera.
+
+#### La cola: la vela que falta al final (0.71.0)
+
+Hasta 0.70.0 el relleno no veía un caso concreto: que el proceso estuviera parado **justo en el
+último cierre**. La vela que falta no tiene ninguna guardada después, así que no es un hueco
+interior, y nadie la repara hasta que se capture el cierre siguiente.
+
+En 1m eso dura un minuto. En 1d, hasta un día — y 1d es la única temporalidad que opera desde 0.70.0.
+El 12-sep-2026 el stack estaba parado a las 00:00 UTC en **3 de los últimos 7 cierres diarios**, y
+ETHUSDT:1d y SOLUSDT:1d llevaban dos velas sin guardar.
+
+Tres decisiones del diseño:
+
+- **Se ancla en la última vela guardada, no en la hora.** Redondear la hora a múltiplos del periodo
+  funciona en 1d, pero falla en 1w: las velas semanales de Binance abren en **lunes** y la época
+  Unix empezó en **jueves**. Avanzando de periodo en periodo desde la serie, cada temporalidad queda
+  en su propia fase.
+- **Dos minutos de margen tras el cierre.** Sin él, un reloj local que adelanta pediría la vela en
+  formación y la guardaría con un precio provisional.
+- **Las colas van antes que los interiores.** Un socavón de 30.000 velas de 1m cuesta 30 peticiones,
+  más que el presupuesto del ciclo; con el orden anterior la cola de 1d habría esperado. Hay un test
+  que falla si se vuelve al orden de 0.70.0.
+
+Probado en seco contra producción y Binance el 12-sep-2026: detectó exactamente las cuatro colas de
+1d que había —dos velas por símbolo— y ninguna falsa en 1m–4h ni en la semanal, y las velas
+recuperadas empalman con lo guardado (ETHUSDT cerró el 9-sep en 2468,13; la del 10 abre en 2468,14).
+
+Cómo comprobarlo en producción: ver [salud-1d](salud-1d.md).
 
 ### Twelve Data — acciones, divisas, índices y ETF
 

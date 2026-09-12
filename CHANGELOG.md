@@ -7,6 +7,61 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.71.0] — 2026-09-12
+
+> El relleno de huecos no veía **la vela que falta al final de la serie**. Con 1d como única
+> temporalidad operativa, eso es lo que más duele: el stack estaba parado a las 00:00 UTC en **3 de
+> los últimos 7 cierres diarios**, y ETHUSDT:1d y SOLUSDT:1d llevaban dos velas sin guardar.
+
+### Fixed — El relleno repara también la cola de la serie
+
+- Hasta 0.70.0 `huecos.py` solo rellenaba huecos **interiores**, entre la primera y la última vela
+  guardada. Si el proceso estaba parado **justo en el último cierre**, la vela que faltaba no tenía
+  ninguna después y nadie la reparaba hasta que se capturase el cierre siguiente: un minuto en 1m,
+  **hasta un día en 1d**.
+- Nuevo `cola_faltante`, función pura: de la última vela guardada a la última **cerrada**. Tres
+  decisiones del diseño, cada una con su test:
+  - **Se ancla en la última vela guardada, no en la hora.** Redondear la hora a múltiplos del periodo
+    funciona en 1d pero **falla en 1w**: las velas semanales de Binance abren en lunes y la época Unix
+    empezó en jueves.
+  - **Dos minutos de margen tras el cierre**, para que un reloj local adelantado no guarde la vela en
+    formación con un precio provisional.
+  - **Las colas se atienden antes que los huecos interiores**, de la temporalidad más larga a la más
+    corta. Un socavón de 30.000 velas de 1m cuesta 30 peticiones, más que el presupuesto del ciclo;
+    con el orden anterior la cola de 1d habría esperado. **Hay un test que falla si se vuelve al
+    orden de 0.70.0**, comprobado.
+- La línea del piloto dice ahora qué colas se recuperaron, por clave: `cola recuperada: ETHUSDT:1d +2`.
+
+### Probado en seco contra producción y Binance
+
+Sin escribir nada: se leyó la última vela guardada de cada serie en producción, se calcularon las
+colas con la función nueva y se pidieron esas velas a Binance.
+
+- Detectó **exactamente las cuatro colas que había** —las de 1d, dos velas por símbolo, 10 y 11 de
+  septiembre— y **ninguna falsa** en 1m–4h ni en la semanal, cuya vela del 7-sep aún no ha cerrado.
+- Cuatro peticiones, frente a un presupuesto de veinte.
+- Las velas de Binance **empalman** con lo guardado: ETHUSDT cerró el 9-sep en 2468,13 y la vela del
+  10 abre en 2468,14.
+
+La escritura real la hará el piloto en su primer ciclo tras desplegar.
+
+### Fixed — Un símbolo ilegible ya no tumba a los demás
+
+- El comentario de `rellenar` decía «un símbolo ilegible no tumba a los demás», y justo debajo había
+  un `return` que hacía lo contrario: el primer error de lectura cancelaba el relleno de todos los
+  símbolos. Ahora se anota y se sigue. Con test.
+
+### Added — La verificación de salud, en el repositorio
+
+- `infra/salud-1d.sql` y `docs/salud-1d.md`: seis checks de solo lectura para la operativa en 1d, y
+  qué hacer si alguno sale `ATENCION`. Referenciado en las instrucciones de despliegue de `CLAUDE.md`.
+- **El check de la lista blanca mira la última decisión de cada clave, no una ventana de 24 h.** La
+  primera versión dio `ATENCION` en seis claves recién desplegado 0.70.0 cuando la lista blanca
+  estaba funcionando: la ventana mezclaba decisiones de antes y de después.
+- Con la versión nueva, sobre producción: **las 20 claves con decisión de hace ≤13 minutos, solo
+  `ETHUSDT:1d` y `SOLUSDT:1d` operan, las 18 restantes vetadas.** Es la confirmación de que la lista
+  blanca de 0.70.0 funciona en vivo.
+
 ## [0.70.0] — 2026-09-08
 
 > Solo emiten **`ETHUSDT:1d`** y **`SOLUSDT:1d`**. Y de paso aparecieron dos cosas que llevaban
