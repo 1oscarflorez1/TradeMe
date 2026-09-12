@@ -18,11 +18,23 @@ Y eso no es solo un gráfico con menos puntos — la evaluación de desenlaces l
 343 de las 839 decisiones cerradas desde el 6 de agosto tenían la ventana incompleta. El guardia de
 0.55.0 dejó de darlas por buenas, que era lo correcto; esto es lo que hace que dejen de faltar.
 
+La cola de la serie (0.71.0)
+----------------------------
+Hasta 0.70.0 solo se rellenaban **huecos interiores**, entre la primera y la última vela guardada.
+Faltaba el caso que más duele al operar solo en 1d: que el proceso esté parado **justo en el último
+cierre**. Entonces la vela que falta no tiene ninguna guardada después, no es un hueco interior, y
+nadie la repara hasta que se capture el cierre siguiente.
+
+En 1m eso dura un minuto. En 1d, hasta un día entero — y el 12-sep-2026 el stack estaba parado a las
+00:00 UTC en **3 de los últimos 7 cierres diarios**, así que ETHUSDT:1d y SOLUSDT:1d, las dos únicas
+claves que operan, llevaban dos velas sin guardar. Ver `cola_faltante`.
+
 Lo que NO hace
 ---------------
-Rellena **huecos interiores**, entre la primera y la última vela que ya existen. No extiende la
-serie hacia atrás: alargar la ventana es otro hito, tiene otro coste y hay que medirlo antes,
-porque el backtest crece con el cuadrado del número de velas.
+No extiende la serie **hacia atrás**: alargar la ventana es otro hito, tiene otro coste y hay que
+medirlo antes, porque el backtest crece con el cuadrado del número de velas. Y hacia delante nunca
+pasa de la última vela **cerrada**: guardar la que se está formando sería guardar un precio que
+todavía no es definitivo.
 
 Y solo para símbolos de **Binance**. En una acción un hueco no es un fallo, es que el mercado
 estaba cerrado; rellenar ahí inventaría sesiones que no existieron.
@@ -40,6 +52,11 @@ LIMITE_BINANCE = 1000
 #: que veinte por ciclo lo resuelven en tres o cuatro pasadas sin alargar el ciclo ni martillear la
 #: API. El presupuesto es por ciclo entero, no por símbolo: si uno tiene un socavón, se lo lleva.
 PRESUPUESTO_POR_CICLO = 20
+#: Tiempo que se espera tras el cierre teórico antes de dar una vela por cerrada. Cubre la deriva
+#: del reloj de la máquina respecto a Binance: un reloj que adelanta un minuto pediría la vela que
+#: aún se está formando y la guardaría con un precio provisional. Dos minutos no retrasan nada que
+#: importe —en 1d son el 0,14 % del periodo— y quitan esa posibilidad del todo.
+MARGEN_CIERRE_MS = 120_000
 
 
 class Hueco(NamedTuple):
@@ -49,6 +66,9 @@ class Hueco(NamedTuple):
     interval: str
     desde: int
     hasta: int
+    #: Tramo que va de la última vela guardada a la última cerrada. Se atiende antes que los
+    #: interiores: ver `prioridad`.
+    es_cola: bool = False
 
     @property
     def velas(self) -> int:
@@ -75,6 +95,53 @@ def tramos_faltantes(open_times: list[int], paso_ms: int) -> list[tuple[int, int
         if siguiente - anterior > paso_ms:
             fuera.append((anterior + paso_ms, siguiente))
     return fuera
+
+
+def cola_faltante(
+    ultimo_open_ms: int,
+    paso_ms: int,
+    ahora_ms: int,
+    margen_ms: int = MARGEN_CIERRE_MS,
+) -> tuple[int, int] | None:
+    """Tramo `[desde, hasta)` de la última vela guardada a la última **cerrada**, si falta alguna.
+
+    Se ancla en la **última vela guardada** y avanza de `paso` en `paso`, en lugar de redondear la
+    hora actual a múltiplos del periodo. La diferencia no es de estilo: redondear a múltiplos de la
+    época Unix funciona en 1d —los días de Binance empiezan a las 00:00 UTC, que coinciden— pero
+    **falla en 1w**, porque las velas semanales de Binance abren en lunes y la época empezó en
+    jueves. Anclado en la serie, cualquier temporalidad de periodo fijo queda en su propia fase.
+
+    Una vela con apertura `t` se da por cerrada cuando `t + paso + margen <= ahora`. Sin el margen,
+    un reloj local ligeramente adelantado pediría la vela en formación y la guardaría con un precio
+    provisional. Ver `MARGEN_CIERRE_MS`.
+
+    Función pura, igual que `tramos_faltantes`: lo que decide qué falta se prueba sin base de datos
+    ni red.
+    """
+    if paso_ms <= 0:
+        return None
+    # Mayor j con la vela `ultimo + j·paso` ya cerrada: ultimo + (j+1)·paso + margen <= ahora.
+    j = (ahora_ms - margen_ms - ultimo_open_ms) // paso_ms - 1
+    if j < 1:
+        return None
+    return (ultimo_open_ms + paso_ms, ultimo_open_ms + (j + 1) * paso_ms)
+
+
+def prioridad(hueco: Hueco) -> tuple[int, int]:
+    """Orden de atención: primero las colas, de la temporalidad más larga a la más corta; después
+    los interiores, de mayor a menor.
+
+    Las colas van delante porque son lo único que el resto del mecanismo no puede reparar: un hueco
+    interior sigue ahí el ciclo siguiente, y una cola de 1m se convierte en hueco interior en cuanto
+    la api guarda el minuto siguiente. Una cola de **1d**, en cambio, sigue siendo cola hasta 24 h,
+    y mientras tanto las decisiones de la única temporalidad que opera no se pueden evaluar.
+
+    Además cuestan poco: casi siempre una petición. Entre los interiores se mantiene el criterio de
+    siempre —los grandes primero, que son los que más evaluaciones bloquean—.
+    """
+    if hueco.es_cola:
+        return (0, -interval_ms(hueco.interval))
+    return (1, -hueco.velas)
 
 
 def intervalos_almacenados(dsn: str, symbol: str) -> list[str]:
@@ -118,6 +185,33 @@ def huecos_de(dsn: str, symbol: str, interval: str) -> list[Hueco]:
         Hueco(symbol=symbol, interval=interval, desde=a, hasta=b)
         for a, b in tramos_faltantes(tiempos, paso)
     ]
+
+
+def cola_de(dsn: str, symbol: str, interval: str, ahora_ms: int) -> Hueco | None:
+    """La cola que falta de un símbolo y temporalidad, leída de la base de datos.
+
+    Sin ninguna vela guardada no hay de dónde anclar la fase, así que no se inventa: poblar una
+    serie vacía es extenderla, que es otro hito.
+    """
+    import psycopg
+
+    try:
+        paso = interval_ms(interval)
+    except ValueError:
+        return None
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT (EXTRACT(epoch FROM MAX(ts)) * 1000)::bigint FROM candles "
+            "WHERE symbol=%s AND interval=%s",
+            (symbol, interval),
+        )
+        fila = cur.fetchone()
+    if fila is None or fila[0] is None:
+        return None
+    tramo = cola_faltante(int(fila[0]), paso, ahora_ms)
+    if tramo is None:
+        return None
+    return Hueco(symbol=symbol, interval=interval, desde=tramo[0], hasta=tramo[1], es_cola=True)
 
 
 def rellenar_hueco(dsn: str, hueco: Hueco, sink: Any = None) -> int:
@@ -167,52 +261,74 @@ def rellenar(
     symbols: list[str],
     intervals: list[str] | None = None,
     presupuesto: int = PRESUPUESTO_POR_CICLO,
+    ahora_ms: int | None = None,
+    sink: Any = None,
 ) -> list[str]:
-    """Rellena lo que quepa en el presupuesto, empezando por los huecos más grandes.
+    """Rellena lo que quepa en el presupuesto: primero las colas, después los huecos interiores.
 
-    Se atacan primero los mayores porque son los que más evaluaciones bloquean: un socavón de tres
-    días en 1m deja sin desenlace muchas más decisiones que veinte huecos de una vela.
+    El orden está en `prioridad`. Entre los interiores se atacan primero los mayores, porque son
+    los que más evaluaciones bloquean: un socavón de tres días en 1m deja sin desenlace muchas más
+    decisiones que veinte huecos de una vela.
 
     Sin `intervals` se reparan **todas las temporalidades guardadas** de cada símbolo, que es lo
     correcto: pasarle una lista escrita a mano fue lo que dejó `1m` y `5m` sin reparar durante dos
     semanas. El parámetro se conserva para poder acotar en pruebas, no para el uso normal.
+    `ahora_ms` y `sink` existen por lo mismo: fijar el reloj y no tocar la base en los tests.
     """
+    import time
+
+    ahora = ahora_ms if ahora_ms is not None else int(time.time() * 1000)
+    log: list[str] = []
     pendientes: list[Hueco] = []
     for symbol in symbols:
         for interval in intervals if intervals is not None else intervalos_almacenados(dsn, symbol):
             try:
                 pendientes.extend(huecos_de(dsn, symbol, interval))
+                cola = cola_de(dsn, symbol, interval, ahora)
+                if cola is not None:
+                    pendientes.append(cola)
             except Exception as err:  # noqa: BLE001 - un símbolo ilegible no tumba a los demás
-                return [f"{symbol} {interval}: no se pudieron leer los huecos ({err})"]
+                # Hasta 0.70.0 aquí había un `return`, que tumbaba a todos los demás justo al
+                # contrario de lo que dice este comentario. Se anota y se sigue con el resto.
+                log.append(f"{symbol} {interval}: no se pudieron leer los huecos ({err})")
     if not pendientes:
-        return []
+        return log
 
     from .db import PgCandleSink
 
-    pendientes.sort(key=lambda h: h.velas, reverse=True)
-    log: list[str] = []
+    pendientes.sort(key=prioridad)
     gastado = 0
     escritas = 0
     atendidos = 0
-    sink = PgCandleSink(dsn)  # uno para todo el ciclo: son decenas de miles de velas
+    colas_recuperadas: list[str] = []
+    propio = sink is None
+    destino = PgCandleSink(dsn) if propio else sink  # uno para todo el ciclo: son miles de velas
     try:
         for hueco in pendientes:
             if gastado >= presupuesto:
                 break
             try:
-                escritas += rellenar_hueco(dsn, hueco, sink=sink)
+                n = rellenar_hueco(dsn, hueco, sink=destino)
+                escritas += n
                 gastado += hueco.peticiones
                 atendidos += 1
+                if hueco.es_cola and n:
+                    colas_recuperadas.append(f"{hueco.symbol}:{hueco.interval} +{n}")
             except Exception as err:  # noqa: BLE001 - un hueco que falla no impide los siguientes
                 log.append(f"{hueco.symbol} {hueco.interval}: falló el relleno ({err})")
                 gastado += 1
     finally:
-        sink.close()
+        if propio:
+            destino.close()
 
     quedan = len(pendientes) - atendidos
     faltan_velas = sum(h.velas for h in pendientes[atendidos:])
     log.append(
-        f"{escritas} velas recuperadas en {atendidos} hueco(s); "
-        f"quedan {quedan} hueco(s) con {faltan_velas} velas"
+        f"{escritas} velas recuperadas en {atendidos} tramo(s); "
+        f"quedan {quedan} tramo(s) con {faltan_velas} velas"
     )
+    if colas_recuperadas:
+        # Por clave, porque una cola de 1d recuperada es justo lo que hay que poder ver: sin ella
+        # las decisiones de la única temporalidad que opera no se pueden evaluar.
+        log.append("cola recuperada: " + ", ".join(colas_recuperadas))
     return log
