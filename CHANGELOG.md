@@ -7,6 +7,43 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.71.1] — 2026-09-12
+
+> Verificando 0.71.0 en producción aparecieron dos instrumentos de observabilidad que **contaban de
+> más**. Los dos veredictos eran correctos; las cifras, no.
+
+### Verificado — el relleno de la cola, en producción
+
+- Las velas 1d del 10 y el 11 de septiembre de los cuatro símbolos están guardadas, y **las 12 velas
+  del 9 al 11 son idénticas a Binance** en apertura, máximo, mínimo, cierre y volumen.
+- Nadie más pudo escribirlas: el siguiente cierre diario aún no había ocurrido y la api solo guarda
+  velas cuyo cierre ve pasar.
+
+### Fixed — El contador de «nunca se evaluarán» contaba las que aún estaban en camino
+
+- `bloqueadas_por_hueco` daba una decisión por perdida en cuanto su ventana vencía. Pero la última
+  vela de la ventana **abre justo en el límite** y no cierra hasta un periodo después. El 12-sep-2026
+  marcaba `BNBUSDT:4h` con 14 velas de 15, y la que faltaba era la de las 20:00 de ese día, **aún en
+  formación**.
+- En 4h el aviso falso duraba 4 horas; en **1d, un día entero por cada decisión**, justo en la única
+  temporalidad que opera.
+- Nuevo `db.ventana_cerrada`, función pura: solo cuenta cuando la última vela ya debió cerrar, con
+  **el mismo margen** que el relleno de la cola para que las dos piezas no puedan discrepar.
+- El contador **no tenía ningún test**; ahora tiene siete. Comprobado al revés: con la regla antigua
+  el test del caso de BNB falla.
+- Sobre producción: de las 5 que marcaba, **4 son pérdidas reales** (tres de ARQQ, acción desactivada
+  sin velas en su ventana, y una de `BTCUSDT:1w` anterior a que se guardaran las semanales) y **la
+  de BNB no**. Ninguna afecta a ETHUSDT:1d ni a SOLUSDT:1d.
+
+### Fixed — El check 5 de salud contaba capturas en vez de velas
+
+- Cada vela de 1d genera varias capturas al día. El check contaba filas: **16 evaluadas de ETH eran 6
+  velas** y 24 abiertas eran 9. El `OK` era correcto, pero las cifras inflaban la muestra unas tres
+  veces — la trampa de agregar por decisión que el proyecto ya había documentado.
+- Ahora toma la primera captura de cada vela, como el check 6 y el panel: ETH 5 evaluadas y 9
+  abiertas, SOL 6 y 8. El límite de «atascada» pasa de 11 a 12 días por la misma razón de límite que
+  el contador.
+
 ## [0.71.0] — 2026-09-12
 
 > El relleno de huecos no veía **la vela que falta al final de la serie**. Con 1d como única
