@@ -83,19 +83,28 @@ SELECT symbol || ':' || interval                                    AS clave,
   FROM ultima ORDER BY 1;
 
 \echo
-\echo '== 5. Evaluacion de las decisiones de 1d =='
--- Horizonte de 1d = 10 velas. Una decision con plan y mas de 11 dias sin desenlace esta atascada,
--- casi siempre porque le faltan velas dentro de su ventana.
+\echo '== 5. Evaluacion de las decisiones de 1d (contadas por vela, no por captura) =='
+-- Cada vela de 1d genera VARIAS capturas a lo largo del dia. Contar filas inflaba las cifras unas
+-- tres veces (el 12-sep-2026: 16 filas evaluadas de ETH eran 6 velas). Aqui se toma la PRIMERA
+-- captura de cada vela, igual que el check 6 y que el panel.
+--
+-- Atascada = mas de 12 dias sin desenlace: 10 de horizonte, 1 para que cierre la ultima vela de la
+-- ventana (abre justo en el limite) y 1 de holgura para el ciclo del piloto.
+WITH una_por_vela AS (
+  SELECT DISTINCT ON (symbol, interval, candle_open) *
+    FROM snapshots WHERE interval = '1d' AND symbol IN ('ETHUSDT', 'SOLUSDT')
+   ORDER BY symbol, interval, candle_open, captured_at ASC
+)
 SELECT symbol,
-       COUNT(*) FILTER (WHERE outcome_result IS NOT NULL) AS evaluadas,
+       COUNT(*) FILTER (WHERE outcome_result IS NOT NULL) AS velas_evaluadas,
        COUNT(*) FILTER (WHERE outcome_result IS NULL AND direction IN ('LONG','SHORT') AND plan_entry IS NOT NULL
-                          AND captured_at > now() - interval '11 days')               AS abiertas_en_plazo,
+                          AND captured_at > now() - interval '12 days')               AS abiertas_en_plazo,
        COUNT(*) FILTER (WHERE outcome_result IS NULL AND direction IN ('LONG','SHORT') AND plan_entry IS NOT NULL
-                          AND captured_at <= now() - interval '11 days')              AS atascadas,
+                          AND captured_at <= now() - interval '12 days')              AS atascadas,
        CASE WHEN COUNT(*) FILTER (WHERE outcome_result IS NULL AND direction IN ('LONG','SHORT')
-                                    AND plan_entry IS NOT NULL AND captured_at <= now() - interval '11 days') = 0
+                                    AND plan_entry IS NOT NULL AND captured_at <= now() - interval '12 days') = 0
             THEN 'OK' ELSE 'ATENCION: desenlaces atascados' END AS estado
-  FROM snapshots WHERE interval = '1d' AND symbol IN ('ETHUSDT', 'SOLUSDT')
+  FROM una_por_vela
  GROUP BY symbol ORDER BY symbol;
 
 \echo
