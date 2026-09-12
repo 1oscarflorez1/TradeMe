@@ -320,8 +320,41 @@ def insert_alert(
         conn.commit()
 
 
+def ventana_cerrada(
+    captured_at_ms: int, periodo_ms: int, h: int, ahora_ms: int, margen_ms: int | None = None
+) -> bool:
+    """¿Debería estar ya **cerrada** la última vela de la ventana de evaluación de una decisión?
+
+    La ventana son las velas con `ts` en `(captured_at, captured_at + h·periodo]` —ver
+    `_velas_de_la_ventana`—. Su última vela puede **abrir justo en el límite**, y entonces no cierra
+    hasta un periodo después. Por eso «la ventana venció» no basta para decir que a una decisión le
+    faltan velas: hay que esperar a que su última vela haya podido cerrar.
+
+    El fallo que esto corrige (12 sep 2026)
+    ----------------------------------------
+    La primera versión de `bloqueadas_por_hueco` usaba `now() > captured_at + h·periodo`. El día que
+    se desplegó 0.71.0 informaba de `BNBUSDT:4h` como «nunca se evaluará» con 14 velas de 15, y la
+    que faltaba era la de las 20:00 de ese mismo día, **todavía en formación**. En 4h el aviso falso
+    dura cuatro horas; en **1d, un día entero por cada decisión** —y 1d es la única temporalidad que
+    opera. Un contador de «perdidas para siempre» que cuenta como perdidas las que aún están en
+    camino no mide lo que dice.
+
+    El margen es el mismo que usa el relleno de la cola (`huecos.MARGEN_CIERRE_MS`), a propósito:
+    si las dos piezas usaran márgenes distintos, podrían discrepar sobre si una vela ya cerró.
+    """
+    if margen_ms is None:
+        from .huecos import MARGEN_CIERRE_MS
+
+        margen_ms = MARGEN_CIERRE_MS
+    fin = captured_at_ms + periodo_ms * h
+    return ahora_ms >= fin + periodo_ms + margen_ms
+
+
 def bloqueadas_por_hueco(
-    dsn: str, horizons: dict[str, int] | None = None, horizon: int = 20
+    dsn: str,
+    horizons: dict[str, int] | None = None,
+    horizon: int = 20,
+    ahora_ms: int | None = None,
 ) -> int:
     """Decisiones que ya nunca se evaluarán porque a su ventana le faltan velas.
 
@@ -331,13 +364,16 @@ def bloqueadas_por_hueco(
     inventarle un desenlace, y aun así hay que poder contarlas: una cifra que crece delata que la
     ingesta está perdiendo velas, y era justo lo que nadie estaba mirando.
 
-    Solo cuenta aquellas cuya ventana ya venció; las recientes están pendientes por motivos
-    normales.
+    Solo cuenta aquellas cuya última vela **ya debería haber cerrado**; las demás están pendientes
+    por motivos normales. Ver `ventana_cerrada`. `ahora_ms` existe para fijar el reloj en los tests.
     """
+    import time
+
     import psycopg
 
     from .market.normalize import INTERVAL_MS
 
+    ahora = ahora_ms if ahora_ms is not None else int(time.time() * 1000)
     total = 0
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute("""
@@ -351,16 +387,17 @@ def bloqueadas_por_hueco(
             if ms is None:
                 continue
             h = (horizons or {}).get(str(interval), horizon)
+            if not ventana_cerrada(int(captured_at.timestamp() * 1000), ms, h, ahora):
+                continue  # su última vela aún puede estar formándose: no está perdida, llegará
             cur.execute(
                 """
-                SELECT count(*) >= %s, now() > %s + (%s * interval '1 millisecond')
-                FROM candles
+                SELECT count(*) FROM candles
                 WHERE symbol=%s AND interval=%s AND ts > %s
                   AND ts <= %s + (%s * interval '1 millisecond')
                 """,
-                (h, captured_at, ms * h, symbol, interval, captured_at, captured_at, ms * h),
+                (symbol, interval, captured_at, captured_at, ms * h),
             )
             fila = cur.fetchone()
-            if fila is not None and not fila[0] and fila[1]:
+            if fila is not None and int(fila[0]) < h:
                 total += 1
     return total
