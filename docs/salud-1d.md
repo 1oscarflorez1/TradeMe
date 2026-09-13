@@ -60,6 +60,9 @@ vela, igual que el check 6 y que el panel.
 
 El límite de «atascada» es de **12 días** y no 11: 10 de horizonte, uno para que cierre la última
 vela de la ventana —que abre justo en el límite— y uno de holgura para el ciclo del piloto.
+Desde 0.72.0 la ventana arranca en la vela de captura y cierra un día antes, así que el límite
+queda con dos días de holgura. No se ajusta: esperar de más solo retrasa un aviso, esperar de menos
+lo daría falso. Ver `docs/reproducibilidad.md`.
 
 ### El contador del piloto: «N decisiones nunca se evaluarán»
 

@@ -7,6 +7,57 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.72.0] — 2026-09-12
+
+> Midiendo la paridad entre vivo y backtest, las decisiones coincidían pero los desenlaces no: la
+> evaluación en vivo **excluía la vela de captura**. En 1d, las primeras 24 horas de cada operación.
+
+### Fixed — La ventana de evaluación arranca en la captura
+
+- El evaluador pedía las velas con `ts > captured_at`: una decisión diaria de las 00:00:15 se
+  evaluaba **desde el día siguiente**, y el timeout cerraba una vela más tarde que en el backtest.
+  Un stop tocado el mismo día de la decisión no contaba.
+- Nuevo `ventana.py`, **única definición** de la ventana: el resto de la vela de captura se recorre
+  con velas **más finas posteriores a la captura** (1h en 1d, 15m en 4h…), para que nada anterior a
+  la decisión cuente, y después las h−1 velas siguientes. La vela de captura es la primera de las h,
+  como en el backtest; un test exige el mismo desenlace que `evaluate_trade`.
+- La usan el evaluador real y el de sombra —que estaban escritos dos veces línea a línea y ahora son
+  una—, el filtro de reproducibilidad y el contador de «nunca se evaluarán».
+- 13 tests de la ventana. Comprobado al revés: con la regla anterior, el caso del stop tocado el día
+  de la captura sale `timeout +0,000` en vez de `sl −1,000`.
+
+### Fixed — El filtro de reproducibilidad compara también el R
+
+- `evaluacion.juzgar` comparaba solo la clase de resultado. Casi todo lo que cambia con la ventana
+  son timeouts que siguen siéndolo con otro R: **el verificador no podía fallar por el motivo que
+  se buscaba**. Ahora exige el mismo R, con tolerancia de redondeo.
+
+### Added — Reevaluación del histórico, con informe en seco
+
+- `python -m trademe_quant.reevaluar_desenlaces` recalcula cada desenlace guardado con la misma
+  función que el evaluador. Sin flags **no escribe nada**; con `--aplicar` guarda antes una copia de
+  cada fila que cambia en `artifacts/` y reescribe solo esas, sin tocar `evaluated_at`. Lo que hoy
+  no puede recalcularse por falta de velas se deja como está.
+- Informe en seco sobre producción: en la rama real **997 iguales, 470 cambian, 276 no
+  recalculables** de 1.743; en sombra 1.579, 550 y 1 de 2.130.
+- Cada cambio posterior al 6-ago está explicado: **483 son solo la ventana** (la regla anterior
+  reproduce lo guardado exactamente); 159 tenían **el horizonte equivocado** y 250 son compatibles con
+  el antiguo `LIMIT h` sobre huecos. Estos dos grupos ya estaban mal con su propia regla, y muchos
+  pasaban el filtro anterior porque la clase coincidía.
+- Horizonte equivocado, con causa confirmada: cuatro configuraciones optimizadas de BTC no tienen
+  `horizon_by_tf` y, hasta 0.68.0, sustituían al yaml entero; la evaluación de todas las pendientes
+  se lanzaba con la configuración de la clave del backtest y usaba el horizonte por defecto, 20.
+- ETHUSDT:1d pasa de −0,191 a −0,235 R netos (6 velas; cambian 4, todas timeouts) y SOLUSDT:1d no
+  cambia (7 velas). Muestras demasiado pequeñas para decir nada del rendimiento.
+
+### Operación
+
+- **Desplegar y reescribir van seguidos.** Con la ventana nueva desplegada y el histórico sin
+  reescribir, la evidencia de la cuarentena y del meta-modelo cae de ~1.212 a 997 filas en la rama
+  real y de ~2.014 a 1.579 en sombra hasta que se aplique. La lista blanca impide que eso tenga
+  efecto operativo, pero un ciclo del piloto en medio reentrenaría con menos datos.
+- Documentado en `docs/reproducibilidad.md`; nota en `docs/salud-1d.md` sobre el límite del check 5.
+
 ## [0.71.1] — 2026-09-12
 
 > Verificando 0.71.0 en producción aparecieron dos instrumentos de observabilidad que **contaban de
