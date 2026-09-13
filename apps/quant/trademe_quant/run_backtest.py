@@ -13,7 +13,7 @@ from typing import Any
 from .backtest import run_backtest
 from .db import evaluate_shadow_outcomes, evaluate_snapshot_outcomes, save_backtest
 from .decision import horizon_for
-from .ensemble import artifacts_dir, load_active_ensemble
+from .ensemble import artifacts_dir, horizontes_evaluacion, load_active_ensemble
 from .independence import load_factor
 from .market.binance import VELAS_POR_DEFECTO
 from .velas import series
@@ -35,14 +35,13 @@ def run_and_save(symbol: str, interval: str, velas: int = VELAS_POR_DEFECTO) -> 
     save_backtest(_dsn(), symbol, interval, result)
     evaluated = 0
     try:
-        horizontes = {
-            iv: horizon_for(config, iv)
-            for iv in config.get("evaluation", {}).get("horizon_by_tf", {})
-        }
-        evaluated = evaluate_snapshot_outcomes(_dsn(), horizonte, horizontes or None)
+        # Evalúa las pendientes de TODAS las claves, así que el mapa no puede salir de la
+        # configuración de esta: sale del yaml base. Ver `ensemble.horizontes_evaluacion`.
+        horizontes = horizontes_evaluacion()
+        evaluated = evaluate_snapshot_outcomes(_dsn(), horizonte, horizontes)
         # Y las sombra: es lo que permite que una temporalidad en cuarentena acumule expediente
         # y pueda salir de ella. Van a sus propias columnas, nunca al rendimiento real.
-        evaluate_shadow_outcomes(_dsn(), horizonte, horizontes or None)
+        evaluate_shadow_outcomes(_dsn(), horizonte, horizontes)
     except Exception:  # noqa: BLE001 - paso secundario
         evaluated = 0
     return {

@@ -259,17 +259,9 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     # está perdiendo velas más deprisa de lo que el relleno las repara.
     try:
         from .db import bloqueadas_por_hueco
-        from .ensemble import load_ensemble
+        from .ensemble import horizontes_evaluacion
 
-        horizontes = {
-            str(k): int(v)
-            for k, v in (
-                load_ensemble(artifacts_dir() / "ensemble.yaml")
-                .get("evaluation", {})
-                .get("horizon_by_tf", {})
-            ).items()
-        }
-        n_bloqueadas = bloqueadas_por_hueco(dsn, horizontes)
+        n_bloqueadas = bloqueadas_por_hueco(dsn, horizontes_evaluacion())
         if n_bloqueadas:
             log.append(
                 f"datos: {n_bloqueadas} decisiones nunca se evaluarán "

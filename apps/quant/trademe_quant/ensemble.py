@@ -154,6 +154,31 @@ def usa_optimizadas(base: dict[str, Any]) -> bool:
     return bool(base.get("use_optimized_configs", True))
 
 
+def horizontes_evaluacion() -> dict[str, int]:
+    """Horizonte de evaluación por temporalidad, leído **siempre** del yaml base.
+
+    Es una propiedad de la medición, no de una clave: todas las decisiones de todas las claves se
+    evalúan y se filtran con el mismo mapa. Antes de 0.72.1 cada llamador lo conseguía por su
+    cuenta —o no lo conseguía—, y quien no pasaba nada caía en 20 velas para cualquier temporalidad:
+
+    - La cuarentena, el meta-modelo y el Fundamental Score filtraban la reproducibilidad **sin
+      horizontes**. Con 20 velas, un timeout de 1d guardado con 10 no reproduce: el meta-modelo
+      entrenaba sin la mitad de las decisiones de ETHUSDT:1d, y la cuarentena juzgaba 4h con 150 de
+      sus 242 desenlaces de sombra.
+    - La evaluación de pendientes tomaba el mapa de la configuración de la clave cuyo backtest la
+      lanzaba. Cuatro yaml optimizados de BTC no lo traen y, mientras sustituían al yaml (hasta
+      0.68.0), todo se evaluó con 20.
+
+    Sin `horizon_by_tf` devuelve `{}` y cada llamador aplica su horizonte de reserva.
+    """
+    base = load_ensemble(artifacts_dir() / "ensemble.yaml")
+    evaluacion = base.get("evaluation", {})
+    por_tf = evaluacion.get("horizon_by_tf", {}) if isinstance(evaluacion, dict) else {}
+    if not isinstance(por_tf, dict):
+        return {}
+    return {str(k): int(v) for k, v in por_tf.items()}
+
+
 def load_active_ensemble(symbol: str, interval: str) -> dict[str, Any]:
     """Config ACTIVA para un símbolo+temporalidad: la base, con lo optimizado de esa clave encima.
 
