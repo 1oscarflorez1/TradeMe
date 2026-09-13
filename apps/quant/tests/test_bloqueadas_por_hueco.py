@@ -67,11 +67,18 @@ def test_el_margen_es_el_mismo_que_el_del_relleno_de_la_cola() -> None:
 # --- El contador, con la base simulada ----------------------------------------------------------
 
 
-def _psycopg_falso(
-    monkeypatch: Any, pendientes: list[tuple[str, str, dt.datetime]], velas: int
-) -> list[str]:
-    """Una base que devuelve esas decisiones pendientes y `velas` velas en cualquier ventana."""
-    consultas: list[str] = []
+def _base_falsa(
+    monkeypatch: Any, pendientes: list[tuple[str, str, dt.datetime]], completa: bool
+) -> list[tuple[str, str]]:
+    """Una base con esas decisiones pendientes, y una trayectoria completa o no para todas.
+
+    La trayectoria se simula entera en vez de las velas: su definición vive en `ventana` y tiene
+    sus propios tests. Aquí solo importa qué hace el contador con ella, y cuándo la pide.
+    """
+    import trademe_quant.db as db
+    from trademe_quant.ventana import Trayectoria
+
+    pedidas: list[tuple[str, str]] = []
 
     class _Cur:
         def __enter__(self) -> Any:
@@ -81,13 +88,10 @@ def _psycopg_falso(
             return None
 
         def execute(self, sql: str, params: Any = None) -> None:
-            consultas.append(sql)
+            return None
 
         def fetchall(self) -> list[tuple[str, str, dt.datetime]]:
             return pendientes
-
-        def fetchone(self) -> tuple[int]:
-            return (velas,)
 
     class _Conn:
         def cursor(self) -> Any:
@@ -99,38 +103,45 @@ def _psycopg_falso(
         def __exit__(self, *_: object) -> None:
             return None
 
+    def falsa_trayectoria(conn: Any, symbol: str, interval: str, captured_at: Any, h: int) -> Any:
+        pedidas.append((symbol, interval))
+        return Trayectoria([(1.0, 1.0, 1.0)], completa=completa, apertura_captura_ms=0, cierre_ms=0)
+
     modulo = types.ModuleType("psycopg")
     modulo.connect = lambda *_a, **_k: _Conn()  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "psycopg", modulo)
-    return consultas
+    monkeypatch.setattr(db, "_trayectoria_de", falsa_trayectoria)
+    return pedidas
 
 
 def test_no_cuenta_una_decision_cuya_ultima_vela_aun_se_forma(monkeypatch: Any) -> None:
-    """El caso de BNB tal y como lo vio el piloto: 14 de 15 velas a las 21:18 del día 12."""
+    """El caso de BNB tal y como lo vio el piloto: le faltaba una vela a las 21:18 del día 12."""
     pendiente = [("BNBUSDT", "4h", _dt("2026-09-10T08:00:00"))]
-    consultas = _psycopg_falso(monkeypatch, pendiente, velas=14)
+    pedidas = _base_falsa(monkeypatch, pendiente, completa=False)
     n = bloqueadas_por_hueco("dsn-falso", {"4h": 15}, ahora_ms=_ms("2026-09-12T21:18:00"))
     assert n == 0
-    # Y ni siquiera se consulta la ventana: no tiene sentido contar velas que aún no pueden estar.
-    assert len(consultas) == 1
+    # Y ni siquiera se pide la trayectoria: no tiene sentido buscar velas que aún no pueden estar.
+    assert pedidas == []
 
 
 def test_si_cuenta_la_misma_decision_cuando_su_ultima_vela_ya_debio_cerrar(
     monkeypatch: Any,
 ) -> None:
-    """Pasado el cierre de la última vela, 14 de 15 sí es una vela perdida de verdad."""
+    """Pasado el cierre de la última vela, una trayectoria incompleta sí es una pérdida real."""
     pendiente = [("BNBUSDT", "4h", _dt("2026-09-10T08:00:00"))]
-    _psycopg_falso(monkeypatch, pendiente, velas=14)
+    pedidas = _base_falsa(monkeypatch, pendiente, completa=False)
     assert bloqueadas_por_hueco("dsn-falso", {"4h": 15}, ahora_ms=_ms("2026-09-13T01:00:00")) == 1
+    assert pedidas == [("BNBUSDT", "4h")]
 
 
-def test_con_la_ventana_completa_no_esta_bloqueada(monkeypatch: Any) -> None:
+def test_con_la_trayectoria_completa_no_esta_bloqueada(monkeypatch: Any) -> None:
     pendiente = [("ETHUSDT", "1d", _dt("2026-08-20T00:05:00"))]
-    _psycopg_falso(monkeypatch, pendiente, velas=10)
+    _base_falsa(monkeypatch, pendiente, completa=True)
     assert bloqueadas_por_hueco("dsn-falso", {"1d": 10}, ahora_ms=_ms("2026-09-12T21:18:00")) == 0
 
 
 def test_una_temporalidad_sin_duracion_fija_se_ignora(monkeypatch: Any) -> None:
     pendiente = [("BTCUSDT", "1M", _dt("2026-01-01T00:00:00"))]
-    _psycopg_falso(monkeypatch, pendiente, velas=0)
+    pedidas = _base_falsa(monkeypatch, pendiente, completa=False)
     assert bloqueadas_por_hueco("dsn-falso", ahora_ms=_ms("2026-09-12T21:18:00")) == 0
+    assert pedidas == []
