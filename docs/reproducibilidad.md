@@ -209,3 +209,49 @@ Cambian 4 velas de ETH, todas timeouts que siguen siéndolo: la del 21-ago pasa 
 del 24 de +0,54 a −0,31, la del 25 de −0,19 a +0,19 y la del 26 de +0,27 a +0,09. **Con 6 y 7 velas
 esto no dice nada del rendimiento**; lo que dice es que ahora vivo y backtest miden lo mismo.
 
+### Aplicada (13-sep-2026)
+
+Justo tras desplegar 0.72.0 y antes del primer ciclo que entrenara nada: **1.057 filas reescritas**
+(471 reales y 586 de sombra), copia en `artifacts/reevaluacion_ventana_20260913T113019Z.json`. Al
+repetir el informe en seco: **0 cambian** en las dos ramas, 276 y 1 no recalculables.
+
+## Los horizontes salen del yaml base (0.72.1)
+
+Verificando la reescritura apareció otro fallo, más antiguo, en **quién le pasa los horizontes al
+filtro**. La cuarentena, el meta-modelo y el Fundamental Score llamaban a `ids_reproducibles` **sin
+horizontes**, y el filtro caía en 20 velas para cualquier temporalidad. Nunca se los habían pasado:
+el parámetro existía en sus funciones de carga, pero ningún llamador lo usaba.
+
+Con 20 velas, un timeout de 1d guardado con 10 exige velas que aún no existen, o cierra en otro
+sitio: no reproduce. Medido en producción, ya reescrito el histórico:
+
+| | con 20 velas | con `horizon_by_tf` |
+|---|---|---|
+| real, reproducibles | 1.339 de 1.744 | **1.468** |
+| sombra, reproducibles | 2.243 de 2.389 | **2.388** |
+| ETHUSDT:1d en el meta-modelo | **8** | 16 |
+
+Las excluidas por error eran 35 de 1d, 48 de 1h y 44 de 4h en la rama real, y 92 de 4h y 54 de 1h en
+sombra. **La cuarentena juzgaba 4h con 150 de sus 242 desenlaces de sombra**, y el meta-modelo
+entrenaba sin la mitad de ETHUSDT:1d.
+
+Había una segunda puerta al mismo error: la evaluación de pendientes tomaba el mapa de la
+configuración de **la clave cuyo backtest la lanzaba**, y evalúa las de todas. Es la causa
+confirmada de los desenlaces con horizonte 20 que encontró la reevaluación.
+
+El arreglo es una sola fuente, `ensemble.horizontes_evaluacion()`, que lee siempre el yaml base y es
+el valor por defecto del filtro, del evaluador y del contador de bloqueadas. Sin horizontes ya no
+existe «20 para todo»: pasar `None` significa «los del yaml».
+
+### Lo que cambia en la cuarentena
+
+Simulada en solo lectura con los mismos datos, cambian dos decisiones:
+
+| clave | con 20 velas | con `horizon_by_tf` |
+|---|---|---|
+| BNBUSDT:4h | n=21, +0,498 R · sigue vetada | n=40, +0,099 R · **sale** |
+| ETHUSDT:4h | n=18, −0,046 R · sigue vetada | n=40, +0,348 R · **sale** |
+
+**No tiene efecto operativo**: la lista blanca solo deja operar ETHUSDT:1d y SOLUSDT:1d, y restringe
+aunque la cuarentena levante el veto. Es el mismo estado en que ya está BTCUSDT:4h.
+

@@ -146,9 +146,17 @@ def veredictos(
     horizon: int = HORIZONTE_POR_DEFECTO,
     rama: str = "real",
 ) -> list[Veredicto]:
-    """Juzga todas las decisiones cerradas. Una consulta de velas por símbolo y temporalidad."""
+    """Juzga todas las decisiones cerradas. Una consulta de velas por símbolo y temporalidad.
+
+    Sin `horizons`, los del yaml base (`ensemble.horizontes_evaluacion`). No existe un horizonte
+    «neutro» con el que juzgar: 20 velas para todo era una regla más, y la equivocada.
+    """
     import psycopg
 
+    if horizons is None:
+        from .ensemble import horizontes_evaluacion
+
+        horizons = horizontes_evaluacion()
     if rama not in _RAMAS:
         raise ValueError(f"rama desconocida: {rama}")
     direccion, entrada, parada, objetivo, resultado, retorno = _RAMAS[rama]

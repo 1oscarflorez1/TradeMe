@@ -275,7 +275,7 @@ def main(argv: list[str] | None = None) -> None:
     import psycopg
 
     from .costes import desde_config
-    from .ensemble import artifacts_dir, load_ensemble
+    from .ensemble import artifacts_dir, horizontes_evaluacion, load_ensemble
     from .evaluacion import _CacheSeries
 
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -283,9 +283,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     base = load_ensemble(artifacts_dir() / "ensemble.yaml")
-    horizons = {
-        str(k): int(v) for k, v in base.get("evaluation", {}).get("horizon_by_tf", {}).items()
-    }
+    horizons = horizontes_evaluacion()
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         cache = _CacheSeries(conn)
         resultados = reevaluar(leer_filas(conn), cache.trayectoria, horizons)

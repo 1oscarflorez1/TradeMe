@@ -211,6 +211,10 @@ def _evaluar_rama(dsn: str, rama: str, horizon: int, horizons: dict[str, int] | 
     from .backtest import evaluate_trade
     from .ventana import desenlace
 
+    if horizons is None:
+        from .ensemble import horizontes_evaluacion
+
+        horizons = horizontes_evaluacion()
     direccion, entrada, parada, objetivo, resultado, retorno, instante = _COLUMNAS[rama]
     updated = 0
     with psycopg.connect(dsn) as conn:
@@ -394,6 +398,10 @@ def bloqueadas_por_hueco(
     Solo cuenta aquellas cuya última vela **ya debería haber cerrado**; las demás están pendientes
     por motivos normales. Ver `ventana_cerrada`. `ahora_ms` existe para fijar el reloj en los tests.
     """
+    if horizons is None:
+        from .ensemble import horizontes_evaluacion
+
+        horizons = horizontes_evaluacion()
     import time
 
     import psycopg

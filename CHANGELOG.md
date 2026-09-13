@@ -7,6 +7,38 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.72.1] — 2026-09-13
+
+> Verificando la reescritura del histórico apareció por qué la cuarentena y el meta-modelo veían
+> menos de lo que había: **llamaban al filtro de reproducibilidad sin horizontes**, y el filtro
+> juzgaba todas las temporalidades con 20 velas.
+
+### Aplicado — la reevaluación de 0.72.0, en producción
+
+- **1.057 desenlaces reescritos** (471 reales, 586 de sombra) justo tras desplegar y antes de que
+  ningún ciclo entrenara nada. Copia en `artifacts/reevaluacion_ventana_20260913T113019Z.json`.
+- Al repetir el informe en seco, **0 cambian** en las dos ramas.
+
+### Fixed — Los horizontes de evaluación salen siempre del yaml base
+
+- La cuarentena, el meta-modelo y el Fundamental Score filtraban con `ids_reproducibles(dsn)` sin
+  horizontes: **20 velas para todo**. Un timeout de 1d guardado con 10 no reproducía.
+- Medido en producción: el meta-modelo entrenaba sin **35 decisiones de 1d** —8 de las 16 de
+  ETHUSDT:1d—, 48 de 1h y 44 de 4h; la cuarentena juzgaba 4h con **150 de sus 242** desenlaces de
+  sombra. Reproducibles con el mapa correcto: 1.468 reales (antes 1.339) y 2.388 de sombra (2.243).
+- La evaluación de pendientes tomaba el mapa de la clave cuyo backtest la lanzaba, y evalúa las de
+  todas: la causa confirmada de los desenlaces con horizonte 20 de la reevaluación.
+- Nueva `ensemble.horizontes_evaluacion()`, única fuente, y valor por defecto del filtro, del
+  evaluador y del contador de bloqueadas. `run_backtest`, el piloto y `reevaluar_desenlaces` la usan
+  en vez de construir cada uno su mapa.
+- 7 tests. Comprobado al revés: con las llamadas anteriores fallan los tres de comportamiento.
+
+### Efecto esperado en el primer ciclo
+
+- La cuarentena sacará **BNBUSDT:4h y ETHUSDT:4h** (simulado en solo lectura: n=40, +0,099 y
+  +0,348 R en sombra). **Sin efecto operativo**: la lista blanca solo deja operar ETH y SOL en 1d.
+- El meta-modelo reentrena con las filas recuperadas; publica solo si mejora.
+
 ## [0.72.0] — 2026-09-12
 
 > Midiendo la paridad entre vivo y backtest, las decisiones coincidían pero los desenlaces no: la
