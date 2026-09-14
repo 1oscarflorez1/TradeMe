@@ -38,7 +38,7 @@ distorsionar con poca evidencia).
 ## Flujo de artefactos
 
 ```
-apps/quant  ──run_calibration──►  artifacts/calibrators.json  ──►  apps/api (POST /reload)  ──►  señal
+apps/quant  ──run_calibration──►  artifacts/calibrators.json  ──►  apps/api (recarga sola)  ──►  señal
 ```
 
 1. Entrenar (reproduce el backtest y ajusta los calibradores):
@@ -50,7 +50,9 @@ apps/quant  ──run_calibration──►  artifacts/calibrators.json  ──�
 
    Escribe `artifacts/calibrators.json` (carpeta compartida por volumen con la API).
 
-2. Recargar en la API sin reiniciar:
+2. La API lo recoge sola en unos 15 segundos como mucho, sin reiniciar (ver
+   [`recarga-artefactos.md`](recarga-artefactos.md)). Para forzarlo al momento sigue existiendo
+   `POST /reload`, que exige sesión iniciada:
 
    ```bash
    curl -X POST http://localhost:3001/reload

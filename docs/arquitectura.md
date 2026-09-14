@@ -21,3 +21,8 @@ Ambos comparten **contrato**, no código de runtime (ver [`contrato.md`](contrat
 
 **Datos compartidos**: PostgreSQL + TimescaleDB (velas históricas y señales) y Redis (cache/pub-sub).
 Tanto `api` como `quant` leen el mismo histórico.
+
+**Artefactos**: quant los publica en `artifacts/` —cuarentena, meta-modelo, calibradores,
+independencia, fundamentales, correlaciones— escribiendo de forma atómica, y la api los recoge sola
+cuando cambian en disco, en unos 15 segundos como mucho. Hasta 0.72.2 solo los leía al arrancar o con
+`POST /reload`. Ver [`recarga-artefactos.md`](recarga-artefactos.md).

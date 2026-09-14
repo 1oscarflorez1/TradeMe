@@ -235,7 +235,8 @@ python -m trademe_quant.run_fundamental BTCUSDT
 ```
 
 El piloto automático lo ejecuta en cada ciclo, justo después de la Data Intelligence Layer (usa lo
-que esa acaba de guardar). La api recoge el artefacto nuevo con `POST /reload`.
+que esa acaba de guardar). La api recoge el artefacto nuevo sola, en unos 15 segundos como mucho: ver
+[`recarga-artefactos.md`](recarga-artefactos.md).
 
 ## Relacionado
 

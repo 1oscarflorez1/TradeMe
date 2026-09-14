@@ -29,7 +29,7 @@ sigue exportando como formato estándar para futuros consumidores (móvil, otros
 snapshots evaluados ──▶ apps/quant (entrena, valida, decide si publica)
                               │  metamodel.json  (+ metamodel.onnx)
                               ▼
-                        apps/api  ──POST /reload──▶  evalúa por señal ──▶ Panel / WS / DB
+                        apps/api  ──recarga sola (≤15 s)──▶  evalúa por señal ──▶ Panel / WS / DB
 ```
 
 ## Modos (`META_MODE`)

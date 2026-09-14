@@ -86,7 +86,8 @@ Get-Content infra\salud-1d.sql | docker exec -i trademe-prod-postgres-1 psql -U 
 - **`packages/core-signals`** — contrato JSON Schema y **vectores de paridad**: garantizan que Node
   y Python calculan exactamente lo mismo. Sin eso, cualquier backtest sería ficción.
 - Datos en TimescaleDB (migraciones automáticas al arrancar, registradas en `schema_migrations`) y
-  Redis. Artefactos en `artifacts/`, que quant publica y la api recarga con `POST /reload`.
+  Redis. Artefactos en `artifacts/`, que quant publica (escritura atómica) y la api recoge sola al
+  cambiar en disco, en ≤15 s (`ARTIFACTS_POLL_MS`). `POST /reload` fuerza la recarga al momento.
 
 ### Proveedores de datos
 

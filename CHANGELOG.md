@@ -7,6 +7,52 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.73.0] — 2026-09-14
+
+> Lo que el piloto decidía llegaba a la api **en el siguiente despliegue**. La api leía la
+> cuarentena, el meta-modelo y demás artefactos al arrancar y solo los releía con `POST /reload`, que
+> nadie llamaba tras un ciclo del piloto.
+
+### Consolidado — 0.72.2 en producción
+
+- Retiradas del `quarantine.json` las 7 entradas que la lista blanca había publicado como cuarentena
+  (copia en `artifacts/quarantine.backup-20260914T141758Z.json`); el piloto las republica como «sin
+  cuarentena» sin anunciar cambio.
+- Marcadas como leídas las 3.039 alertas de cuarentena anteriores al despliegue.
+- Ciclos de las 14:10, 14:25 y 14:40: `cuarentena revisada (25 claves, sin cambios)` y 0 alertas.
+  Vectores de paridad 12/12 contra el código desplegado de api y piloto, y las 25 claves con el mismo
+  estado en los dos.
+
+### Added — La api recoge sola los artefactos que publica el piloto
+
+- Nuevo `artifacts/vigilancia.ts`: cada `ARTIFACTS_POLL_MS` (15 s por defecto) compara inodo, fecha y
+  tamaño de cada artefacto y recarga **solo lo que cambió**, invalidando después la caché de
+  configuración por clave. Sondeo y no `fs.watch`: no depende de que el montaje propague eventos.
+- Nunca aplica un fichero a medias: si no se puede leer entero conserva el estado anterior y
+  reintenta. Para la cuarentena, aplicar un JSON roto habría sido levantar vetos.
+- `POST /reload` y la recarga automática usan la misma tabla de artefactos.
+- Cada recarga deja en el log el retraso desde que cambió el fichero: la latencia se mide en
+  producción, no se supone.
+- 13 tests con ficheros reales y el cargador real de la cuarentena.
+
+### Latencia medida
+
+- Propagación del bind mount entre contenedores: **83 ms** y **18 ms** en dos publicaciones.
+- Del disco a la memoria de la api con el módulo nuevo, sobre el `quarantine.json` de producción:
+  **9,3 s** (el piloto escribió a las 16:12:56.004; en memoria a las 16:13:05.291), dentro de la cota
+  de intervalo + propagación. Medido ejecutando el módulo en solo lectura en el contenedor de la api
+  de producción, antes de desplegar.
+- Antes: hasta el siguiente despliegue. `BNBUSDT:4h` salió de cuarentena a las 12:30:33 y la api no
+  lo cargó hasta el reinicio de las 13:38:19.
+
+### Fixed
+
+- **quant escribe los artefactos de forma atómica** (`trademe_quant.publicacion`): temporal oculto y
+  `os.replace`. Cuarentena, meta_policy, fundamental_policy, independencia, correlaciones,
+  fundamentales, calibradores y meta-modelo.
+- **El modo del meta-modelo en `/signal` y `/status` era el del arranque**: `buildApp` lo recibía por
+  valor. Ahora es un getter y sigue a `meta_policy.json`.
+
 ## [0.72.2] — 2026-09-14
 
 > La cuarentena avisaba de la misma salida **en cada ciclo**: 3.030 alertas acumuladas desde agosto,
