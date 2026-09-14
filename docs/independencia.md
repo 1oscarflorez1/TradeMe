@@ -98,7 +98,7 @@ Hay dos tests que fallan si esa invariante se rompe, uno en Node y otro en Pytho
 snapshots ──▶ apps/quant (independence.py: mide por símbolo+temporalidad)
                     │  artifacts/independence.json
                     ▼
-              apps/api ──POST /reload──▶ aplica el factor en cada señal
+              apps/api ──recarga sola (≤15 s)──▶ aplica el factor en cada señal
 ```
 
 Mismo patrón que `ensemble.yaml`, `calibrators.json` y `metamodel.json`: **el cómputo vive en

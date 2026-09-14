@@ -72,6 +72,7 @@ from .nula import (
     distribucion_expectancy_bloques,
     marcas_de,
 )
+from .publicacion import publicar_json
 
 # Decisiones sombra evaluadas que hacen falta para plantearse levantar la cuarentena. Con menos, una
 # racha buena de tres días bastaría para volver a operar una temporalidad que perdía dinero.
@@ -369,9 +370,7 @@ def save_policy(artifacts: Path, decisiones: dict[str, dict[str, Any]]) -> dict[
         },
         "intervals": decisiones,
     }
-    (artifacts / "quarantine.json").write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf8"
-    )
+    publicar_json(artifacts / "quarantine.json", data, indent=2, ensure_ascii=False)
     return data
 
 

@@ -26,6 +26,8 @@ from typing import Any
 
 import numpy as np
 
+from .publicacion import publicar_json
+
 # Los seis votos direccionales del ensemble. ADX y ATR no votan (contexto y volatilidad).
 VOTE_COLUMNS: tuple[str, ...] = (
     "ema_cross_score",
@@ -164,9 +166,7 @@ def publish(artifacts: Path, dsn: str, floor: float = DEFAULT_FLOOR) -> dict[str
         "entries": entradas,
     }
     artifacts.mkdir(parents=True, exist_ok=True)
-    (artifacts / "independence.json").write_text(
-        json.dumps(datos, indent=2, ensure_ascii=False) + "\n", encoding="utf8"
-    )
+    publicar_json(artifacts / "independence.json", datos, indent=2, ensure_ascii=False)
     return datos
 
 

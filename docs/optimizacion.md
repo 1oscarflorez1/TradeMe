@@ -36,7 +36,8 @@ apps/quant ──run_optimize──► artifacts/ensemble.optimized.yaml (+ opti
    Imprime el veredicto (base vs optimizado en hold-out). Si gana, escribe
    `artifacts/ensemble.optimized.yaml`; siempre escribe `artifacts/optimization_report.json`.
 
-2. Recargar en la API (sin reiniciar):
+2. Recargar en la API (sin reiniciar). Los yaml optimizados no entran en la recarga automática —
+   desde 0.69.0 no se usan, ver `use_optimized_configs`—, así que aquí sigue haciendo falta:
 
    ```bash
    curl -X POST http://localhost:3001/reload

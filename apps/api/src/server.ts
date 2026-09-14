@@ -58,6 +58,7 @@ import { MacroStore } from './macro/store.js';
 import { Fundamentals } from './ensemble/fundamental.js';
 import { FundamentalPolicy } from './ensemble/fundamental-policy.js';
 import { Correlaciones } from './ensemble/correlaciones.js';
+import { VigilanteArtefactos, type Vigilado } from './artifacts/vigilancia.js';
 import { computeMacroBias } from './macro/bias.js';
 import { fetchFundingRate } from './macro/funding.js';
 import { EMA } from 'technicalindicators';
@@ -204,21 +205,63 @@ async function main(): Promise<void> {
   const pusher = new Pusher(env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT);
   const pushCooldown = new Map<string, number>();
 
+  // Todo lo que publica el piloto y la api tiene en memoria, en una sola tabla: la usan la recarga
+  // manual (`POST /reload`) y la automática, así que no pueden recargar cosas distintas.
+  const artefactos: Vigilado[] = [
+    {
+      nombre: 'ensemble',
+      ruta: env.ENSEMBLE_CONFIG,
+      recargar: () => {
+        Object.assign(ensemble, loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m)));
+      },
+    },
+    { nombre: 'cuarentena', ruta: env.QUARANTINE_PATH, recargar: () => quarantine.reload() },
+    { nombre: 'calibradores', ruta: env.CALIBRATORS_PATH, recargar: () => calibrators.reload() },
+    { nombre: 'metamodelo', ruta: env.METAMODEL_PATH, recargar: () => metaModel.reload() },
+    { nombre: 'meta_policy', ruta: env.META_POLICY_PATH, recargar: () => metaPolicy.reload() },
+    { nombre: 'independencia', ruta: env.INDEPENDENCE_PATH, recargar: () => independence.reload() },
+    {
+      nombre: 'fundamentales',
+      ruta: join(artifactsDir, 'fundamental'),
+      directorio: true,
+      recargar: () => fundamentals.reload(),
+    },
+    {
+      nombre: 'fundamental_policy',
+      ruta: join(artifactsDir, 'fundamental_policy.json'),
+      recargar: () => fundamentalPolicy.reload(),
+    },
+    {
+      nombre: 'correlaciones',
+      ruta: join(artifactsDir, 'correlaciones.json'),
+      recargar: () => correlaciones.reload(),
+    },
+  ];
+  // La config activa de cada clave se cachea con la cuarentena, la independencia y el modo del
+  // Fundamental Score ya resueltos: cualquier recarga tiene que invalidarla, o no cambia nada.
+  const vigilante = new VigilanteArtefactos(artefactos, {
+    alRecargar: (recargas) => {
+      ensembleCache.clear();
+      app.log.info(
+        {
+          recargados: recargas.map((r) => r.nombre),
+          retraso_ms: Object.fromEntries(recargas.map((r) => [r.nombre, r.retrasoMs])),
+          cuarentena: quarantine.version,
+        },
+        'artefactos recargados desde disco',
+      );
+    },
+    alOmitir: (nombre) =>
+      app.log.warn({ artefacto: nombre }, 'artefacto ilegible en disco: se conserva el anterior'),
+  });
+
   function reloadArtifacts(): {
     ensembleVersion: string;
     calibrationVersion: string | null;
   } {
-    const fresh = loadEnsembleSafe(env.ENSEMBLE_CONFIG, (m) => console.warn(m));
-    Object.assign(ensemble, fresh);
+    for (const a of artefactos) a.recargar();
     ensembleCache.clear();
-    calibrators.reload();
-    metaModel.reload();
-    metaPolicy.reload();
-    independence.reload();
-    quarantine.reload();
-    fundamentals.reload();
-    fundamentalPolicy.reload();
-    correlaciones.reload();
+    vigilante.sincronizar();
     return {
       ensembleVersion: ensemble.version,
       calibrationVersion: calibrators.version,
@@ -252,7 +295,11 @@ async function main(): Promise<void> {
     ensemble,
     calibrators,
     metaModel,
-    metaMode: metaPolicy.mode,
+    // Getter, no valor: con el valor, /signal y /health se quedaban con el modo del arranque aunque
+    // meta_policy.json cambiara y se recargara.
+    get metaMode() {
+      return metaPolicy.mode;
+    },
     metaPolicyReason: () => metaPolicy.reason,
     captureInfo: () => ({
       enabled: env.AUTO_CAPTURE === 'true',
@@ -780,6 +827,15 @@ async function main(): Promise<void> {
     env.JWT_SECRET ? (token) => Boolean(token && verifyJwt(token, env.JWT_SECRET!)) : undefined,
   );
   await app.listen({ host: env.API_HOST, port: env.API_PORT });
+
+  // Desde aquí los artefactos que publique el piloto se aplican solos. Ver `artifacts/vigilancia.ts`.
+  vigilante.iniciar(env.ARTIFACTS_POLL_MS);
+  app.log.info(
+    { intervalo_ms: env.ARTIFACTS_POLL_MS, artefactos: artefactos.map((a) => a.nombre) },
+    env.ARTIFACTS_POLL_MS > 0
+      ? 'recarga automática de artefactos activa'
+      : 'recarga automática de artefactos desactivada: solo POST /reload',
+  );
 
   const subscriptions = buildSubscriptions(env);
   for (const sub of subscriptions) {

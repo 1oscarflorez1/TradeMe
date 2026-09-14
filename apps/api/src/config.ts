@@ -26,6 +26,9 @@ const EnvSchema = z.object({
   META_POLICY_PATH: z.string().default('artifacts/meta_policy.json'),
   INDEPENDENCE_PATH: z.string().default('artifacts/independence.json'),
   QUARANTINE_PATH: z.string().default('artifacts/quarantine.json'),
+  // Cada cuánto se mira si el piloto ha republicado algún artefacto (ms). 0 = solo `POST /reload`.
+  // Ver `artifacts/vigilancia.ts`: la latencia de un cambio de cuarentena queda acotada a esto.
+  ARTIFACTS_POLL_MS: z.coerce.number().int().min(0).default(15000),
   // Historial y documentación: el Dockerfile copia el repositorio entero, así que ambos viajan
   // dentro de la imagen y no hay nada que montar.
   CHANGELOG_PATH: z.string().default('CHANGELOG.md'),

@@ -47,6 +47,7 @@ import numpy as np
 
 from .correlaciones import observaciones_efectivas
 from .nula import p95_seleccion
+from .publicacion import publicar_json
 
 MODES = ["off", "shadow", "active"]
 
@@ -315,7 +316,7 @@ def save_policy(artifacts: Path, mode: str, reason: str, ev: dict[str, Any]) -> 
         "evidence": ev,
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    (artifacts / "fundamental_policy.json").write_text(json.dumps(data, indent=2))
+    publicar_json(artifacts / "fundamental_policy.json", data, indent=2)
     return data
 
 

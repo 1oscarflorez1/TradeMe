@@ -46,6 +46,7 @@ from typing import Any
 import numpy as np
 
 from .independence import effective_votes
+from .publicacion import publicar_json
 
 #: Temporalidad y profundidad con que se mide la correlación. 1h equilibra ruido de microestructura
 #: y muestra suficiente; 500 velas son unas tres semanas.
@@ -203,7 +204,7 @@ def publish(artifacts: Path, symbols: list[str]) -> dict[str, Any]:
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     artifacts.mkdir(parents=True, exist_ok=True)
-    (artifacts / "correlaciones.json").write_text(json.dumps(data, indent=2), encoding="utf8")
+    publicar_json(artifacts / "correlaciones.json", data, indent=2)
     return data
 
 
