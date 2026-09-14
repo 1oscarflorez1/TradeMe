@@ -504,6 +504,7 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     # lista fija que alguien tendría que acordarse de vaciar.
     try:
         from .ensemble import load_ensemble
+        from .quarantine_policy import avisos as avisos_cuarentena
         from .quarantine_policy import publish as publish_quarantine
 
         base = load_ensemble(artifacts_dir() / "ensemble.yaml")
@@ -514,18 +515,17 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
         # decírselo o su expediente real se congelaría y el gobierno la juzgaría con datos viejos.
         lista_blanca = [str(x) for x in base.get("active_keys", [])]
         qtn = publish_quarantine(artifacts_dir(), dsn, vetadas, estructurales, lista_blanca)
-        cambios = [v for v in qtn["intervals"].values() if v["changed"]]
-        for c in cambios:
-            estado = "entra en" if c["quarantined"] else "sale de"
-            log.append(f"cuarentena: {c['interval']} {estado} cuarentena — {c['reason']}")
+        cambios = avisos_cuarentena(qtn)
+        for aviso in cambios:
+            log.append(f"cuarentena: {aviso.titulo} — {aviso.motivo}")
             insert_alert(
                 dsn,
                 "cuarentena",
-                "warning" if c["quarantined"] else "success",
-                f"{c['interval']}: {estado} cuarentena",
-                c["reason"],
-                None,
-                c["interval"],
+                aviso.severidad,
+                aviso.titulo,
+                aviso.motivo,
+                aviso.symbol,
+                aviso.interval,
             )
         if not cambios:
             log.append(f"cuarentena revisada ({len(qtn['intervals'])} claves, sin cambios)")

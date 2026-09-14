@@ -8,7 +8,13 @@ import { inferProbs, pickAction } from '../src/ensemble/inference.js';
 import { IndicatorRegistry } from '../src/indicators/registry.js';
 import { buildSignal } from '../src/ensemble/signal.js';
 import type { Macro } from '../src/domain/signal.js';
-import { DEFAULT_ENSEMBLE, horizonFor, validCandlesFor } from '../src/ensemble/config.js';
+import {
+  DEFAULT_ENSEMBLE,
+  horizonFor,
+  validCandlesFor,
+  vetadaEfectiva,
+} from '../src/ensemble/config.js';
+import { estadoCuarentena } from '../src/ensemble/quarantine.js';
 import type { Candle } from '../src/domain/candle.js';
 
 interface Vectors {
@@ -230,5 +236,34 @@ describe('cuarentena con salida (M10.7)', () => {
     const sig = construye(false);
     expect(sig.shadow_action).toBeUndefined();
     expect(sig.shadow_direction).toBeUndefined();
+  });
+});
+
+interface CasoCuarentena {
+  nombre: string;
+  clave: string;
+  yaml: string[];
+  lista_blanca: string[];
+  entrada: unknown;
+  en_cuarentena: boolean;
+  opera: boolean;
+}
+
+describe('paridad: estado de cuarentena y veto efectivo', () => {
+  // Hasta 0.72.1 quant trataba el yaml como suelo y esta api dejaba mandar al artefacto. Los mismos
+  // casos corren en `apps/quant/tests/test_parity.py`: si las dos reglas vuelven a separarse, falla.
+  const { casos } = JSON.parse(
+    readFileSync(
+      join(here, '../../../packages/core-signals/parity/cuarentena_vectors.json'),
+      'utf8',
+    ),
+  ) as { casos: CasoCuarentena[] };
+
+  it.each(casos.map((c) => [c.nombre, c] as const))('%s', (_nombre, caso) => {
+    const [symbol, interval] = caso.clave.split(':') as [string, string];
+    const enCuarentena = estadoCuarentena(caso.entrada, caso.yaml.includes(interval));
+    const cfg = { ...DEFAULT_ENSEMBLE, activeKeys: caso.lista_blanca };
+    expect(enCuarentena).toBe(caso.en_cuarentena);
+    expect(!vetadaEfectiva(cfg, symbol, interval, enCuarentena)).toBe(caso.opera);
   });
 });

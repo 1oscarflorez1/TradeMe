@@ -186,8 +186,16 @@ def evaluate_shadow(
     return ev
 
 
-def evaluate_real(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_ENTRADA) -> dict[str, Any]:
+def evaluate_real(
+    rows: list[dict[str, Any]],
+    limite: int = MIN_SAMPLES_ENTRADA,
+    columna: str = "outcome_return_r",
+) -> dict[str, Any]:
     """Resume el rendimiento REAL de una temporalidad que sí opera.
+
+    `columna` permite aplicar la misma puerta de entrada a la **sombra** de una clave que no está en
+    cuarentena pero no opera por la lista blanca: su expediente real está congelado, y lo que habría
+    hecho es lo único que la describe. Ver `publish`.
 
     **Solo las `limite` decisiones evaluadas más recientes**, y esto es lo que corrige el defecto
     detectado el 17 de agosto de 2026: el expediente promediaba toda la historia, mezclando
@@ -214,9 +222,7 @@ def evaluate_real(rows: list[dict[str, Any]], limite: int = MIN_SAMPLES_ENTRADA)
     Que la firma ni siquiera admita el argumento lo hace estructuralmente imposible, no cuestión de
     acordarse.
     """
-    rs = [float(r["outcome_return_r"]) for r in rows if r.get("outcome_return_r") is not None][
-        :limite
-    ]
+    rs = [float(r[columna]) for r in rows if r.get(columna) is not None][:limite]
     return _resumen(rs)
 
 
@@ -439,6 +445,39 @@ def fetch_expedientes(
     return agrupado, Poblacion(pob_rs, pob_ts)
 
 
+def en_cuarentena(politica: dict[str, Any], clave: str, interval: str, actuales: list[str]) -> bool:
+    """El estado de cuarentena **publicado** de una clave. Misma regla que `quarantine.ts`.
+
+    Sin entrada legible en el artefacto manda el yaml. Con entrada, manda el artefacto, salvo en un
+    caso: si la decisión se tomó cuando el yaml no listaba esa temporalidad (`base_quarantined`
+    falso) y ahora sí, el yaml vuelve a vetar. Una entrada anterior al campo se da por decidida con
+    el yaml vigente.
+
+    Así se sostienen las tres cosas que el gobierno necesita a la vez:
+
+    - **El yaml puede vetar una temporalidad entera**, también en las claves que ya operaban:
+      añadirla a `quarantine_intervals` tiene efecto.
+    - **Quitarla del yaml no levanta un veto vigente**: una cuarentena se levanta con evidencia, no
+      editando un fichero.
+    - **Una clave heredada del yaml puede salir con su expediente sombra**, y queda fuera.
+
+    El fallo que esto corrige (14 sep 2026)
+    ----------------------------------------
+    Hasta 0.72.1 el piloto trataba el yaml como un suelo absoluto —si la temporalidad estaba en el
+    yaml, la clave estaba vetada, dijera lo que dijera el artefacto— mientras la api dejaba mandar
+    al artefacto. `BTCUSDT:4h` salió de cuarentena: para la api quedó fuera; para el piloto seguía
+    dentro, y la volvía a «sacar» en cada ciclo. **3.030 alertas** de cuarentena acumuladas, 1.100
+    de ellas de «4h sale». Dos copias de una regla que discrepaban, otra vez.
+    """
+    en_yaml = interval in actuales
+    entrada = (politica.get("intervals") or {}).get(clave)
+    if not isinstance(entrada, dict) or not isinstance(entrada.get("quarantined"), bool):
+        return en_yaml
+    if en_yaml and entrada.get("base_quarantined") is False:
+        return True
+    return bool(entrada["quarantined"])
+
+
 def estado_previo(
     politica: dict[str, Any],
     clave: str,
@@ -446,10 +485,13 @@ def estado_previo(
     actuales: list[str],
     lista_blanca: list[str] | None = None,
 ) -> bool:
-    """¿Está vetada esta clave AHORA MISMO? Yaml ∪ artefacto ∪ lista blanca.
+    """¿Está vetada esta clave ahora mismo? Cuarentena publicada **o** fuera de la lista blanca.
 
-    El fallo que esto corrige (22 ago 2026)
-    ----------------------------------------
+    Es el veto efectivo, espejo de `vetadaEfectiva` en la api, y decide **a qué expediente mirar**:
+    una clave que no opera solo genera desenlace sombra.
+
+    El fallo que motivó leer el artefacto (22 ago 2026)
+    ----------------------------------------------------
     `publish` decidía a qué expediente mirar con `interval in actuales`, es decir con la lista del
     `ensemble.yaml`, **que es por temporalidad**. Pero quien veta de verdad en la plataforma es
     `quarantine.json`, **que es por clave `SÍMBOLO:intervalo`** — así lo lee `quarantine.ts`.
@@ -458,38 +500,62 @@ def estado_previo(
     generar `outcome_return_r` —una temporalidad vetada solo produce sombra—, así que su expediente
     real se congelaba en las decisiones de antes del veto. Y como su temporalidad no figuraba en el
     yaml, el gobierno la seguía juzgando con ESE expediente congelado y la recondenaba cada ciclo
-    con las mismas filas. **Jamás llegaba a la puerta de salida.**
-
-    Es exactamente el fallo que la migración 017 arregló para 4h, reaparecido en el eje
-    `SÍMBOLO:intervalo`: «una medida temporal, irreversible por construcción». El 22 de agosto de
-    2026 había 11 claves vetadas acumuladas en seis días, 6 de ellas atrapadas así, y ninguna había
-    salido nunca. La plataforma se estaba apagando sola.
-
-    El yaml es un SUELO, no un techo
-    ---------------------------------
-    Quitar una temporalidad de `quarantine_intervals` ya no levanta su cuarentena: quien esté vetado
-    en el artefacto sigue vetado hasta demostrar la salida con su expediente sombra. Es deliberado
-    —una cuarentena se levanta con evidencia, no editando un fichero— y la vía manual, si algún día
-    hiciera falta, es borrar la entrada del artefacto.
-
-    Sin artefacto, o con uno ilegible, manda el yaml: exactamente el comportamiento anterior.
+    con las mismas filas. **Jamás llegaba a la puerta de salida.** El 22 de agosto de 2026 había 11
+    claves vetadas acumuladas en seis días, 6 de ellas atrapadas así.
 
     La lista blanca cuenta como veto (0.70.0)
     ------------------------------------------
-    Desde que existe `active_keys`, una clave puede no operar **sin estar en cuarentena**. Y eso,
-    si esta función no lo supiera, reproduciría el fallo que documenta el párrafo anterior:
-    una clave que no opera solo genera desenlace **sombra**, así que su expediente real se congela
-    y el gobierno la seguiría juzgando con ese expediente viejo cada ciclo.
-
-    No es una cuarentena —no aparece en `quarantine.json` ni se levanta con evidencia— pero para
-    decidir **a qué expediente mirar** se comporta igual, y eso es lo único que se pregunta aquí.
+    Una clave fuera de `active_keys` no opera **sin estar en cuarentena**. Para elegir expediente se
+    comporta igual —solo tiene sombra—, pero no es una cuarentena y no se publica como tal. Hasta
+    0.72.1 sí se publicaba, y así acabaron «en cuarentena» claves como `BTCUSDT:1d` que nunca
+    entraron por su expediente. Ver `en_cuarentena` y `publish`.
     """
-    if interval in actuales:
+    if en_cuarentena(politica, clave, interval, actuales):
         return True
-    if lista_blanca and clave not in lista_blanca:
-        return True
-    entrada = (politica.get("intervals") or {}).get(clave)
-    return bool(entrada.get("quarantined")) if isinstance(entrada, dict) else False
+    return bool(lista_blanca) and clave not in (lista_blanca or [])
+
+
+class Aviso(NamedTuple):
+    """Una alerta de cuarentena: una por clave que cambia de estado."""
+
+    clave: str
+    symbol: str
+    interval: str
+    severidad: str
+    titulo: str
+    motivo: str
+
+
+def avisos(publicado: dict[str, Any]) -> list[Aviso]:
+    """Las alertas que corresponden a un `quarantine.json` recién publicado.
+
+    Solo las claves con `changed`, que desde 0.72.2 compara con el estado publicado: una clave que
+    salió de cuarentena avisa una vez, no en cada ciclo. Y con la **clave** en el título y en la
+    alerta: hasta 0.72.1 solo llevaban la temporalidad, y «4h: sale de cuarentena» no decía de qué
+    activo — con cuatro símbolos operando la misma temporalidad, era imposible saber a quién mirar.
+    """
+    fuera: list[Aviso] = []
+    for clave, entrada in sorted((publicado.get("intervals") or {}).items()):
+        if not isinstance(entrada, dict) or not entrada.get("changed"):
+            continue
+        symbol, _, interval = clave.partition(":")
+        dentro = bool(entrada.get("quarantined"))
+        estado = "entra en" if dentro else "sale de"
+        fuera.append(
+            Aviso(
+                clave,
+                symbol,
+                interval,
+                "warning" if dentro else "success",
+                f"{clave}: {estado} cuarentena",
+                str(entrada.get("reason", "")),
+            )
+        )
+    return fuera
+
+
+#: Coletilla del motivo cuando una clave sin cuarentena se juzga por su sombra.
+POR_LISTA_BLANCA = "medido en sombra: la lista blanca no la deja operar"
 
 
 def publish(
@@ -499,17 +565,23 @@ def publish(
     estructurales: list[str] | None = None,
     lista_blanca: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Revisa cada temporalidad y publica `quarantine.json`.
+    """Revisa cada clave y publica `quarantine.json`.
 
-    `actuales` son las temporalidades vetadas según `ensemble.yaml`, pero el estado real de cada
-    clave sale de `estado_previo`: el yaml es el suelo y el artefacto manda por encima. De eso
-    depende a qué expediente se mira — si está vetada, al sombra (lo que habría hecho); si opera, al
-    real (lo que hizo)— y equivocarse ahí deja claves condenadas para siempre.
+    Para cada clave hay dos preguntas distintas, y hasta 0.72.1 se respondían con la misma variable:
+
+    1. **¿Está en cuarentena?** — el estado publicado, `en_cuarentena`, con la misma regla que la
+       api. De ahí sale qué puerta se aplica y si ha habido **cambio**: `changed` compara con lo
+       publicado, así que una alerta solo salta cuando el estado cambia de verdad.
+    2. **¿Qué expediente la describe?** — si está en cuarentena, su sombra y la puerta de salida.
+       Si no lo está y opera, su rendimiento real y la puerta de entrada. Si no lo está pero la
+       lista blanca no la deja operar, la puerta de **entrada** sobre su **sombra**: es lo que
+       habría hecho, y su expediente real está congelado.
+
+    Cada entrada guarda `base_quarantined`: si el yaml listaba su temporalidad al decidir. Es lo que
+    permite a `en_cuarentena` distinguir «salió por expediente» de «el yaml la ha añadido después».
 
     `estructurales` son las que entraron **por coste** y no por expediente. Su puerta de salida es
-    más dura —el P95 de la nula en vez de la mediana— porque la pregunta que responden al volver es
-    otra. Ver `umbral_salida`. Sin la lista, todas se tratan como de expediente: el comportamiento
-    anterior, que es el conservador respecto a este cambio.
+    más dura —el P95 de la nula en vez de la mediana—. Ver `umbral_salida`.
     """
     estructural_set = set(estructurales or [])
     datos, poblacion = fetch_expedientes(dsn)
@@ -517,27 +589,34 @@ def publish(
     decisiones: dict[str, dict[str, Any]] = {}
     for clave, filas in datos.items():
         interval = clave.split(":", 1)[1]
-        vetada = estado_previo(politica, clave, interval, actuales, lista_blanca)
+        estructural = interval in estructural_set
+        previo = en_cuarentena(politica, clave, interval, actuales)
+        opera = not estado_previo(politica, clave, interval, actuales, lista_blanca)
         # Cada caso mira su propio expediente y su propia ventana: la de salida es más larga porque
         # volver a operar exige más pruebas que dejar de hacerlo. Y solo la de salida recibe la
         # población: la nula no puede afectar a la entrada ni por accidente.
-        ev = (
-            evaluate_shadow(filas, MIN_SAMPLES_SALIDA, poblacion)
-            if vetada
-            else evaluate_real(filas, MIN_SAMPLES_ENTRADA)
-        )
-        nueva, motivo = decide_quarantine(vetada, ev, interval in estructural_set)
+        if previo:
+            ev = evaluate_shadow(filas, MIN_SAMPLES_SALIDA, poblacion)
+        elif opera:
+            ev = evaluate_real(filas, MIN_SAMPLES_ENTRADA)
+        else:
+            ev = evaluate_real(filas, MIN_SAMPLES_ENTRADA, columna="shadow_outcome_return_r")
+        nueva, motivo = decide_quarantine(previo, ev, estructural)
+        if not previo and not opera:
+            motivo = motivo.replace("opera con normalidad", "sin cuarentena")
+            motivo = f"{motivo}; {POR_LISTA_BLANCA}"
         decisiones[clave] = {
             "interval": interval,
             "quarantined": nueva,
-            "was_quarantined": vetada,
-            "changed": nueva != vetada,
+            "was_quarantined": previo,
+            "changed": nueva != previo,
+            "base_quarantined": interval in actuales,
             "reason": motivo,
             "evidence": {
                 "n": ev["n"],
                 "expectancy": round(float(ev["expectancy"]), 4),
                 "win_rate": round(float(ev["win_rate"]), 4),
-                "source": "sombra" if vetada else "real",
+                "source": "real" if opera else "sombra",
                 # Los tres se guardan aunque la entrada no los use: la diferencia entre «el azar da
                 # esto» y «se exigía esto» tiene que poder auditarse desde el artefacto, no
                 # reconstruirse. En la entrada salen a 0 y el umbral efectivo coincide con el fijo.
@@ -545,7 +624,9 @@ def publish(
                 "nula_p95": round(float(ev.get("nula_p95", 0.0)), 4),
                 "n_poblacion": int(ev.get("n_poblacion", 0)),
                 "bloques_poblacion": int(ev.get("bloques_poblacion", 0)),
-                "umbral_salida": round(umbral_salida(ev), 4) if vetada else None,
+                # Con `estructural`: hasta 0.72.1 se guardaba el umbral de expediente, y el
+                # artefacto decía +0,05 donde la decisión había exigido el P95 de la nula.
+                "umbral_salida": round(umbral_salida(ev, estructural), 4) if previo else None,
             },
         }
     return save_policy(artifacts, decisiones)

@@ -7,6 +7,48 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.72.2] — 2026-09-14
+
+> La cuarentena avisaba de la misma salida **en cada ciclo**: 3.030 alertas acumuladas desde agosto,
+> 1.100 de ellas de «4h: sale de cuarentena». El piloto y la api leían el estado de cuarentena con
+> reglas distintas.
+
+### Verificado — 0.72.1 en producción
+
+- Primer ciclo tras desplegar: `histórico: 1471/1747 desenlaces reproducibles; 276 sin ventana, 0
+  discrepantes`.
+- Sale de cuarentena **BNBUSDT:4h** (+0,100 R en 40 de sombra). **ETHUSDT:4h no**: con 9 desenlaces
+  de sombra nuevos desde la simulación del día anterior bajó a +0,009 R. Repetida la simulación sobre
+  los mismos datos del ciclo, coincide exacta con lo publicado: es el dato, no un fallo. Sale también
+  **ETHUSDT:1h** (+0,692 R frente al P95 de +0,391 exigido a las estructurales).
+
+### Fixed — Una regla de cuarentena para el piloto y la api
+
+- El piloto trataba el yaml como **suelo absoluto** —temporalidad en el yaml, clave vetada— y la api
+  dejaba mandar al artefacto. `BTCUSDT:4h` salió con su sombra: fuera para la api, dentro para el
+  piloto, que la volvía a sacar con alerta cada pasada.
+- Regla única, `quarantine_policy.en_cuarentena` y `estadoCuarentena` en la api: sin entrada manda el
+  yaml; con entrada, el artefacto; y si la decisión se tomó sin el yaml listando la temporalidad y
+  ahora la lista, el yaml vuelve a vetar. Cada entrada guarda `base_quarantined` para distinguirlo.
+- Nuevos vectores de paridad `cuarentena_vectors.json` (12 casos) que corren contra las dos
+  implementaciones. Comprobado al revés: la regla anterior del piloto falla 2 y la de la api otros 2,
+  justo donde discrepaban.
+
+### Fixed — Una alerta por cambio de estado, con la clave
+
+- `publish` separa **¿está en cuarentena?** (qué puerta y si hay cambio) de **¿qué expediente la
+  describe?**. `changed` compara con el estado publicado: una alerta por cambio, no por ciclo.
+- Las alertas y el log llevan la clave (`BTCUSDT:4h: sale de cuarentena`) y el símbolo; antes solo la
+  temporalidad.
+- Una clave **fuera de la lista blanca** ya no se publica como cuarentena: se le aplica la puerta de
+  entrada sobre su sombra. Hasta ahora se la juzgaba con la de salida y, sin muestra, quedaba «en
+  cuarentena»: así están `BTCUSDT:1d`, `BNBUSDT:1d`, `BTCUSDT:1w` y las de 1m y 5m, sin ninguna
+  alerta de entrada en su historia.
+- El artefacto guarda el umbral de salida que se exigió de verdad: en las estructurales decía +0,05
+  donde la decisión había pedido el P95.
+- Simulado sobre producción, sin escribir: dos ciclos con la regla nueva, **0 alertas** y ningún
+  estado publicado cambia.
+
 ## [0.72.1] — 2026-09-13
 
 > Verificando la reescritura del histórico apareció por qué la cuarentena y el meta-modelo veían

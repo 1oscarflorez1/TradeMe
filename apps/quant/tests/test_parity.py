@@ -9,6 +9,7 @@ from trademe_quant.indicators import compute_readings
 from trademe_quant.inference import infer_probs, pick_action
 from trademe_quant.macro import compute_macro_bias
 from trademe_quant.metamodel import predict_forest
+from trademe_quant.quarantine_policy import en_cuarentena, estado_previo
 
 VECTORS = json.loads(
     (pathlib.Path(__file__).parents[3] / "packages/core-signals/parity/vectors.json").read_text()
@@ -220,3 +221,28 @@ def test_la_penalizacion_es_monotona_y_nunca_empuja_a_comprar() -> None:
         p = infer_probs(0.4, 0.5, 0.06, 0.2, 1.0, 0.7, fund_term)
         assert p["BUY"] <= previo + 1e-12, fund_term
         previo = p["BUY"]
+
+
+CUARENTENA = json.loads(
+    (
+        pathlib.Path(__file__).parents[3] / "packages/core-signals/parity/cuarentena_vectors.json"
+    ).read_text(encoding="utf8")
+)
+
+
+def test_paridad_del_estado_de_cuarentena_y_el_veto_efectivo() -> None:
+    """Los mismos casos que `parity.test.ts`: quant y api tienen que leer igual el artefacto.
+
+    Hasta 0.72.1 no lo hacían. Para el piloto el yaml era un suelo; para la api mandaba el
+    artefacto. `BTCUSDT:4h` salía de cuarentena en la api y seguía dentro en el piloto, que la
+    volvía a sacar —con alerta— en cada ciclo.
+    """
+    for caso in CUARENTENA["casos"]:
+        clave = caso["clave"]
+        interval = clave.split(":", 1)[1]
+        politica = {"intervals": {clave: caso["entrada"]}}
+        assert (
+            en_cuarentena(politica, clave, interval, caso["yaml"]) is caso["en_cuarentena"]
+        ), caso["nombre"]
+        vetada = estado_previo(politica, clave, interval, caso["yaml"], caso["lista_blanca"])
+        assert (not vetada) is caso["opera"], caso["nombre"]
