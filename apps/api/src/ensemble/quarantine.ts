@@ -13,6 +13,11 @@ export interface QuarantineEntry {
   quarantined: boolean;
   was_quarantined?: boolean;
   changed?: boolean;
+  /**
+   * Si `ensemble.yaml` listaba esta temporalidad cuando se tomó la decisión (desde 0.72.2). Es lo
+   * que distingue «salió por expediente» de «el yaml la ha añadido después». Ver `estadoCuarentena`.
+   */
+  base_quarantined?: boolean;
   reason: string;
   evidence?: {
     n: number;
@@ -78,8 +83,7 @@ export class QuarantinePolicy {
    * cuarentena por ausencia de datos.
    */
   isQuarantined(symbol: string, interval: string, base: boolean): boolean {
-    const e = this.set?.intervals?.[`${symbol.toUpperCase()}:${interval}`];
-    return e ? e.quarantined : base;
+    return estadoCuarentena(this.set?.intervals?.[`${symbol.toUpperCase()}:${interval}`], base);
   }
 
   entryFor(symbol: string, interval: string): QuarantineEntry | undefined {
@@ -89,6 +93,29 @@ export class QuarantinePolicy {
   meta(): QuarantineSet | null {
     return this.set;
   }
+}
+
+/**
+ * El estado de cuarentena de una clave a partir de su entrada en el artefacto y del yaml (`base`).
+ *
+ * Espejo exacto de `quarantine_policy.en_cuarentena` en quant, comprobado con los mismos casos en
+ * `packages/core-signals/parity/cuarentena_vectors.json`:
+ *
+ * - Sin entrada legible, manda el yaml. Nunca se levanta una cuarentena por ausencia de datos.
+ * - Con entrada, manda el artefacto: una clave heredada del yaml que salió con su sombra queda
+ *   fuera, y quitar la temporalidad del yaml no levanta un veto vigente.
+ * - Salvo que la decisión se tomara sin el yaml listándola (`base_quarantined: false`) y ahora sí:
+ *   añadir una temporalidad al yaml vuelve a vetarla.
+ *
+ * Hasta 0.72.1 quant trataba el yaml como suelo absoluto y esta función no: la misma clave estaba
+ * fuera de cuarentena aquí y dentro para el piloto, que la volvía a sacar —y a alertar— cada ciclo.
+ */
+export function estadoCuarentena(entrada: unknown, base: boolean): boolean {
+  if (!entrada || typeof entrada !== 'object' || Array.isArray(entrada)) return base;
+  const e = entrada as Partial<QuarantineEntry>;
+  if (typeof e.quarantined !== 'boolean') return base;
+  if (base && e.base_quarantined === false) return true;
+  return e.quarantined;
 }
 
 function readSet(path: string): QuarantineSet | null {

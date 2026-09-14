@@ -1,0 +1,75 @@
+{
+  "descripcion": "Estado de cuarentena y veto efectivo de una clave. Los mismos casos contra quarantine_policy.en_cuarentena/estado_previo (quant) y estadoCuarentena/vetadaEfectiva (api). Hasta 0.72.1 el piloto trataba el yaml como suelo y la api dejaba mandar al artefacto: una clave salía de cuarentena para la api y seguía dentro para el piloto, que la volvía a sacar —y a alertar— en cada ciclo.",
+  "casos": [
+    {
+      "nombre": "sin entrada en el artefacto manda el yaml",
+      "clave": "BTCUSDT:4h", "yaml": ["4h"], "lista_blanca": [], "entrada": null,
+      "en_cuarentena": true, "opera": false
+    },
+    {
+      "nombre": "sin entrada y fuera del yaml, opera",
+      "clave": "BTCUSDT:15m", "yaml": ["4h"], "lista_blanca": [], "entrada": null,
+      "en_cuarentena": false, "opera": true
+    },
+    {
+      "nombre": "el artefacto veta por clave aunque el yaml no liste la temporalidad",
+      "clave": "BTCUSDT:15m", "yaml": [], "lista_blanca": [],
+      "entrada": { "quarantined": true, "base_quarantined": false },
+      "en_cuarentena": true, "opera": false
+    },
+    {
+      "nombre": "quitar la temporalidad del yaml no levanta un veto vigente",
+      "clave": "BTCUSDT:4h", "yaml": [], "lista_blanca": [],
+      "entrada": { "quarantined": true, "base_quarantined": true },
+      "en_cuarentena": true, "opera": false
+    },
+    {
+      "nombre": "salió por expediente con el yaml listándola: sigue fuera",
+      "clave": "BTCUSDT:4h", "yaml": ["4h"], "lista_blanca": [],
+      "entrada": { "quarantined": false, "base_quarantined": true },
+      "en_cuarentena": false, "opera": true
+    },
+    {
+      "nombre": "entrada anterior a base_quarantined: se asume decidida con el yaml vigente",
+      "clave": "BTCUSDT:4h", "yaml": ["4h"], "lista_blanca": [],
+      "entrada": { "quarantined": false },
+      "en_cuarentena": false, "opera": true
+    },
+    {
+      "nombre": "el yaml añade la temporalidad después de la decisión: vuelve a vetar",
+      "clave": "BTCUSDT:1h", "yaml": ["1h"], "lista_blanca": [],
+      "entrada": { "quarantined": false, "base_quarantined": false },
+      "en_cuarentena": true, "opera": false
+    },
+    {
+      "nombre": "entrada corrupta: manda el yaml (vetando)",
+      "clave": "BTCUSDT:4h", "yaml": ["4h"], "lista_blanca": [],
+      "entrada": { "quarantined": "sí" },
+      "en_cuarentena": true, "opera": false
+    },
+    {
+      "nombre": "entrada corrupta: manda el yaml (sin vetar)",
+      "clave": "BTCUSDT:30m", "yaml": [], "lista_blanca": [],
+      "entrada": [],
+      "en_cuarentena": false, "opera": true
+    },
+    {
+      "nombre": "fuera de la lista blanca no es cuarentena, pero no opera",
+      "clave": "BTCUSDT:1d", "yaml": [], "lista_blanca": ["ETHUSDT:1d", "SOLUSDT:1d"],
+      "entrada": null,
+      "en_cuarentena": false, "opera": false
+    },
+    {
+      "nombre": "dentro de la lista blanca y sin cuarentena, opera",
+      "clave": "ETHUSDT:1d", "yaml": [], "lista_blanca": ["ETHUSDT:1d", "SOLUSDT:1d"],
+      "entrada": { "quarantined": false, "base_quarantined": false },
+      "en_cuarentena": false, "opera": true
+    },
+    {
+      "nombre": "la lista blanca no levanta una cuarentena",
+      "clave": "ETHUSDT:1d", "yaml": [], "lista_blanca": ["ETHUSDT:1d", "SOLUSDT:1d"],
+      "entrada": { "quarantined": true, "base_quarantined": false },
+      "en_cuarentena": true, "opera": false
+    }
+  ]
+}
