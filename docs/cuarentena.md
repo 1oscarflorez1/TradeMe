@@ -275,6 +275,9 @@ a ser un **suelo**: puede vetar una temporalidad entera, pero quitarla de la lis
 veto vigente. Una cuarentena se levanta con evidencia, no editando un fichero; la vía manual, si
 hiciera falta, es borrar la entrada del artefacto.
 
+(Ese «suelo» se implementó demasiado literal en el piloto, y la api nunca lo aplicó: ver *Un estado,
+dos lectores*, más abajo.)
+
 Medido sobre los datos reales antes de entregarlo: **ninguna clave cambia de estado** —nadie sale ni
 entra de golpe—, seis pasan a juzgarse por su expediente sombra, y las alertas falsas de «entra en
 cuarentena» que se disparaban en cada pasada del piloto caen **de 6 por ciclo a 0**.
@@ -285,6 +288,46 @@ sombra y `BTCUSDT:1h` con 31. Sin el destrabe habrían cruzado el mínimo y segu
 **Y la causa de fondo era una duplicación.** El informe sabía leer el artefacto por clave y el
 gobierno no: dos copias de la misma regla que discrepaban. Ahora el informe delega en la del
 gobierno, y su marca `⚠ ATRAPADA` se queda como **detector de regresión** — debe dar siempre 0.
+
+### Un estado, dos lectores (v0.72.2)
+
+El «suelo» del destrabe se quedó a medias. En el piloto era absoluto: si la temporalidad estaba en el
+yaml, la clave estaba vetada, dijera lo que dijera el artefacto. En la api, en cambio, **mandaba el
+artefacto**. Cuando `BTCUSDT:4h` —heredada del yaml— demostró su salida con la sombra, la api la dio
+por fuera y el piloto la siguió dando por dentro: la volvía a sacar en cada pasada, con alerta.
+
+**Medido en producción el 14 de septiembre de 2026:** 3.030 alertas de cuarentena acumuladas desde
+agosto, 1.100 de ellas de «4h: sale de cuarentena». Y un efecto más callado: desde la lista blanca
+(0.70.0), el piloto trataba «fuera de la lista» como «vetada», juzgaba esas claves con la puerta de
+**salida** y, sin muestra, publicaba que seguían en cuarentena. Así acabaron «en cuarentena» siete
+claves —`BTCUSDT:1d`, `BNBUSDT:1d`, `BTCUSDT:1w` y las de 1m y 5m— que no registran ni una
+alerta de entrada.
+
+**La regla, ahora única** —`quarantine_policy.en_cuarentena` y `estadoCuarentena` en la api, con los
+mismos casos en `packages/core-signals/parity/cuarentena_vectors.json`—:
+
+| situación | estado |
+|---|---|
+| sin entrada en el artefacto | lo que diga el yaml |
+| con entrada | lo que diga el artefacto |
+| con entrada decidida **sin** el yaml listando la temporalidad, y ahora la lista | vetada: el yaml la ha añadido |
+
+Cada entrada guarda `base_quarantined`, si el yaml listaba su temporalidad al decidir. Es lo que
+permite las tres cosas a la vez: añadir una temporalidad al yaml veta (lo que hizo 0.68.0 con 15m,
+30m y 1h), quitarla no levanta nada, y una clave heredada puede salir con su sombra y quedarse fuera.
+
+Y el gobierno separa dos preguntas que antes compartían variable:
+
+- **¿Está en cuarentena?** Decide la puerta —salida o entrada— y si hay cambio. `changed` compara
+  con el estado publicado, así que **una alerta por cambio, no por ciclo**. Con la clave en el
+  título: «4h: sale de cuarentena» no decía de qué activo.
+- **¿Qué expediente la describe?** Si está en cuarentena, su sombra. Si opera, lo real. Si no está
+  en cuarentena pero la lista blanca no la deja operar, **la puerta de entrada sobre su sombra**: es
+  lo que habría hecho, y su expediente real está congelado. No se publica como cuarentena.
+
+Simulado sobre producción antes de entregarlo: dos ciclos, **0 alertas**, ningún estado publicado
+cambia. El artefacto guarda además el umbral de salida que de verdad se exigió: en las
+estructurales decía +0,05 donde la decisión había pedido el P95 de la nula.
 
 ## Estado actual
 
@@ -330,10 +373,15 @@ entre el 17 y el 22 de agosto de 2026 seis claves quedaron vetadas sin vía de v
 arregló la v0.47.0. Reversible en el papel y condena en la práctica.)
 
 **¿Cómo se levanta una cuarentena a mano?**
-Borrando su entrada de `quarantine.json`. Quitar la temporalidad de `quarantine_intervals` en el
-`ensemble.yaml` **no basta** desde v0.47.0: el yaml es un suelo, no un techo. Puede meter en
-cuarentena una temporalidad entera, pero no sacar de ella a quien ya está dentro — para eso está el
-expediente sombra.
+Borrando su entrada de `quarantine.json`, siempre que su temporalidad no esté en
+`quarantine_intervals`: sin entrada manda el yaml. Quitar la temporalidad del yaml **no basta**:
+puede meter en cuarentena una temporalidad entera, pero no sacar de ella a quien ya está dentro —
+para eso está el expediente sombra.
+
+**¿Y si una clave heredada del yaml sale con su sombra?**
+Queda fuera, para la api y para el piloto, aunque la temporalidad siga en el yaml. Desde v0.72.2 la
+entrada recuerda con qué yaml se decidió (`base_quarantined`), y solo una temporalidad **añadida**
+al yaml después vuelve a vetarla.
 
 **¿Las decisiones en cuarentena cuentan para la expectancy?**
 No. Ni las reales (no hay ninguna: no se opera) ni las sombra (están en columnas separadas
