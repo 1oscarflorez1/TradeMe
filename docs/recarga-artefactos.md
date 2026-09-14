@@ -80,11 +80,11 @@ seguían usando ese modo aunque `meta_policy.json` cambiara y se recargara. Ahor
 |---|---|
 | Propagación del bind mount: el piloto escribe, la api ve el nuevo mtime | **83 ms** y **18 ms** (dos publicaciones, 14-sep-2026) |
 | Sondeo | como mucho `ARTIFACTS_POLL_MS`, 15 s por defecto |
-| Del disco a la memoria de la api, en producción | **9,3 s** (escrito 16:12:56.004, en memoria 16:13:05.291) |
+| Del disco a la memoria de la api, en producción | **9,3 s** y **2,6 s** en dos publicaciones (16:12:56 y 16:28:18) |
 | Antes de 0.73.0 | hasta el siguiente despliegue (68 min en el caso de BNBUSDT:4h) |
 
 La cota es **intervalo + propagación**: unos 15 segundos como mucho y 7,5 de media, porque la
-publicación cae en un punto cualquiera del intervalo. Los 9,3 s medidos están dentro. Frente a un ciclo
+publicación cae en un punto cualquiera del intervalo. Las dos medidas, 9,3 y 2,6 s, están dentro. Frente a un ciclo
 de piloto de ~15 minutos, bajar el intervalo apenas cuesta pero no cambia nada que importe.
 
 **Cómo se midió antes de desplegar.** El módulo `vigilancia.ts` de esta versión, transpilado, se

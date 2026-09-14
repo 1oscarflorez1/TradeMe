@@ -39,8 +39,8 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 
 - Propagación del bind mount entre contenedores: **83 ms** y **18 ms** en dos publicaciones.
 - Del disco a la memoria de la api con el módulo nuevo, sobre el `quarantine.json` de producción:
-  **9,3 s** (el piloto escribió a las 16:12:56.004; en memoria a las 16:13:05.291), dentro de la cota
-  de intervalo + propagación. Medido ejecutando el módulo en solo lectura en el contenedor de la api
+  **9,3 s** y **2,6 s** en dos publicaciones (16:12:56 y 16:28:18), dentro de la cota de intervalo +
+  propagación. Medido ejecutando el módulo en solo lectura en el contenedor de la api
   de producción, antes de desplegar.
 - Antes: hasta el siguiente despliegue. `BNBUSDT:4h` salió de cuarentena a las 12:30:33 y la api no
   lo cargó hasta el reinicio de las 13:38:19.
