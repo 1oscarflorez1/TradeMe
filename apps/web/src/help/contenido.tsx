@@ -732,7 +732,7 @@ export const GLOSARIO: Array<[string, string, string]> = [
   ['ONNX', 'ML', 'Formato estándar para ejecutar modelos entrenados de forma rápida y portable.'],
   ['Funding rate', 'Fundamental', 'Coste de financiación de los perpetuos; refleja el posicionamiento del mercado.'],
   ['Sesgo macro', 'Fundamental', 'Inclinación de fondo (funding + tendencia semanal), inyectada en los logits.'],
-  ['Fundamental Score', 'Fundamental', 'Percentil del funding a 90 días. Solo penaliza compras; hoy en sombra, sin influir.'],
+  ['Fundamental Score', 'Fundamental', 'Percentil del funding a 90 días. Solo penalizaría compras. Retirado en 0.75.0: auditado en walk-forward, no mejoraba las compras.'],
   ['Modo sombra', 'Método', 'Se calcula y se registra sin influir, para poder demostrar que merece influir.'],
   ['Apuestas efectivas', 'Riesgo', 'Cuántas apuestas independientes son varias señales que se mueven juntas.'],
   ['Correlación', 'Riesgo', 'Cuánto se parecen los movimientos de dos activos: 1 es idéntico, 0 es sin relación.'],

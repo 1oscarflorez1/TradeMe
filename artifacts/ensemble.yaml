@@ -217,8 +217,20 @@ macro:
 # `absorbs_funding` gobierna además la migración: al pasar a `active`, el funding sale de `macro`
 # (funding_weight -> 0) y su peso se transfiere a trend_weight. Sin esa transferencia |bias| <= 0,5
 # y el escudo macro, que exige |bias| > conflict_threshold, no volvería a dispararse nunca.
+#
+# RETIRADO en 0.75.0 (mode: 'off'): ni la api lo calcula ni el piloto publica su distribucion ni lo
+# gobierna. Auditoria walk-forward (trademe_quant.run_fundamental_estudio), 5 semanas y 1.224 largos
+# TP/SL registrados en vivo, contra una regla fijada ANTES de medir:
+#
+#   AUC en largos                 0,421      se exige >= 0,55 (el azar alcanza 0,619)
+#   mejora de lo que conservaria  -0,101 R   se exige > max(0,05; P95 del azar +0,317)
+#   AUC dentro de cada semana     0,552      se exige >= 0,55 (la unica que cumple, justo)
+#
+# Descartaba sobre todo en las semanas en que los largos ganaban: el funding alto acompano a las
+# semanas alcistas. Y "como les fue a los largos la semana pasada" ordena mejor (AUC 0,633).
+# Ver docs/fundamental.md. Para reactivarlo: repetir el estudio con mas historico.
 fundamental:
-  mode: 'shadow'
+  mode: 'off'
   w_fund: 0.5
   start: 0.3333333333333333
   window_days: 90
