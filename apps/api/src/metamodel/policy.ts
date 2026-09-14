@@ -37,6 +37,17 @@ export class MetaPolicy {
   }
 }
 
+/**
+ * El modo con el que la api aplica el meta-modelo: el de su gobierno, o `off` si está retirado.
+ *
+ * Retirarlo es una decisión de configuración (`metamodel.enabled` en `ensemble.yaml`), no del
+ * gobierno automático: el gobierno decide cuánto confiar en un modelo que se sigue midiendo; la
+ * bandera dice que no hay nada que medir. Con `off` no se calcula `meta_confidence` ni se muestra.
+ */
+export function modoEfectivo(activo: boolean, politica: Pick<MetaPolicy, 'mode'>): MetaMode {
+  return activo ? politica.mode : 'off';
+}
+
 function idx(m: MetaMode): number {
   const i = ORDER.indexOf(m);
   return i === -1 ? 1 : i;
