@@ -1,5 +1,10 @@
 # Meta-modelo (Módulo 2) — inferencia en vivo
 
+> **Retirado en 0.74.0.** Ni el piloto lo reentrena ni la api lo aplica (`metamodel.enabled: false`
+> en `ensemble.yaml`). En walk-forward no supera al azar y pierde contra una regla que solo mira qué
+> dirección ganó la semana pasada. Ver [Retirado](#retirado-0740) al final. El resto del documento
+> describe cómo funcionaba y cómo funcionaría si se reactivara.
+
 > Decisión de arquitectura: **el entrenamiento vive 100 % en Python** (`apps/quant`); el motor en
 > vivo (Node) solo **evalúa** un artefacto plano publicado. Sin dependencias nativas, sin salto de
 > red y con paridad Node≡Python verificada en CI. Es el mismo patrón que ya usan `ensemble.yaml` y
@@ -99,8 +104,9 @@ entrenando en memoria:
 - **Y entrena con lo que ya no opera**: de las 632 filas de entrenamiento, 496 son de 15m y 30m y solo
   23 de 1d, la única temporalidad que opera desde 0.70.0.
 
-El gobierno hizo lo que debía: no publicó el modelo y mantiene el modo en `shadow`. El publicado es
-el del 5-sep.
+El gobierno hizo lo que debía: no publicó el modelo y mantiene el modo en `shadow`. Pero un solo
+corte temporal no basta para decidir, así que se repitió la pregunta semana a semana: ver
+[Retirado](#retirado-0740).
 
 ## Campos en la señal
 
@@ -113,3 +119,65 @@ En el Panel aparece como un chip 🧠 junto a la decisión.
 
 `predictForest` (Node) y `predict_forest` (Python) se verifican con vectores dorados en
 `packages/core-signals/parity/macro_vectors.json` → sección `metamodel`. Si divergen, CI falla.
+
+## Retirado (0.74.0)
+
+### La pregunta y la regla, antes de medir
+
+¿Ordena el meta-modelo las decisiones mejor que el azar, en las condiciones en que lo usaría el
+piloto? `trademe_quant.run_metamodelo_estudio` lo mide en **walk-forward semanal**: cada semana se
+juzga con un modelo entrenado solo con las anteriores, con el mismo bosque y el mismo procedimiento
+de umbral que producción. Usa desenlaces reales y de sombra —las decisiones vetadas también se
+tomaron, con las mismas features—, una fila por vela (primera captura), solo reproducibles y en R
+neta.
+
+La regla se fijó **antes** de ver ningún número. Se queda solo si cumple las tres:
+
+1. AUC agregada ≥ 0,55, el mismo listón que su gobierno exige para ascender.
+2. Mejora de expectancy filtrando por encima del P95 del azar filtrando las mismas operaciones, por
+   bloques diarios.
+3. AUC ≥ 0,55 **dentro de cada dirección**. Si solo ordena mezclando largos y cortos, lo que ordena
+   es la deriva del mercado.
+
+### Lo medido (14-sep-2026)
+
+6 semanas, 3.937 decisiones y 3.027 TP/SL juzgadas fuera de muestra:
+
+| | meta-modelo | listón |
+|---|---|---|
+| AUC agregada | **0,528** | ≥ 0,55; el azar alcanza 0,535 |
+| Mejora de expectancy filtrando | **−0,022 R** | > +0,139, el P95 del azar |
+| AUC solo en largos | 0,580 | ≥ 0,55 |
+| AUC solo en cortos | **0,523** | ≥ 0,55 |
+| Referencia: «la dirección que ganó la semana pasada» | **0,562** | — |
+
+No cumple ninguna. Y lo más elocuente es la última fila: una regla de una línea que solo sabe qué
+dirección ganó la semana anterior ordena mejor que el bosque. Filtrar con él **empeora** la
+expectancy.
+
+La única AUC alta por temporalidad es la de 4h, 0,69 con 128 filas: una de siete comparaciones, con
+muestra corta, en una temporalidad que no opera. No es base para reactivar nada.
+
+Encaja con lo que ya decían [`metamodelo-diagnostico.md`](metamodelo-diagnostico.md) —no estaba
+invertido, no aprende— y [`habilidad-direccional.md`](habilidad-direccional.md): no hay habilidad
+direccional que filtrar, hay deriva.
+
+### Qué cambia
+
+- **El piloto** no reentrena el meta-modelo ni evalúa su sombra ni gobierna su modo. Lo dice en el
+  log: `meta-modelo retirado (metamodel.enabled: false)`.
+- **La api** lo aplica en modo `off`: no calcula `meta_confidence`, no aparece el chip 🧠 y `/status`
+  lo marca como desactivado. La bandera se lee del yaml, que la api recarga sola, así que el cambio
+  no necesita reinicio.
+- **No se borra nada**: ni el código, ni el último artefacto publicado, ni `meta_policy.json`.
+
+### Cómo reactivarlo
+
+Repetir el estudio con más histórico y, **solo si cumple la regla de arriba**, poner
+`metamodel.enabled: true`. Relajar la regla después de ver el resultado sería el mismo sesgo que
+retiró las configuraciones optimizadas.
+
+```
+docker exec trademe-prod-quant-1 python -m trademe_quant.run_metamodelo_estudio
+```
+

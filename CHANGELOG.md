@@ -7,6 +7,40 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.74.0] — 2026-09-14
+
+> **Se retira el meta-modelo.** Medido en walk-forward semanal contra una regla fijada antes de ver
+> los números, no supera al azar, filtrar con él empeora la expectancy y pierde contra una regla que
+> solo mira qué dirección ganó la semana pasada.
+
+### Added — Estudio walk-forward del meta-modelo
+
+- Nuevo `trademe_quant.run_metamodelo_estudio`: cada semana se juzga con un modelo entrenado solo
+  con las anteriores, con el mismo bosque y el mismo umbral que producción. Desenlaces reales y de
+  sombra, una fila por vela, reproducibles y en R neta.
+- Regla fijada antes de medir: AUC agregada ≥ 0,55, mejora por encima del P95 del azar (bloques
+  diarios) y AUC ≥ 0,55 dentro de cada dirección, para no confundir deriva con habilidad.
+- 12 tests, incluidos uno con una señal real, que la regla acepta, y otro con pura deriva
+  direccional, que rechaza.
+
+### Medido — 14-sep-2026, 6 semanas, 3.027 decisiones TP/SL fuera de muestra
+
+- AUC agregada **0,528**; el azar alcanza 0,535.
+- Mejora filtrando **−0,022 R**; el azar alcanza +0,139.
+- AUC solo en cortos **0,523** (en largos 0,580).
+- «La dirección que ganó la semana pasada», como referencia: AUC **0,562**, mejor que el bosque.
+- Única AUC alta por temporalidad: 4h, 0,69 con 128 filas, una de siete comparaciones y una
+  temporalidad que no opera.
+
+### Changed — Meta-modelo retirado
+
+- `metamodel.enabled: false` en `ensemble.yaml`, con la medición en el comentario.
+- **Piloto:** no reentrena, no evalúa su sombra ni gobierna su modo, y lo dice en el log.
+- **api:** lo aplica en modo `off`, así que no calcula `meta_confidence` ni muestra el chip, y
+  `/status` lo marca como desactivado. La bandera se relee con el yaml, sin reinicio.
+- No se borra nada. Para reactivarlo, repetir el estudio y que cumpla la regla: ver
+  `docs/metamodelo.md`.
+
 ## [0.73.1] — 2026-09-14
 
 > Una cifra publicada con 0.72.0 estaba mal, y en sentido contrario: decía que la reescritura del
