@@ -613,10 +613,19 @@ function AutomationSection() {
         <span className="reg-chip" title="El piloto recalibra siempre tras promover parámetros nuevos y por mantenimiento periódico">
           Calibración <strong>{fmtH(st.hours_since_calibration ?? null)}</strong>
         </span>
-        <span className="reg-chip" title="Reentrenamiento del meta-modelo con los registros evaluados nuevos">
-          Meta-modelo <strong>{fmtH(st.hours_since_metamodel ?? null)}</strong>
-        </span>
-        {st.meta_policy?.mode && (
+        {st.meta_policy?.retirado ? (
+          <span
+            className="reg-chip"
+            title="Retirado en 0.74.0: ni el piloto lo reentrena ni la api lo aplica. Se reactiva con metamodel.enabled en ensemble.yaml, si un nuevo estudio lo justifica."
+          >
+            Meta-modelo <strong>retirado</strong>
+          </span>
+        ) : (
+          <span className="reg-chip" title="Reentrenamiento del meta-modelo con los registros evaluados nuevos">
+            Meta-modelo <strong>{fmtH(st.hours_since_metamodel ?? null)}</strong>
+          </span>
+        )}
+        {st.meta_policy?.mode && !st.meta_policy.retirado && (
           <span
             className="reg-chip"
             title="El sistema asciende solo este modo cuando el meta-modelo demuestra ventaja con tus propias decisiones: sombra (solo observa) → modular (ajusta la confianza) → veto (descarta señales poco fiables). Si empeora, retrocede."
@@ -627,7 +636,8 @@ function AutomationSection() {
       </div>
       {st.meta_policy?.reason && (
         <p className="bt-runmsg">
-          🧠 <strong>Modo {st.meta_policy.mode}</strong> · {st.meta_policy.reason}
+          🧠 <strong>{st.meta_policy.retirado ? 'Meta-modelo retirado' : `Modo ${st.meta_policy.mode}`}</strong> ·{' '}
+          {st.meta_policy.reason}
           {st.meta_policy.evidence?.n
             ? ` (${st.meta_policy.evidence.n} decisiones, mejora ${(st.meta_policy.evidence.lift ?? 0).toFixed(3)} R, AUC ${(st.meta_policy.evidence.auc ?? 0).toFixed(2)})`
             : ''}
@@ -636,7 +646,8 @@ function AutomationSection() {
       <p className="muted calib-legend">
         Ya no necesitas vigilar ni decidir cuándo pulsar: el piloto mide, evalúa tus registros,
         optimiza solo cuando toca (nunca promueve sin ganar en hold-out), **recalibra** tras cada
-        promoción y por mantenimiento, **reentrena el meta-modelo** con los registros nuevos, y te
+        promoción y por mantenimiento
+        {st.meta_policy?.retirado ? '' : ', **reentrena el meta-modelo** con los registros nuevos'}, y te
         avisa por la campana 🔔. Los botones quedan para cuando quieras un resultado inmediato.
       </p>
     </section>

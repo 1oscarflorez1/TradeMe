@@ -618,10 +618,36 @@ def _ciclo_metamodelo(dsn: str, cfg: AutoConfig, log: list[str]) -> None:
 _state: dict[str, object] = {"last_cycle": None, "last_log": [], "datos": []}
 
 
+#: Lo que el Laboratorio muestra del meta-modelo mientras esté retirado.
+MOTIVO_RETIRADA = (
+    "retirado en 0.74.0: en walk-forward no supera al azar ni a la dirección que ganó la semana "
+    "anterior (ver docs/metamodelo.md)"
+)
+
+
 def _meta_policy_summary() -> dict[str, object]:
+    """Resumen del meta-modelo para `/automation`, que es lo que pinta el Laboratorio.
+
+    Con el meta-modelo retirado no se lee `meta_policy.json`: guarda el último modo que decidió su
+    gobierno —`shadow`— y el Laboratorio lo seguía enseñando como si estuviera en marcha, con un
+    motivo y unas cifras de un modelo que ya no se aplica (0.74.1).
+    """
+    from .ensemble import load_ensemble, metamodelo_activo
     from .meta_policy import load_policy
 
     pol = load_policy(artifacts_dir())
+    try:
+        activo = metamodelo_activo(load_ensemble(artifacts_dir() / "ensemble.yaml"))
+    except Exception:  # noqa: BLE001 - un yaml ilegible no puede tumbar el estado del piloto
+        activo = True
+    if not activo:
+        return {
+            "mode": "off",
+            "retirado": True,
+            "reason": MOTIVO_RETIRADA,
+            "updated_at": pol.get("updated_at"),
+            "evidence": None,
+        }
     return {
         "mode": pol.get("mode"),
         "reason": pol.get("reason"),
