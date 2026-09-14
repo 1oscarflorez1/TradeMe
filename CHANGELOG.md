@@ -7,6 +7,73 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.74.0] — 2026-09-14
+
+> **Se retira el meta-modelo.** Medido en walk-forward semanal contra una regla fijada antes de ver
+> los números, no supera al azar, filtrar con él empeora la expectancy y pierde contra una regla que
+> solo mira qué dirección ganó la semana pasada.
+
+### Added — Estudio walk-forward del meta-modelo
+
+- Nuevo `trademe_quant.run_metamodelo_estudio`: cada semana se juzga con un modelo entrenado solo
+  con las anteriores, con el mismo bosque y el mismo umbral que producción. Desenlaces reales y de
+  sombra, una fila por vela, reproducibles y en R neta.
+- Regla fijada antes de medir: AUC agregada ≥ 0,55, mejora por encima del P95 del azar (bloques
+  diarios) y AUC ≥ 0,55 dentro de cada dirección, para no confundir deriva con habilidad.
+- 12 tests, incluidos uno con una señal real, que la regla acepta, y otro con pura deriva
+  direccional, que rechaza.
+
+### Medido — 14-sep-2026, 6 semanas, 3.027 decisiones TP/SL fuera de muestra
+
+- AUC agregada **0,528**; el azar alcanza 0,535.
+- Mejora filtrando **−0,022 R**; el azar alcanza +0,139.
+- AUC solo en cortos **0,523** (en largos 0,580).
+- «La dirección que ganó la semana pasada», como referencia: AUC **0,562**, mejor que el bosque.
+- Única AUC alta por temporalidad: 4h, 0,69 con 128 filas, una de siete comparaciones y una
+  temporalidad que no opera.
+
+### Changed — Meta-modelo retirado
+
+- `metamodel.enabled: false` en `ensemble.yaml`, con la medición en el comentario.
+- **Piloto:** no reentrena, no evalúa su sombra ni gobierna su modo, y lo dice en el log.
+- **api:** lo aplica en modo `off`, así que no calcula `meta_confidence` ni muestra el chip, y
+  `/status` lo marca como desactivado. La bandera se relee con el yaml, sin reinicio.
+- No se borra nada. Para reactivarlo, repetir el estudio y que cumpla la regla: ver
+  `docs/metamodelo.md`.
+
+## [0.73.1] — 2026-09-14
+
+> Una cifra publicada con 0.72.0 estaba mal, y en sentido contrario: decía que la reescritura del
+> histórico **empeoraba** ETHUSDT:1d cuando lo **mejoraba**.
+
+### Fixed — Las cifras de las claves operativas en el informe de la reescritura
+
+- `reevaluar_desenlaces` tomaba la primera captura **evaluada** de cada vela, no la primera captura,
+  que es la que se opera y la que usan el panel y el check 6. El 24-ago la primera captura de
+  ETHUSDT:1d fue un MANTENER sin plan: esa vela no se operó y aun así entraba.
+- Con la regla correcta, en las velas evaluadas cuando se aplicó la reescritura: ETHUSDT:1d pasa de
+  **−0,333 a −0,215 R netos** (5 velas; cambian 3, las mismas que detectó la medición de paridad) y
+  SOLUSDT:1d no cambia (6 velas, −0,023). Lo publicado era −0,191 → −0,235 con 6 velas y 4 cambios.
+- El informe recibe ahora los ids de la primera captura de cada vela. Sobre producción, en seco, da
+  al decimal lo mismo que el check 6: ETH 6 velas, −0,1308 bruta y −0,1550 neta; SOL 7, +0,0451 y
+  +0,0231. Corregidos `docs/reproducibilidad.md` y la entrada de 0.72.0.
+
+### Verificado — 0.73.0 en producción
+
+- Primeros dos ciclos del piloto tras desplegar: **12 recargas**, cada artefacto una vez por
+  publicación, retraso medio **8,0 s** y máximo **13,8 s**, dentro de la cota de 15 s. Ningún fichero
+  ilegible ni temporales abandonados.
+
+### Diagnóstico — El meta-modelo reentrenado da AUC 0,30
+
+- Por debajo de 0,5 ordena al revés, así que se revisó en solo lectura antes de darlo por bueno. **No
+  lo causó la reescritura**: con las etiquetas anteriores da 0,39. En el tramo de prueba (7-12 sep)
+  ganaron los cortos, y la feature «es largo» sola tiene AUC 0,24: el bosque aprende la deriva
+  direccional de julio y agosto, lo mismo que ya documentaba `habilidad-direccional.md`. Además, de
+  632 filas de entrenamiento solo 23 son de 1d, lo único que opera.
+- El gobierno actuó bien: no lo publicó y el modo sigue en `shadow`. Documentado en
+  `docs/metamodelo.md`.
+
 ## [0.73.0] — 2026-09-14
 
 > Lo que el piloto decidía llegaba a la api **en el siguiente despliegue**. La api leía la
@@ -167,8 +234,10 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - Horizonte equivocado, con causa confirmada: cuatro configuraciones optimizadas de BTC no tienen
   `horizon_by_tf` y, hasta 0.68.0, sustituían al yaml entero; la evaluación de todas las pendientes
   se lanzaba con la configuración de la clave del backtest y usaba el horizonte por defecto, 20.
-- ETHUSDT:1d pasa de −0,191 a −0,235 R netos (6 velas; cambian 4, todas timeouts) y SOLUSDT:1d no
-  cambia (7 velas). Muestras demasiado pequeñas para decir nada del rendimiento.
+- **Cifra corregida en 0.73.1.** Con la regla del panel —primera captura de cada vela— ETHUSDT:1d
+  **mejora** de −0,333 a −0,215 R netos (5 velas; cambian 3, todas timeouts) y SOLUSDT:1d no cambia
+  (6 velas). Aquí se publicó por error que empeoraba de −0,191 a −0,235. Muestras demasiado pequeñas
+  para decir nada del rendimiento.
 
 ### Operación
 

@@ -122,22 +122,36 @@ def _expectancy(rs: list[float]) -> str:
 
 
 def _primeras_por_vela(
-    resultados: list[Reevaluada], symbol: str, interval: str
+    resultados: list[Reevaluada], symbol: str, interval: str, primeras_capturas: set[str]
 ) -> list[Reevaluada]:
-    """Una fila por vela: la primera captura, que es la que se opera (ver `docs/salud-1d.md`)."""
-    primeras: dict[Any, Reevaluada] = {}
+    """Las velas operadas: su **primera captura**, la que se opera, si ya tiene desenlace.
+
+    La misma regla que el panel y el check 6 de salud (`docs/salud-1d.md`). Antes de 0.73.1 este
+    informe tomaba la primera captura **evaluada** de cada vela, porque solo recibe filas
+    evaluadas. No es lo mismo: el 24-ago la primera captura de ETHUSDT:1d fue un MANTENER sin plan,
+    esa vela no se operó, y aun así entró con la de las 01:51. Con ella el informe decía que ETH
+    empeoraba de −0,191 a −0,235 R netos; con la regla del panel **mejoraba** de −0,333 a −0,215.
+    """
     de_clave = [
         x
         for x in resultados
-        if x.fila.rama == "real" and x.fila.symbol == symbol and x.fila.interval == interval
+        if x.fila.rama == "real"
+        and x.fila.symbol == symbol
+        and x.fila.interval == interval
+        and str(x.fila.id) in primeras_capturas
     ]
-    for x in sorted(de_clave, key=lambda y: y.fila.captured_at):
-        primeras.setdefault(x.fila.candle_open or x.fila.captured_at, x)
-    return list(primeras.values())
+    return sorted(de_clave, key=lambda y: y.fila.captured_at)
 
 
-def informe(resultados: list[Reevaluada], coste_pct: float) -> list[str]:
-    """Lo que hay que ver antes de aplicar: cuánto cambia, dónde, y qué le pasa a lo que opera."""
+def informe(
+    resultados: list[Reevaluada], coste_pct: float, primeras_capturas: set[str]
+) -> list[str]:
+    """Lo que hay que ver antes de aplicar: cuánto cambia, dónde, y qué le pasa a lo que opera.
+
+    `primeras_capturas` son los ids de la primera captura de cada vela de las claves operativas,
+    evaluada o no (ver `primeras_capturas`). Es obligatorio a propósito: sin él no hay forma de
+    saber qué vela se operó.
+    """
     from .costes import coste_en_r
 
     lineas: list[str] = []
@@ -176,7 +190,7 @@ def informe(resultados: list[Reevaluada], coste_pct: float) -> list[str]:
         f"{'neta antes':>12}{'neta después':>14}"
     )
     for symbol, interval in CLAVES_OPERATIVAS:
-        primeras = _primeras_por_vela(resultados, symbol, interval)
+        primeras = _primeras_por_vela(resultados, symbol, interval, primeras_capturas)
         antes: list[float] = []
         despues: list[float] = []
         costes: list[float] = []
@@ -227,6 +241,21 @@ def leer_filas(conn: Any) -> list[Fila]:
                     )
                 )
     return filas
+
+
+def primeras_capturas(conn: Any) -> set[str]:
+    """Id de la primera captura de cada vela de las claves operativas, tenga desenlace o no."""
+    fuera: set[str] = set()
+    with conn.cursor() as cur:
+        for symbol, interval in CLAVES_OPERATIVAS:
+            cur.execute(
+                "SELECT DISTINCT ON (candle_open) id::text FROM snapshots "
+                "WHERE symbol=%s AND interval=%s AND candle_open IS NOT NULL "
+                "ORDER BY candle_open, captured_at ASC",
+                (symbol, interval),
+            )
+            fuera.update(str(r[0]) for r in cur.fetchall())
+    return fuera
 
 
 def aplicar(conn: Any, resultados: list[Reevaluada], destino: Path) -> tuple[Path, int]:
@@ -287,7 +316,7 @@ def main(argv: list[str] | None = None) -> None:
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         cache = _CacheSeries(conn)
         resultados = reevaluar(leer_filas(conn), cache.trayectoria, horizons)
-        for linea in informe(resultados, desde_config(base)):
+        for linea in informe(resultados, desde_config(base), primeras_capturas(conn)):
             print(linea)
         if not args.aplicar:
             print("\n  En seco: no se ha escrito nada. Para aplicar: --aplicar")

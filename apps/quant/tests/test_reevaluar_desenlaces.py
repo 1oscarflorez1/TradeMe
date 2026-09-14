@@ -88,7 +88,7 @@ def test_el_informe_cuenta_por_rama_y_temporalidad() -> None:
         clasificar(_fila("timeout", 0.5, sid=2), _tray([QUIETA] * 10)),
         clasificar(_fila("timeout", 0.5, sid=3, rama="sombra"), _tray([QUIETA], completa=False)),
     ]
-    texto = "\n".join(informe(resultados, 0.0))
+    texto = "\n".join(informe(resultados, 0.0, set()))
     assert "[real] 2 desenlaces · iguales 1 · cambian 1 · no recalculables 0" in texto
     assert "[sombra] 1 desenlaces · iguales 0 · cambian 0 · no recalculables 1" in texto
     assert "transiciones: timeout->timeout 1" in texto
@@ -101,17 +101,33 @@ def test_el_despues_de_las_operativas_es_lo_que_quedara_en_la_base() -> None:
         clasificar(_fila("timeout", 0.5, sid=1), _tray([QUIETA] * 10)),  # pasa a 0.0
         clasificar(_fila("timeout", 0.3, sid=2, captura=otro_dia), _tray([QUIETA], completa=False)),
     ]
-    linea = next(x for x in informe(resultados, 0.0) if x.strip().startswith("ETHUSDT:1d"))
+    linea = next(
+        x for x in informe(resultados, 0.0, {"1", "2"}) if x.strip().startswith("ETHUSDT:1d")
+    )
     velas, bruta_antes, bruta_despues = linea.split()[1:4]
     assert velas == "2"
     assert float(bruta_antes) == 0.4
     assert float(bruta_despues) == 0.15
 
 
+def test_una_vela_cuya_primera_captura_no_se_opero_no_cuenta() -> None:
+    """El caso del 24-ago-2026 en ETHUSDT:1d: la primera captura fue un MANTENER sin plan.
+
+    Una captura posterior de esa vela sí tenía plan y desenlace, pero esa vela no se operó. Antes de
+    0.73.1 el informe la contaba (desde entonces no), y daba ETH empeorando cuando mejoraba.
+    """
+    otra = CAPTURA + dt.timedelta(hours=1, minutes=51)
+    resultados = [
+        clasificar(_fila("timeout", 0.54, sid=10, captura=otra), _tray([QUIETA] * 10)),
+    ]
+    linea = next(x for x in informe(resultados, 0.0, {"9"}) if x.strip().startswith("ETHUSDT:1d"))
+    assert linea.split()[1] == "0"
+
+
 def test_el_neto_descuenta_el_coste_de_cada_operacion() -> None:
     """Entrada 100 y stop 95: 1 R son 5 de precio, y un 0,12 % de 100 son 0,024 R."""
     resultados = [clasificar(_fila("timeout", 0.5), _tray([QUIETA] * 10))]
-    linea = next(x for x in informe(resultados, 0.12) if x.strip().startswith("ETHUSDT:1d"))
+    linea = next(x for x in informe(resultados, 0.12, {"1"}) if x.strip().startswith("ETHUSDT:1d"))
     _, _, bruta_antes, bruta_despues, neta_antes, neta_despues = linea.split()
     assert abs(float(neta_antes) - (0.5 - 0.024)) < 1e-4
     assert abs(float(neta_despues) - (0.0 - 0.024)) < 1e-4

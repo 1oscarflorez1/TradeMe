@@ -198,16 +198,25 @@ el horizonte 20.
 
 ### En las claves que operan
 
-Primera captura de cada vela, rama real, expectancy en R:
+Primera captura de cada vela —la que se opera, la regla del panel y del check 6—, rama real,
+velas ya evaluadas cuando se aplicó la reescritura, expectancy en R:
 
 | clave | velas | bruta antes | bruta después | neta antes | neta después |
 |---|---|---|---|---|---|
-| ETHUSDT:1d | 6 | −0,167 | −0,210 | −0,191 | −0,235 |
-| SOLUSDT:1d | 7 | −0,143 | −0,143 | −0,165 | −0,165 |
+| ETHUSDT:1d | 5 | −0,308 | −0,190 | −0,333 | −0,215 |
+| SOLUSDT:1d | 6 | 0,000 | 0,000 | −0,023 | −0,023 |
 
-Cambian 4 velas de ETH, todas timeouts que siguen siéndolo: la del 21-ago pasa de +0,38 a +0,76, la
-del 24 de +0,54 a −0,31, la del 25 de −0,19 a +0,19 y la del 26 de +0,27 a +0,09. **Con 6 y 7 velas
-esto no dice nada del rendimiento**; lo que dice es que ahora vivo y backtest miden lo mismo.
+Cambian 3 velas de ETH, todas timeouts que siguen siéndolo: la del 21-ago pasa de +0,38 a +0,76, la
+del 25 de −0,19 a +0,19 y la del 26 de +0,27 a +0,09. Son exactamente las tres que había detectado la
+medición de paridad. **Con 5 y 6 velas esto no dice nada del rendimiento**; lo que dice es que ahora
+vivo y backtest miden lo mismo.
+
+> **Corregido en 0.73.1.** El informe en seco publicado con 0.72.0 decía que ETH pasaba de −0,191 a
+> −0,235 R netos con 6 velas y 4 cambios —empeoraba—, y SOL tenía 7 velas. Tomaba la primera captura
+> **evaluada** de cada vela, porque el informe solo recibía filas evaluadas. El 24-ago la primera
+> captura de ETH fue un MANTENER sin plan: esa vela no se operó, pero entró con la captura de las
+> 01:51. Con la regla del panel ETH **mejora**. El informe usa ya la primera captura, y sobre
+> producción da al decimal lo mismo que el check 6.
 
 ### Aplicada (13-sep-2026)
 

@@ -462,10 +462,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     components.push({
       key: 'meta',
       label: 'Meta-modelo (filtro ML)',
-      status: deps.metaModel?.ready ? 'ok' : 'na',
-      detail: deps.metaModel?.ready
-        ? `modo ${deps.metaMode ?? 'shadow'}${deps.metaPolicyReason?.() ? ` · ${deps.metaPolicyReason()}` : ''}`
-        : 'aún sin modelo publicado (necesita más registros evaluados)',
+      status: deps.metaModel?.ready && deps.metaMode !== 'off' ? 'ok' : 'na',
+      detail:
+        deps.metaMode === 'off'
+          ? 'desactivado: no puntúa ni filtra señales (retirado en 0.74.0, ver docs/metamodelo.md)'
+          : deps.metaModel?.ready
+            ? `modo ${deps.metaMode ?? 'shadow'}${deps.metaPolicyReason?.() ? ` · ${deps.metaPolicyReason()}` : ''}`
+            : 'aún sin modelo publicado (necesita más registros evaluados)',
     });
 
     // Notificaciones push

@@ -221,10 +221,8 @@ def _dsn() -> str:
 
 def run_cycle(cfg: AutoConfig) -> list[str]:
     """Una pasada: mide lo vencido y optimiza solo cuando toca. Devuelve un log."""
-    from .meta_policy import decide_mode, evaluate_shadow, load_policy, save_policy
     from .run_backtest import run_and_save
     from .run_calibration import calibrate_and_publish
-    from .run_metamodel import fetch_shadow_rows, train_and_publish
     from .run_optimize import optimize_and_publish
 
     log: list[str] = []
@@ -549,6 +547,25 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001
         log.append(f"error calibración: {err}")
 
+    _ciclo_metamodelo(dsn, cfg, log)
+    return log
+
+
+def _ciclo_metamodelo(dsn: str, cfg: AutoConfig, log: list[str]) -> None:
+    """Reentrena el meta-modelo y gobierna su modo, salvo que esté retirado en el yaml.
+
+    Retirado en 0.74.0 (`metamodel.enabled: false`): ver `ensemble.metamodelo_activo`. Con la
+    bandera apagada no se entrena, no se evalúa su sombra y no se publica nada, así que el piloto
+    deja de gastar el ciclo en un filtro que no supera al azar.
+    """
+    from .ensemble import load_ensemble, metamodelo_activo
+    from .meta_policy import decide_mode, evaluate_shadow, load_policy, save_policy
+    from .run_metamodel import fetch_shadow_rows, train_and_publish
+
+    if not metamodelo_activo(load_ensemble(artifacts_dir() / "ensemble.yaml")):
+        log.append("meta-modelo retirado (metamodel.enabled: false): ni se entrena ni se aplica")
+        return
+
     # Meta-modelo (Módulo 2): reentrena con los registros nuevos; publica solo si mejora.
     try:
         mm_age = _hours_since_file("metamodel.json")
@@ -596,7 +613,6 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
                     )
     except Exception as err:  # noqa: BLE001
         log.append(f"error meta-modelo: {err}")
-    return log
 
 
 _state: dict[str, object] = {"last_cycle": None, "last_log": [], "datos": []}

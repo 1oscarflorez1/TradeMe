@@ -53,7 +53,7 @@ import { intervalMs } from './domain/candle.js';
 import type { Signal } from './domain/signal.js';
 import { Calibrators } from './calibration/load.js';
 import { MetaModel } from './metamodel/apply.js';
-import { MetaPolicy } from './metamodel/policy.js';
+import { MetaPolicy, modoEfectivo } from './metamodel/policy.js';
 import { MacroStore } from './macro/store.js';
 import { Fundamentals } from './ensemble/fundamental.js';
 import { FundamentalPolicy } from './ensemble/fundamental-policy.js';
@@ -165,6 +165,9 @@ async function main(): Promise<void> {
   const fundamentals = Fundamentals.load(join(artifactsDir, 'fundamental'));
   const metaModel = MetaModel.load(env.METAMODEL_PATH);
   const metaPolicy = MetaPolicy.load(env.META_POLICY_PATH, env.META_MODE);
+  // Se evalúa en cada uso: `ensemble` se recarga en caliente, así que retirar o reactivar el
+  // meta-modelo en el yaml se aplica sin reiniciar.
+  const modoMeta = () => modoEfectivo(ensemble.metamodelEnabled, metaPolicy);
   // Captura automática server-side: registra decisiones operables aunque nadie tenga el portal
   // abierto. Es lo que mantiene vivo el dataset del meta-modelo.
   const captureIntervals = new Set(env.AUTO_CAPTURE_INTERVALS.split(',').map((x) => x.trim()));
@@ -298,7 +301,7 @@ async function main(): Promise<void> {
     // Getter, no valor: con el valor, /signal y /health se quedaban con el modo del arranque aunque
     // meta_policy.json cambiara y se recargara.
     get metaMode() {
-      return metaPolicy.mode;
+      return modoMeta();
     },
     metaPolicyReason: () => metaPolicy.reason,
     captureInfo: () => ({
@@ -426,7 +429,7 @@ async function main(): Promise<void> {
                   funding: fundingStore.get(symbol),
                   calibrators,
                   metaModel,
-                  metaMode: metaPolicy.mode,
+                  metaMode: modoMeta(),
                   metaVetoThreshold: env.META_VETO_THRESHOLD,
                   metaModulateWeight: env.META_MODULATE_WEIGHT,
                 })
@@ -480,7 +483,7 @@ async function main(): Promise<void> {
                   funding: fundingStore.get(symbol),
                   calibrators,
                   metaModel,
-                  metaMode: metaPolicy.mode,
+                  metaMode: modoMeta(),
                   metaVetoThreshold: env.META_VETO_THRESHOLD,
                   metaModulateWeight: env.META_MODULATE_WEIGHT,
                 });
@@ -535,7 +538,7 @@ async function main(): Promise<void> {
                 }
               }
               case 'estado_del_sistema':
-                return { proveedores: providers.info(), metaModo: metaPolicy.mode, motivo: metaPolicy.reason };
+                return { proveedores: providers.info(), metaModo: modoMeta(), motivo: metaPolicy.reason };
               case 'uso_por_temporalidad': {
                 const st = await snapshotsRepo?.stats(symbol).catch(() => null);
                 const porTf = new Map((st?.porTf ?? []).map((t) => [t.interval, t.total]));
@@ -662,7 +665,7 @@ async function main(): Promise<void> {
         funding: fundingStore.get(symbol),
         calibrators,
         metaModel,
-        metaMode: metaPolicy.mode,
+        metaMode: modoMeta(),
         metaVetoThreshold: env.META_VETO_THRESHOLD,
         metaModulateWeight: env.META_MODULATE_WEIGHT,
       });

@@ -103,3 +103,10 @@ medición dice además que no habría funcionado — no hay señal que invertir.
 - [metamodelo.md](metamodelo.md) — qué es y cómo se gobierna
 - [independencia.md](independencia.md) — por qué seis votos son 1,41, y el control de ruido
 - [correlaciones.md](correlaciones.md) — la misma idea aplicada a las observaciones
+
+## Cerrado en 0.74.0
+
+El walk-forward semanal de 14-sep-2026 confirmó este diagnóstico con otra muestra y otro método
+—AUC 0,528 frente a un P95 del azar de 0,535, y peor que «la dirección que ganó la semana pasada»—, y
+el meta-modelo se retiró. Ver [`metamodelo.md`](metamodelo.md#retirado-0740).
+
