@@ -7,6 +7,30 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.74.1] — 2026-09-14
+
+> Desplegado 0.74.0, el meta-modelo quedó retirado en el piloto y en la api, pero **el Laboratorio
+> seguía enseñándolo en modo sombra**.
+
+### Verificado — 0.74.0 en producción
+
+- Primer ciclo del piloto tras desplegar (19:20 UTC): `meta-modelo retirado (metamodel.enabled:
+  false): ni se entrena ni se aplica`. `metamodel.json` sigue siendo el del 5-sep y `meta_policy.json`
+  no se ha vuelto a escribir.
+- La api resuelve el modo a `off` con el yaml desplegado aunque su gobierno decía `shadow`: de las
+  capturas posteriores al despliegue, **0 de 18** llevan `meta_confidence`, frente a 73 de 73 antes.
+  Ningún error en su log.
+
+### Fixed — El Laboratorio mostraba el meta-modelo en modo sombra
+
+- `/automation` resumía el meta-modelo leyendo `meta_policy.json`, que se quedó con el último modo que
+  decidió su gobierno. El Laboratorio enseñaba «Filtro ML shadow», el motivo y las cifras de un
+  modelo que ya no se aplica, y un contador de horas desde el último reentrenamiento que no iba a
+  parar de crecer.
+- Con el meta-modelo retirado, el resumen devuelve `mode: off` y `retirado: true` con el motivo de
+  la retirada, y el Laboratorio muestra «Meta-modelo retirado» en lugar del contador y del modo.
+- 2 tests: retirado no se presenta como sombra; activo sigue leyendo su política.
+
 ## [0.74.0] — 2026-09-14
 
 > **Se retira el meta-modelo.** Medido en walk-forward semanal contra una regla fijada antes de ver
