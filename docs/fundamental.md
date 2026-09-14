@@ -1,6 +1,10 @@
 # Fundamental Score — el funding, y solo contra los largos (M12)
 
-> Estado: **en sombra**. Se calcula, se registra y **no influye en ninguna decisión**.
+> Estado: **retirado en 0.75.0** (`fundamental.mode: 'off'`). La api no lo calcula y el piloto ni
+> publica su distribución ni lo gobierna. Auditado en walk-forward contra una regla fijada antes de
+> medir, lo que habría dejado abrir rendía menos que todo. Ver
+> [Auditoría y retirada](#auditoría-walk-forward-y-retirada-0750). El resto del documento describe
+> cómo funcionaba.
 
 ## Qué se midió antes de programar nada
 
@@ -214,11 +218,80 @@ La transferencia del peso no es cosmética. Sin ella `|bias| ≤ 0,5`, y el **es
 `|bias| > conflict_threshold`, hoy 0,5— no volvería a dispararse jamás. Se habría desactivado una
 salvaguarda sin que nadie lo decidiera ni lo notara.
 
+## Auditoría walk-forward y retirada (0.75.0)
+
+### El método, el mismo que retiró el meta-modelo
+
+`trademe_quant.run_fundamental_estudio` juzga semana a semana lo que el score registró en vivo desde
+el 19-ago-2026: una fila por vela (primera captura), desenlaces reales y de sombra reproducibles, en
+R neta. Dos diferencias con el estudio del meta-modelo, las dos por la naturaleza del score:
+
+- **No se entrena.** Es una fórmula fija sobre un percentil de los 90 días anteriores a cada
+  decisión, así que cada semana ya es fuera de muestra.
+- **Solo actúa sobre los largos.** En los cortos no descarta nada, así que el control por dirección
+  pasa a ser que el efecto en largos **se mantenga dentro de cada semana**. Si solo aparece
+  mezclando semanas, es deriva.
+
+La regla, fijada antes de ejecutarlo: se queda solo si **AUC en largos ≥ 0,55**, **mejora de lo
+conservado > máx(0,05 R; P95 del azar por bloques diarios)** y **AUC en largos dentro de cada semana
+≥ 0,55**.
+
+### Lo medido (14-sep-2026)
+
+5 semanas, 1.482 largos (1.224 con TP/SL), 601 de ellos descartados por el score:
+
+| | Fundamental Score | listón |
+|---|---|---|
+| AUC en largos | **0,421** | ≥ 0,55; el azar alcanza 0,619 |
+| Mejora de lo que conservaría | **−0,101 R** | > máx(0,05; +0,317) |
+| AUC en largos dentro de cada semana | 0,552 | ≥ 0,55 |
+| Referencia: expectancy de los largos la semana anterior | **0,633** | — |
+| Control: AUC en cortos (no descarta ninguno) | 0,543 | — |
+
+| semana | largos | descartados | expectancy | AUC | mejora |
+|---|---|---|---|---|---|
+| W34 | 334 | 231 | +0,310 | 0,582 | +0,280 |
+| W35 | 133 | 80 | +0,481 | 0,566 | +0,232 |
+| W36 | 162 | 76 | −0,007 | 0,478 | +0,030 |
+| W37 | 739 | 174 | −0,647 | 0,557 | +0,010 |
+| W38 | 114 | 40 | −0,133 | 0,531 | −0,198 |
+
+**Falla dos de las tres condiciones.** Y la tabla por semanas enseña por qué, sin necesidad de
+interpretarla mucho: dentro de cada semana hay una ordenación débil —0,552 de media, justo en el
+listón—, pero **el score descartaba sobre todo en las semanas en que los largos ganaban**. En W34
+descartó 231 de 334 con una expectancy de +0,31 R; en W37, la peor semana, solo 174 de 739. El
+funding alto acompañó a las semanas alcistas, que es lo contrario de lo que el score supone. Al
+agregar, lo que deja abrir rinde **0,101 R menos** que todo, y una regla trivial que solo mira cómo
+les fue a los largos la semana anterior ordena mucho mejor.
+
+El gobierno del score lo medía con su propio estadístico (las descartadas aportan 0): +0,029 R,
+frente a un azar de +0,112. Tampoco pasaba.
+
+### Qué cambia
+
+- `fundamental.mode: 'off'` en `ensemble.yaml`, con la medición en el comentario.
+- **La api** no calcula el score ni registra su sombra; el panel dice «Fundamental Score apagado».
+  El funding sigue en el sesgo macro, que solo lo cedía con el score activo.
+- **El piloto** no publica la distribución del funding ni gobierna el modo, y lo dice en el log. La
+  ingesta del funding de la Data Intelligence Layer sigue: la usan otros estudios.
+- No se borra nada: ni el código, ni los artefactos `fundamental/*.json`, ni `fundamental_policy.json`.
+
+### Cómo reactivarlo
+
+Repetir el estudio con más histórico y poner `mode: 'shadow'` solo si cumple la regla de arriba. La
+ordenación débil dentro de cada semana podría sugerir otra formulación —el percentil frente a la
+propia semana, por ejemplo—, pero eso sería una hipótesis nueva sacada de estos mismos datos:
+tendría que medirse sobre datos que no se hayan usado para plantearla.
+
+```
+docker exec trademe-prod-quant-1 python -m trademe_quant.run_fundamental_estudio
+```
+
 ## Configuración
 
 ```yaml
 fundamental:
-  mode: 'shadow'        # off · shadow · active
+  mode: 'off'           # off · shadow · active — retirado en 0.75.0
   w_fund: 0.5           # peso de la penalización sobre el logit BUY
   start: 0.3333333333   # percentil por debajo del cual no se penaliza
   window_days: 90

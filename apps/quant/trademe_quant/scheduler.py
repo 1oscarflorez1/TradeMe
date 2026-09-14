@@ -444,16 +444,7 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - sin histórico el score se declara stale, no miente
         log.append(f"error cobertura funding: {err}")
 
-    # Fundamental Score (M12): publica la distribución de referencia del funding de cada símbolo.
-    # Va DESPUÉS de la DIL a propósito — usa lo que esa acaba de guardar. Sigue sin decidir nada:
-    # el score está en sombra y la penalización efectiva es 0 hasta que demuestre su lift.
-    try:
-        from .run_fundamental import publish as publish_fundamental
-
-        for linea in publish_fundamental(dsn, symbols):
-            log.append(f"fundamental: {linea}")
-    except Exception as err:  # noqa: BLE001 - sin score el motor decide igual que hoy
-        log.append(f"error fundamental: {err}")
+    _ciclo_fundamental_distribucion(dsn, symbols, log)
 
     # Gestor de Correlaciones: mide cuántos activos INDEPENDIENTES hay de verdad. Va antes del
     # gobierno porque este lo usa para descontar la muestra: cuatro activos cripto correlacionados
@@ -474,28 +465,7 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     ) as err:  # noqa: BLE001 - sin medición no se descuenta; nunca relaja el criterio
         log.append(f"error correlaciones: {err}")
 
-    # Gobierno del Fundamental Score: mide su expediente sombra y decide si ya se ha ganado el
-    # derecho a influir. Va después de publicar las distribuciones porque juzga lo que estas
-    # produjeron. Como todo lo demás aquí: asciende con evidencia y retrocede al perderla.
-    try:
-        from .fundamental_policy import publish as publish_fund_policy
-
-        fpol = publish_fund_policy(artifacts_dir(), dsn)
-        if fpol["changed"]:
-            log.append(f"fundamental: modo -> {fpol['mode']} ({fpol['reason']})")
-            insert_alert(
-                dsn,
-                "fundamental_policy",
-                "warning" if fpol["mode"] == "active" else "success",
-                f"Fundamental Score: modo {fpol['mode']}",
-                str(fpol["reason"]),
-                None,
-                None,
-            )
-        else:
-            log.append(f"fundamental: sigue en {fpol['mode']} ({fpol['reason']})")
-    except Exception as err:  # noqa: BLE001 - sin política, manda ensemble.yaml
-        log.append(f"error política fundamental: {err}")
+    _ciclo_fundamental_gobierno(dsn, log)
 
     # Gobierno de la cuarentena: mide el expediente sombra de las temporalidades vetadas y el
     # rendimiento real de las que operan, y decide. Sin esto, `quarantine_intervals` sería una
@@ -549,6 +519,63 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
 
     _ciclo_metamodelo(dsn, cfg, log)
     return log
+
+
+def _fundamental_activo() -> bool:
+    """`fundamental.mode` del yaml base. Un yaml ilegible no retira nada: manda lo de siempre."""
+    from .ensemble import fundamental_activo, load_ensemble
+
+    try:
+        return fundamental_activo(load_ensemble(artifacts_dir() / "ensemble.yaml"))
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _ciclo_fundamental_distribucion(dsn: str, symbols: list[str], log: list[str]) -> None:
+    """Publica la distribución de referencia del funding, salvo con el score retirado (0.75.0)."""
+    if not _fundamental_activo():
+        log.append(
+            "Fundamental Score retirado (fundamental.mode: off): ni se publica ni se gobierna"
+        )
+        return
+    # Fundamental Score (M12): publica la distribución de referencia del funding de cada símbolo.
+    # Va DESPUÉS de la DIL a propósito — usa lo que esa acaba de guardar. Sigue sin decidir nada:
+    # el score está en sombra y la penalización efectiva es 0 hasta que demuestre su lift.
+    try:
+        from .run_fundamental import publish as publish_fundamental
+
+        for linea in publish_fundamental(dsn, symbols):
+            log.append(f"fundamental: {linea}")
+    except Exception as err:  # noqa: BLE001 - sin score el motor decide igual que hoy
+        log.append(f"error fundamental: {err}")
+
+
+def _ciclo_fundamental_gobierno(dsn: str, log: list[str]) -> None:
+    """Gobierna el modo del score, salvo retirado: su expediente sombra ya no se registra."""
+    if not _fundamental_activo():
+        return
+    # Gobierno del Fundamental Score: mide su expediente sombra y decide si ya se ha ganado el
+    # derecho a influir. Va después de publicar las distribuciones porque juzga lo que estas
+    # produjeron. Como todo lo demás aquí: asciende con evidencia y retrocede al perderla.
+    try:
+        from .fundamental_policy import publish as publish_fund_policy
+
+        fpol = publish_fund_policy(artifacts_dir(), dsn)
+        if fpol["changed"]:
+            log.append(f"fundamental: modo -> {fpol['mode']} ({fpol['reason']})")
+            insert_alert(
+                dsn,
+                "fundamental_policy",
+                "warning" if fpol["mode"] == "active" else "success",
+                f"Fundamental Score: modo {fpol['mode']}",
+                str(fpol["reason"]),
+                None,
+                None,
+            )
+        else:
+            log.append(f"fundamental: sigue en {fpol['mode']} ({fpol['reason']})")
+    except Exception as err:  # noqa: BLE001 - sin política, manda ensemble.yaml
+        log.append(f"error política fundamental: {err}")
 
 
 def _ciclo_metamodelo(dsn: str, cfg: AutoConfig, log: list[str]) -> None:

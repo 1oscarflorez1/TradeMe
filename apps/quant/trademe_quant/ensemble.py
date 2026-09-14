@@ -169,6 +169,20 @@ def metamodelo_activo(base: dict[str, Any]) -> bool:
     return bool(seccion.get("enabled", True))
 
 
+def fundamental_activo(base: dict[str, Any]) -> bool:
+    """¿Se publica y se gobierna el Fundamental Score? Solo con `fundamental.mode: 'off'`, no.
+
+    **Retirado en 0.75.0.** En walk-forward sobre 5 semanas su AUC en largos es 0,421 (el azar
+    alcanza 0,619) y lo que dejaría abrir rinde 0,101 R menos que todo: descartaba sobre todo en las
+    semanas en que los largos ganaban. Ver `run_fundamental_estudio` y `docs/fundamental.md`. La
+    api lee el mismo campo (`FundamentalConfig.mode`) y con `off` ni lo calcula.
+    """
+    seccion = base.get("fundamental")
+    if not isinstance(seccion, dict):
+        return True
+    return str(seccion.get("mode", "shadow")) != "off"
+
+
 def horizontes_evaluacion() -> dict[str, int]:
     """Horizonte de evaluación por temporalidad, leído **siempre** del yaml base.
 

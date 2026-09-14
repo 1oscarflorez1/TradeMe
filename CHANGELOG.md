@@ -7,6 +7,44 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.75.0] — 2026-09-14
+
+> **Se retira el Fundamental Score.** Auditado con el mismo método que el meta-modelo, falla dos de
+> las tres condiciones fijadas antes de medir, y lo que habría dejado abrir rendía menos que todo.
+
+### Verificado — 0.74.1 en producción
+
+- `/automation` devuelve el meta-modelo con `mode: off` y `retirado: true`, que es lo que pinta el
+  Laboratorio. El piloto sigue registrando `meta-modelo retirado` en cada ciclo.
+
+### Added — Auditoría walk-forward del Fundamental Score
+
+- Nuevo `trademe_quant.run_fundamental_estudio`, con las mismas funciones de AUC y nulas que el
+  estudio del meta-modelo. Juzga semana a semana lo que el score registró en vivo desde el 19-ago:
+  una fila por vela, reales y sombra, reproducibles, en R neta.
+- El score no se entrena y solo actúa sobre los largos, así que el control por dirección es que su
+  efecto se mantenga **dentro de cada semana**. Los cortos quedan como control.
+- Regla fijada antes de medir: AUC en largos ≥ 0,55, mejora de lo conservado > máx(0,05 R; P95 del
+  azar por bloques diarios) y AUC en largos dentro de cada semana ≥ 0,55.
+- 8 tests, incluido el caso en que mezclar semanas invierte lo que ordena cada una.
+
+### Medido — 14-sep-2026, 5 semanas, 1.224 largos TP/SL
+
+- AUC en largos **0,421**; el azar alcanza 0,619.
+- Mejora de lo conservado **−0,101 R**; se exige +0,317.
+- AUC dentro de cada semana 0,552, la única condición que cumple, y justo.
+- Por qué: descartaba sobre todo en las semanas en que los largos ganaban (W34: 231 de 334 con
+  +0,31 R). El funding alto acompañó a las semanas alcistas.
+- «Cómo les fue a los largos la semana anterior», como referencia, ordena con AUC **0,633**.
+
+### Changed — Fundamental Score retirado
+
+- `fundamental.mode: 'off'` en `ensemble.yaml`, con la medición en el comentario.
+- La api ya no lo calcula ni registra su sombra; el funding sigue en el sesgo macro.
+- El piloto no publica su distribución ni gobierna su modo, y lo dice en el log.
+- No se borra nada. El Centro de ayuda y `docs/fundamental.md` explican la retirada y cómo
+  reactivarlo.
+
 ## [0.74.1] — 2026-09-14
 
 > Desplegado 0.74.0, el meta-modelo quedó retirado en el piloto y en la api, pero **el Laboratorio
