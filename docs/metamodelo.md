@@ -167,7 +167,8 @@ direccional que filtrar, hay deriva.
 - **El piloto** no reentrena el meta-modelo ni evalúa su sombra ni gobierna su modo. Lo dice en el
   log: `meta-modelo retirado (metamodel.enabled: false)`.
 - **La api** lo aplica en modo `off`: no calcula `meta_confidence`, no aparece el chip 🧠 y `/status`
-  lo marca como desactivado. La bandera se lee del yaml, que la api recarga sola, así que el cambio
+  lo marca como desactivado. El **Laboratorio** muestra «Meta-modelo retirado» en lugar del modo y de
+  las horas desde el último reentrenamiento (desde 0.74.1: antes seguía enseñando «sombra»). La bandera se lee del yaml, que la api recarga sola, así que el cambio
   no necesita reinicio.
 - **No se borra nada**: ni el código, ni el último artefacto publicado, ni `meta_policy.json`.
 

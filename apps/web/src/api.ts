@@ -363,6 +363,8 @@ export interface AutomationStatus {
   hours_since_metamodel?: number | null;
   meta_policy?: {
     mode?: string;
+    /** Desde 0.74.0: el meta-modelo está retirado (`metamodel.enabled: false`). */
+    retirado?: boolean;
     reason?: string;
     updated_at?: string | null;
     evidence?: { n?: number; lift?: number; auc?: number; kept?: number };
