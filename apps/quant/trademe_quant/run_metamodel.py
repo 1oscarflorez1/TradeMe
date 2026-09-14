@@ -6,13 +6,13 @@ También expone train_and_publish() para el servicio HTTP y el piloto automátic
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from typing import Any
 
 from .ensemble import artifacts_dir
 from .metamodel import export_onnx, forest_to_dict, train_metamodel
+from .publicacion import publicar_json
 
 SNAPSHOT_COLUMNS = [
     "captured_at",
@@ -167,8 +167,7 @@ def train_and_publish(dsn: str | None = None) -> dict[str, Any]:
                 "trained_at": out["trained_at"],
             }
         )
-        with open(artifacts_dir() / "metamodel.json", "w", encoding="utf-8") as fh:
-            json.dump(flat, fh)
+        publicar_json(artifacts_dir() / "metamodel.json", flat)
         out["published"] = True
         out["path"] = path
     else:

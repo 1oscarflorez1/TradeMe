@@ -31,7 +31,6 @@ abajo -`percentile_of` y `long_penalty`- tienen mirror exacto en
 
 from __future__ import annotations
 
-import json
 import math
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -203,9 +202,9 @@ def build_artifact(
 
 
 def write_artifact(artifact: dict[str, Any], base_dir: str | Path) -> Path:
-    """Escribe `artifacts/fundamental/<SÍMBOLO>.json`. La api lo recoge con POST /reload."""
-    destino = Path(base_dir) / "fundamental"
-    destino.mkdir(parents=True, exist_ok=True)
-    ruta = destino / f"{artifact['symbol']}.json"
-    ruta.write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf8")
-    return ruta
+    """Escribe `artifacts/fundamental/<SÍMBOLO>.json`. La api lo recoge sola al cambiar en disco."""
+    from .publicacion import publicar_json
+
+    return publicar_json(
+        Path(base_dir) / "fundamental" / f"{artifact['symbol']}.json", artifact, indent=2
+    )

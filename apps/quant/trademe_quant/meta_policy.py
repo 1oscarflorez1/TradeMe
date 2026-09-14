@@ -36,6 +36,7 @@ from typing import Any
 import numpy as np
 
 from .nula import PERMUTACIONES_CICLO, marcas_de, p95_seleccion
+from .publicacion import publicar_json
 
 MODES = ["off", "shadow", "modulate", "veto"]
 
@@ -193,5 +194,5 @@ def save_policy(artifacts: Path, mode: str, reason: str, ev: dict[str, Any]) -> 
         "evidence": ev,
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    (artifacts / "meta_policy.json").write_text(json.dumps(data, indent=2))
+    publicar_json(artifacts / "meta_policy.json", data, indent=2)
     return data

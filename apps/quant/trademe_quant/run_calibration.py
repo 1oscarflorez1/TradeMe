@@ -15,7 +15,6 @@ respuesta no se transfiere entre activos.
 
 from __future__ import annotations
 
-import json
 import os
 import pathlib
 import sys
@@ -25,6 +24,7 @@ from .backtest import run_backtest
 from .calibration import fit_calibrators
 from .ensemble import load_active_ensemble
 from .market.binance import VELAS_POR_DEFECTO
+from .publicacion import publicar_json
 from .velas import series
 
 
@@ -81,9 +81,7 @@ def calibrate_and_publish(symbols: list[str], interval: str) -> dict[str, object
     }
 
     out_path = os.environ.get("CALIBRATORS_PATH", _repo_artifact("calibrators.json"))
-    pathlib.Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as fh:
-        json.dump(artefacto, fh, indent=2)
+    publicar_json(out_path, artefacto, indent=2)
 
     return {
         "samples": sum(detalle.values()),
