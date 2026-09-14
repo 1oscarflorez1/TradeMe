@@ -354,10 +354,22 @@ def test_un_artefacto_corrupto_no_veta_ni_revienta() -> None:
         assert estado_previo(politica, clave, interval, []) is False
 
 
-def test_el_yaml_es_suelo_no_techo() -> None:
-    """El yaml puede vetar lo que el artefacto daba por operando; al revés, no."""
-    politica: dict[str, Any] = {"intervals": {"BTCUSDT:4h": {"quarantined": False}}}
-    assert estado_previo(politica, "BTCUSDT:4h", "4h", ["4h"]) is True
+def test_el_yaml_veta_al_anadirse_y_no_levanta_al_quitarse() -> None:
+    """Lo que el «suelo» quería proteger, sin impedir salir por expediente (0.72.2).
+
+    Hasta 0.72.1 el yaml vetaba siempre, dijera lo que dijera el artefacto. Así una clave heredada
+    del yaml que salía con su sombra seguía vetada para el piloto —no para la api— y se la volvía a
+    sacar, con alerta, en cada ciclo.
+    """
+    # El yaml añade la temporalidad después de que el artefacto la diera por operando: veta.
+    politica: dict[str, Any] = {
+        "intervals": {"BTCUSDT:1h": {"quarantined": False, "base_quarantined": False}}
+    }
+    assert estado_previo(politica, "BTCUSDT:1h", "1h", ["1h"]) is True
+
+    # Salió por expediente con el yaml listándola: queda fuera.
+    politica = {"intervals": {"BTCUSDT:4h": {"quarantined": False, "base_quarantined": True}}}
+    assert estado_previo(politica, "BTCUSDT:4h", "4h", ["4h"]) is False
 
     # Y quitar la temporalidad del yaml NO levanta un veto vigente: se sale con evidencia, no
     # editando un fichero.

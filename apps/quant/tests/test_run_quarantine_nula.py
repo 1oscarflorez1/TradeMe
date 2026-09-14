@@ -69,12 +69,12 @@ def test_informe_y_gobierno_no_pueden_discrepar() -> None:
         "intervals": {
             "BTCUSDT:15m": {"quarantined": True},
             "SOLUSDT:30m": {"quarantined": False},
-            "ETHUSDT:4h": {"quarantined": False},
+            # Se decidió cuando 4h no estaba en el yaml: al añadirse, el yaml vuelve a vetar.
+            "ETHUSDT:4h": {"quarantined": False, "base_quarantined": False},
         },
         "intervals_yaml": ["4h"],
     }
     delegado = claves_vetadas(DATOS, politica)
     directo = {c for c in DATOS if estado_previo(politica, c, c.split(":", 1)[1], ["4h"])}
     assert delegado == directo
-    # Y el yaml sigue siendo suelo: ETHUSDT:4h está vetada pese a que el artefacto decía que no.
     assert "ETHUSDT:4h" in delegado
