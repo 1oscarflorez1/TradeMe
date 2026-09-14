@@ -80,12 +80,20 @@ seguían usando ese modo aunque `meta_policy.json` cambiara y se recargara. Ahor
 |---|---|
 | Propagación del bind mount: el piloto escribe, la api ve el nuevo mtime | **83 ms** y **18 ms** (dos publicaciones, 14-sep-2026) |
 | Sondeo | como mucho `ARTIFACTS_POLL_MS`, 15 s por defecto |
-| Del disco a la memoria de la api, en producción | **9,3 s** y **2,6 s** en dos publicaciones (16:12:56 y 16:28:18) |
+| Del disco a la memoria de la api, antes de desplegar | **9,3 s** y **2,6 s** en dos publicaciones (16:12:56 y 16:28:18) |
+| Del disco a la memoria de la api, **desplegado** | **8,0 s de media, 13,8 s de máximo** en 12 recargas (ciclos de las 17:00 y 17:15) |
 | Antes de 0.73.0 | hasta el siguiente despliegue (68 min en el caso de BNBUSDT:4h) |
 
 La cota es **intervalo + propagación**: unos 15 segundos como mucho y 7,5 de media, porque la
 publicación cae en un punto cualquiera del intervalo. Las dos medidas, 9,3 y 2,6 s, están dentro. Frente a un ciclo
 de piloto de ~15 minutos, bajar el intervalo apenas cuesta pero no cambia nada que importe.
+
+**Verificado tras desplegar 0.73.0 (14-sep-2026).** Los dos primeros ciclos del piloto dejaron 12
+recargas, cada artefacto una vez por publicación, con retrasos entre 0,7 y 13,8 s y media de 8,0 —la
+esperada es 7,5—, y ningún aviso de fichero ilegible ni temporales abandonados. Un ciclo escribe sus
+artefactos a lo largo de unos 20 segundos, así que la api los aplica en dos ticks seguidos: durante
+esos 15 s puede tener la independencia nueva con la cuarentena anterior, lo que no importa porque
+son independientes.
 
 **Cómo se midió antes de desplegar.** El módulo `vigilancia.ts` de esta versión, transpilado, se
 ejecutó en solo lectura dentro del contenedor de la api de producción, sobre el `quarantine.json`

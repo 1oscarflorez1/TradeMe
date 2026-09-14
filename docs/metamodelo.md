@@ -75,6 +75,33 @@ La decisión se publica en `artifacts/meta_policy.json` y se avisa por la campan
 `META_MODE` pasa a ser un **tope de seguridad**: la automatización nunca sube por encima de él
 (ponlo en `shadow` si quieres que jamás influya, o en `modulate` para que nunca vete).
 
+### Un AUC de 0,30 no es un fallo del modelo (14-sep-2026)
+
+Reentrenado tras la reescritura del histórico y el arreglo de los horizontes (904 filas, frente a 627
+del publicado el 5-sep), el meta-modelo dio **AUC 0,30** en su tramo de prueba. Por debajo de 0,5 no
+es «sin señal»: ordena al revés, así que se diagnosticó antes de darlo por bueno. En solo lectura,
+entrenando en memoria:
+
+| | AUC en prueba |
+|---|---|
+| Como lo entrena el piloto | 0,30 |
+| Mismos datos sin filtro de reproducibilidad | 0,38 |
+| Con las etiquetas de antes de la reescritura, sin filtro | 0,39 |
+| Solo la feature «es largo», en el tramo de prueba | **0,24** |
+| Solo el voto neto, en el tramo de prueba | 0,29 |
+
+- **La reescritura no lo causó**: con las etiquetas anteriores el modelo también ordena al revés.
+- **Es la dirección del mercado.** El modelo entrenó con julio y agosto y se juzgó del 7 al 12 de
+  septiembre. En ese tramo ganaron los cortos, y la feature «es largo» sola predice al revés con AUC
+  0,24. Lo que el bosque aprende es la deriva direccional del periodo de entrenamiento, que es
+  exactamente lo que ya se midió en [`habilidad-direccional.md`](habilidad-direccional.md): la
+  plataforma no tiene habilidad direccional, sigue la deriva.
+- **Y entrena con lo que ya no opera**: de las 632 filas de entrenamiento, 496 son de 15m y 30m y solo
+  23 de 1d, la única temporalidad que opera desde 0.70.0.
+
+El gobierno hizo lo que debía: no publicó el modelo y mantiene el modo en `shadow`. El publicado es
+el del 5-sep.
+
 ## Campos en la señal
 
 - `meta_confidence` — probabilidad de éxito estimada (0–1).

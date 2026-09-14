@@ -7,6 +7,39 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.73.1] — 2026-09-14
+
+> Una cifra publicada con 0.72.0 estaba mal, y en sentido contrario: decía que la reescritura del
+> histórico **empeoraba** ETHUSDT:1d cuando lo **mejoraba**.
+
+### Fixed — Las cifras de las claves operativas en el informe de la reescritura
+
+- `reevaluar_desenlaces` tomaba la primera captura **evaluada** de cada vela, no la primera captura,
+  que es la que se opera y la que usan el panel y el check 6. El 24-ago la primera captura de
+  ETHUSDT:1d fue un MANTENER sin plan: esa vela no se operó y aun así entraba.
+- Con la regla correcta, en las velas evaluadas cuando se aplicó la reescritura: ETHUSDT:1d pasa de
+  **−0,333 a −0,215 R netos** (5 velas; cambian 3, las mismas que detectó la medición de paridad) y
+  SOLUSDT:1d no cambia (6 velas, −0,023). Lo publicado era −0,191 → −0,235 con 6 velas y 4 cambios.
+- El informe recibe ahora los ids de la primera captura de cada vela. Sobre producción, en seco, da
+  al decimal lo mismo que el check 6: ETH 6 velas, −0,1308 bruta y −0,1550 neta; SOL 7, +0,0451 y
+  +0,0231. Corregidos `docs/reproducibilidad.md` y la entrada de 0.72.0.
+
+### Verificado — 0.73.0 en producción
+
+- Primeros dos ciclos del piloto tras desplegar: **12 recargas**, cada artefacto una vez por
+  publicación, retraso medio **8,0 s** y máximo **13,8 s**, dentro de la cota de 15 s. Ningún fichero
+  ilegible ni temporales abandonados.
+
+### Diagnóstico — El meta-modelo reentrenado da AUC 0,30
+
+- Por debajo de 0,5 ordena al revés, así que se revisó en solo lectura antes de darlo por bueno. **No
+  lo causó la reescritura**: con las etiquetas anteriores da 0,39. En el tramo de prueba (7-12 sep)
+  ganaron los cortos, y la feature «es largo» sola tiene AUC 0,24: el bosque aprende la deriva
+  direccional de julio y agosto, lo mismo que ya documentaba `habilidad-direccional.md`. Además, de
+  632 filas de entrenamiento solo 23 son de 1d, lo único que opera.
+- El gobierno actuó bien: no lo publicó y el modo sigue en `shadow`. Documentado en
+  `docs/metamodelo.md`.
+
 ## [0.73.0] — 2026-09-14
 
 > Lo que el piloto decidía llegaba a la api **en el siguiente despliegue**. La api leía la
@@ -167,8 +200,10 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 - Horizonte equivocado, con causa confirmada: cuatro configuraciones optimizadas de BTC no tienen
   `horizon_by_tf` y, hasta 0.68.0, sustituían al yaml entero; la evaluación de todas las pendientes
   se lanzaba con la configuración de la clave del backtest y usaba el horizonte por defecto, 20.
-- ETHUSDT:1d pasa de −0,191 a −0,235 R netos (6 velas; cambian 4, todas timeouts) y SOLUSDT:1d no
-  cambia (7 velas). Muestras demasiado pequeñas para decir nada del rendimiento.
+- **Cifra corregida en 0.73.1.** Con la regla del panel —primera captura de cada vela— ETHUSDT:1d
+  **mejora** de −0,333 a −0,215 R netos (5 velas; cambian 3, todas timeouts) y SOLUSDT:1d no cambia
+  (6 velas). Aquí se publicó por error que empeoraba de −0,191 a −0,235. Muestras demasiado pequeñas
+  para decir nada del rendimiento.
 
 ### Operación
 
