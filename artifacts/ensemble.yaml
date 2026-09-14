@@ -152,6 +152,22 @@ use_optimized_configs: false
 # Ver docs/lista-blanca.md.
 active_keys: ['ETHUSDT:1d', 'SOLUSDT:1d']
 
+# Meta-modelo (Modulo 2): RETIRADO en 0.74.0. Ni el piloto lo reentrena ni la api lo aplica.
+#
+# Walk-forward semanal sobre 6 semanas y 3.027 decisiones TP/SL, cada una juzgada por un modelo que
+# no la habia visto (trademe_quant.run_metamodelo_estudio), contra una regla fijada ANTES de medir:
+#
+#   AUC agregada            0,528   se exige >= 0,55 (el azar alcanza 0,535)
+#   mejora filtrando        -0,022 R   se exige > P95 del azar (+0,139)
+#   AUC solo en cortos      0,523   se exige >= 0,55 en cada direccion
+#
+# Y pierde contra una regla trivial: "la direccion que gano la semana pasada" da AUC 0,562. Lo que
+# aprende es la deriva del mercado, no las operaciones. Ver docs/metamodelo.md.
+#
+# Para reactivarlo: repetir el estudio con mas historico y, solo si cumple la regla, poner true.
+metamodel:
+  enabled: false
+
 quarantine_intervals: ['15m', '30m', '1h', '4h']
 
 # De las anteriores, cuáles entraron por COSTE y no por expediente. La distinción cambia su puerta

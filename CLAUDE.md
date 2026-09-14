@@ -75,7 +75,8 @@ Get-Content infra\salud-1d.sql | docker exec -i trademe-prod-postgres-1 psql -U 
 
 - **`apps/api`** (Node 20 · Fastify) — **aquí nace la decisión**. Velas → 8 indicadores → régimen
   ADX (escalado continuo) → media ponderada → banda neutra → calibración → meta-modelo → señal por
-  WebSocket. Indicadores: EMA 9/21, MACD, Supertrend(10,3) [tendencia/momentum]; RSI 14,
+  WebSocket. **El meta-modelo está retirado desde 0.74.0** (`metamodel.enabled: false`): no supera
+  al azar en walk-forward; ver `docs/metamodelo.md`. Indicadores: EMA 9/21, MACD, Supertrend(10,3) [tendencia/momentum]; RSI 14,
   Bollinger 20·2, Estocástico 14 [reversión]; ADX 14 y ATR 14 como contexto.
 - **`apps/quant`** (Python 3.11 · FastAPI) — el laboratorio. Backtest sin look-ahead y con peor
   caso, Optuna con walk-forward (promociona solo si gana fuera de muestra), calibración

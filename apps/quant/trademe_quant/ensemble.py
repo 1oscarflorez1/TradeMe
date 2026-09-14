@@ -154,6 +154,21 @@ def usa_optimizadas(base: dict[str, Any]) -> bool:
     return bool(base.get("use_optimized_configs", True))
 
 
+def metamodelo_activo(base: dict[str, Any]) -> bool:
+    """¿Se reentrena y se gobierna el meta-modelo? Sin la sección en el yaml, sí.
+
+    **Retirado en 0.74.0** (`metamodel.enabled: false`). En walk-forward semanal sobre 6 semanas no
+    supera al azar (AUC 0,528 frente a un P95 de 0,535), filtrar con él empeora la expectancy
+    (−0,022 R) y pierde contra «la dirección que ganó la semana pasada» (AUC 0,562): lo que aprende
+    es la deriva del mercado. Ver `run_metamodelo_estudio` y `docs/metamodelo.md`. Mirror de
+    `metamodelEnabled` en `config.ts`.
+    """
+    seccion = base.get("metamodel")
+    if not isinstance(seccion, dict):
+        return True
+    return bool(seccion.get("enabled", True))
+
+
 def horizontes_evaluacion() -> dict[str, int]:
     """Horizonte de evaluación por temporalidad, leído **siempre** del yaml base.
 

@@ -160,6 +160,12 @@ export interface EnsembleConfig {
    * demuestra.
    */
   activeKeys: string[];
+  /**
+   * Si el meta-modelo puntúa y filtra señales. Sin la sección en el yaml, sí: el comportamiento
+   * anterior. **Retirado en 0.74.0** (`metamodel.enabled: false`): en walk-forward no supera al azar
+   * y pierde contra «la dirección que ganó la semana pasada». Ver `docs/metamodelo.md`.
+   */
+  metamodelEnabled: boolean;
   /** Resuelto por temporalidad en `forInterval`. */
   quarantined?: boolean;
   /** Resuelto por símbolo+temporalidad en `forInterval` (1 = sin desinflar). */
@@ -241,6 +247,7 @@ export const DEFAULT_ENSEMBLE: EnsembleConfig = {
   costs: { enabled: false, mode: 'taker', takerPct: 0.05, makerPct: 0.02, slippagePct: 0.01 },
   useOptimizedConfigs: false,
   activeKeys: [],
+  metamodelEnabled: true,
 };
 
 /** Frescura de la entrada, en velas, para una temporalidad. */
@@ -407,6 +414,7 @@ interface RawConfig {
   quarantine_intervals?: string[];
   use_optimized_configs?: boolean;
   active_keys?: string[];
+  metamodel?: { enabled?: boolean };
   costs?: {
     enabled?: boolean;
     mode?: string;
@@ -493,6 +501,7 @@ export function fromRaw(raw: RawConfig): EnsembleConfig {
     quarantineIntervals: raw.quarantine_intervals ?? d.quarantineIntervals,
     useOptimizedConfigs: raw.use_optimized_configs ?? d.useOptimizedConfigs,
     activeKeys: raw.active_keys ?? d.activeKeys,
+    metamodelEnabled: raw.metamodel?.enabled ?? d.metamodelEnabled,
     costs: {
       enabled: raw.costs?.enabled ?? d.costs.enabled,
       mode: raw.costs?.mode === 'maker' ? 'maker' : 'taker',
