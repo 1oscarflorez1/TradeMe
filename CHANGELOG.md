@@ -7,6 +7,33 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.75.1] — 2026-09-14
+
+> **Fuera la clave VAPID del código.** `config.ts` traía un par por defecto con la privada
+> publicada en el repositorio. Producción nunca lo usó: sus claves salen de `infra/.env.prod`.
+
+### Verificado — 0.75.0 en producción
+
+- Primer ciclo del piloto tras desplegar: `Fundamental Score retirado (fundamental.mode: off): ni
+  se publica ni se gobierna`, junto a `meta-modelo retirado` y `cuarentena revisada (25 claves, sin
+  cambios)`.
+- Ninguna de las 18 capturas posteriores lleva `fund_percentile` ni `meta_confidence`, y los
+  artefactos `fundamental/*.json` y `fundamental_policy.json` no se han vuelto a escribir.
+
+### Security — Claves VAPID solo del entorno
+
+- `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` ya no tienen valor por defecto. Las resuelve
+  `push/vapid.ts`:
+  - **Producción** (`NODE_ENV=production`, que ahora fija `docker-compose.prod.yml`): solo las
+    variables de entorno. Si faltan, push apagado y aviso al arrancar.
+  - **Desarrollo y tests:** si faltan, se genera un par al arrancar.
+  - **Solo una de las dos:** push apagado en cualquier entorno, con aviso de cuál falta.
+- La api registra al arrancar de dónde salieron las claves, nunca las claves, y «Notificaciones
+  push» en Estado refleja las que usa de verdad.
+- Comprobado en producción, sin mostrar valores: las claves del contenedor no coinciden con las que
+  había en el repositorio, así que no hay nada que rotar ni suscripciones que rehacer.
+- 12 tests, incluido uno que falla si `config.ts` vuelve a llevar un literal con forma de clave.
+
 ## [0.75.0] — 2026-09-14
 
 > **Se retira el Fundamental Score.** Auditado con el mismo método que el meta-modelo, falla dos de
