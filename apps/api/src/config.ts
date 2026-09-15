@@ -3,6 +3,9 @@ import { INTERVALS, isInterval, type Interval } from './domain/candle.js';
 import type { Subscription } from './adapters/data-adapter.js';
 
 const EnvSchema = z.object({
+  // `production` lo fija docker-compose.prod.yml. Ahí las claves salen solo de las variables de
+  // entorno, sin nada generado de reserva (ver `push/vapid.ts`).
+  NODE_ENV: z.string().default('development'),
   API_HOST: z.string().default('0.0.0.0'),
   API_PORT: z.coerce.number().int().positive().default(3001),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -47,8 +50,10 @@ const EnvSchema = z.object({
   META_MODE: z.enum(['off', 'shadow', 'modulate', 'veto']).default('veto'),
   META_VETO_THRESHOLD: z.coerce.number().min(0).max(1).default(0.5),
   META_MODULATE_WEIGHT: z.coerce.number().min(0).max(1).default(0.5),
-  VAPID_PUBLIC_KEY: z.string().default('BEg-pAQi-VrkEr0n9OpokYqzXsBq7Ub_ZqTpGkUrwPZSBb3PlMbj5Hb4qcjJGqydWcqcUnUFrO6EE5gnw0_BIss'),
-  VAPID_PRIVATE_KEY: z.string().default('dUfNiCSsZ-NL-v543jUw-cyRwPD0AX29bz9Jt12tbFI'),
+  // Web Push. Sin claves por defecto: en producción salen de infra/.env.prod y, si faltan, el push
+  // queda apagado; en desarrollo y tests se genera un par al arrancar. Ver `push/vapid.ts`.
+  VAPID_PUBLIC_KEY: z.string().default(''),
+  VAPID_PRIVATE_KEY: z.string().default(''),
   VAPID_SUBJECT: z.string().default('mailto:trademe@example.com'),
   PUSH_MIN_CONFIDENCE: z.coerce.number().default(0.65),
   PUSH_COOLDOWN_MS: z.coerce.number().int().default(600000),
@@ -78,6 +83,10 @@ export type Env = z.infer<typeof EnvSchema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return EnvSchema.parse(source);
+}
+
+export function esProduccion(env: Pick<Env, 'NODE_ENV'>): boolean {
+  return env.NODE_ENV === 'production';
 }
 
 export function parseSymbols(env: Env): string[] {
