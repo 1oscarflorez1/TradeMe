@@ -28,6 +28,7 @@ import { PushSubsRepo } from './db/push-subs-repo.js';
 import { UsersRepo } from './db/users-repo.js';
 import { verifyJwt } from './auth/jwt.js';
 import { Pusher } from './push/push.js';
+import { resolverClavesVapid } from './push/vapid.js';
 import { runMigrations } from './db/migrate.js';
 import { INTERVALS, type Candle, type Interval } from './domain/candle.js';
 import { IndicatorRegistry } from './indicators/registry.js';
@@ -205,7 +206,8 @@ async function main(): Promise<void> {
   if (env.JWT_SECRET && !usersRepo) {
     console.warn('JWT_SECRET configurado sin DATABASE_URL: /auth/login no podrá autenticar a nadie.');
   }
-  const pusher = new Pusher(env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT);
+  const vapid = resolverClavesVapid(env);
+  const pusher = new Pusher(vapid.publicKey, vapid.privateKey, vapid.subject);
   const pushCooldown = new Map<string, number>();
 
   // Todo lo que publica el piloto y la api tiene en memoria, en una sola tabla: la usan la recarga
@@ -396,7 +398,8 @@ async function main(): Promise<void> {
           return true;
         }
       : undefined,
-    vapidPublicKey: env.VAPID_PUBLIC_KEY,
+    vapidPublicKey: vapid.publicKey || undefined,
+    vapidOrigen: vapid.origen,
     savePushSub: pushSubsRepo ? (sub) => pushSubsRepo.save(sub) : undefined,
     getBacktest: backtestsRepo
       ? (symbol, interval) => backtestsRepo.latest(symbol, interval)
@@ -830,6 +833,7 @@ async function main(): Promise<void> {
     env.JWT_SECRET ? (token) => Boolean(token && verifyJwt(token, env.JWT_SECRET!)) : undefined,
   );
   await app.listen({ host: env.API_HOST, port: env.API_PORT });
+  app.log[vapid.nivel]({ origen: vapid.origen }, vapid.mensaje);
 
   // Desde aquí los artefactos que publique el piloto se aplican solos. Ver `artifacts/vigilancia.ts`.
   vigilante.iniciar(env.ARTIFACTS_POLL_MS);

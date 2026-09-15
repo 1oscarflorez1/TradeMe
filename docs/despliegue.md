@@ -34,7 +34,10 @@
    - `JWT_SECRET` → **generar uno propio** (`openssl rand -base64 48`), nunca reutilizar el de
      ejemplo. Sin esta variable la API queda abierta (sirve para probar, no para producción).
    - `QUANT_URL` → URL interna del servicio quant en la red privada de Railway.
+   - `NODE_ENV=production` → sin él la api se comporta como en desarrollo.
    - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` → generadas con `npx web-push generate-vapid-keys`.
+     No hay claves por defecto: en producción, sin ellas el push queda apagado (ver
+     `docs/pwa-push.md`).
 3. Tras el primer deploy, crear los usuarios del equipo (no hay registro público):
    ```bash
    railway run --service api pnpm --filter @trademe/api exec tsx scripts/create-user.ts \

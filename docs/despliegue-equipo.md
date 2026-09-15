@@ -55,6 +55,9 @@ VAPID_PUBLIC_KEY=<la que ya usas>
 VAPID_PRIVATE_KEY=<la que ya usas>
 VAPID_SUBJECT=mailto:tu-correo@ejemplo.com
 ```
+> Las claves VAPID no tienen valor por defecto en el código. Sin ellas la api arranca igual, pero
+> con el push apagado (lo avisa en el log y en Estado). Si no tienes, genéralas con
+> `npx web-push generate-vapid-keys`.
 > El nombre exacto del tailnet lo ves en el panel de Tailscale (algo como `tail1234.ts.net`).
 
 ### 4. Levanta TradeMe en modo producción

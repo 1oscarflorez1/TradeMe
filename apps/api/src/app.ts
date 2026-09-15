@@ -19,6 +19,7 @@ import { computePlanLevels, type PlanLevels } from './ensemble/plan.js';
 import { estadoFinal, trackSnapshot, type SnapshotRow } from './snapshots/tracking.js';
 import type { AlertRow, AlertInput } from './db/alerts-repo.js';
 import type { PushSub } from './push/push.js';
+import type { OrigenVapid } from './push/vapid.js';
 import type { BacktestRow } from './db/backtests-repo.js';
 import type { Macro, Signal } from './domain/signal.js';
 import type { FundamentalArtifact } from './ensemble/fundamental.js';
@@ -122,6 +123,7 @@ export interface AppDeps {
   listAlerts?: (limit: number) => Promise<{ alerts: AlertRow[]; unread: number }>;
   markAlertsRead?: () => Promise<number>;
   vapidPublicKey?: string;
+  vapidOrigen?: OrigenVapid;
   savePushSub?: (sub: PushSub) => Promise<void>;
   quantUrl?: string;
   publicApiUrl?: string;
@@ -471,14 +473,19 @@ export function buildApp(deps: AppDeps): FastifyInstance {
             : 'aún sin modelo publicado (necesita más registros evaluados)',
     });
 
-    // Notificaciones push
+    // Notificaciones push: con las claves que usa de verdad, no con las de las variables de entorno
+    // (en desarrollo se generan al arrancar).
+    const origenVapid = deps.vapidOrigen ?? (deps.vapidPublicKey ? 'entorno' : 'ninguna');
     components.push({
       key: 'push',
       label: 'Notificaciones push',
-      status: env.VAPID_PUBLIC_KEY ? 'ok' : 'na',
-      detail: env.VAPID_PUBLIC_KEY
-        ? 'claves VAPID configuradas'
-        : 'sin claves VAPID (solo avisos en la app)',
+      status: origenVapid === 'ninguna' ? 'na' : 'ok',
+      detail:
+        origenVapid === 'entorno'
+          ? 'claves VAPID configuradas'
+          : origenVapid === 'efimeras'
+            ? 'claves VAPID efímeras de desarrollo: las suscripciones caducan al reiniciar'
+            : 'sin claves VAPID (solo avisos en la app)',
     });
 
     // Señales externas (Reditum/TradingView)

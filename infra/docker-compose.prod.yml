@@ -37,6 +37,8 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     environment:
+      # Producción: las claves VAPID salen solo de infra/.env.prod; si faltan, push apagado.
+      NODE_ENV: production
       API_HOST: 0.0.0.0
       API_PORT: '3001'
       LOG_LEVEL: info
