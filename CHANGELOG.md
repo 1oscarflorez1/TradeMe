@@ -7,6 +7,30 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.76.1] — 2026-09-15
+
+> **Cierre de los hitos de claves VAPID y tamaño muestral de 1d**, verificados en producción. Sin
+> cambios de código.
+
+### Verificado — 0.76.0 en producción
+
+- **Check 7 de `infra/salud-1d.sql`:** ETHUSDT:1d y SOLUSDT:1d en `SIN MUESTRA`, con 2.045 y 672
+  operaciones independientes necesarias.
+- **El piloto da lo mismo:** las líneas `muestra:` del ciclo de las 21:41 UTC y `muestra` en
+  `/automation`. En ese ciclo, `histórico: 1481/1757 desenlaces reproducibles (84 %)` y ninguna
+  línea de error.
+- **Check 3:** el stack no estaba corriendo en el cierre de 3 de los últimos 7 días (11, 12 y
+  15-sep). No es un fallo del código: sin captura a las 00:00 UTC, la decisión de ese cierre no se
+  toma.
+
+### Changed
+
+- **`CLAUDE.md`:** claves VAPID y tamaño muestral de 1d quedan como cerrados, y la configuración de
+  producción apunta a la plantilla `infra/.env.prod.example`.
+- **`.gitignore`:** las salidas locales de los estudios y las copias de seguridad de las operaciones
+  sobre producción (`artifacts/*_estudio*.json`, `*.backup-*.json`…) dejan de aparecer como
+  pendientes. Siguen en disco; no se borra nada.
+
 ## [0.76.0] — 2026-09-15
 
 > **Cuánto falta para saber si ETH y SOL en 1d ganan de verdad.** Confirmar en vivo la expectancy
