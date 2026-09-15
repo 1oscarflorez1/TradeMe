@@ -125,16 +125,25 @@ indicadores son incrementales por naturaleza.
 ## Estado y pendientes
 
 **Configuración que el usuario debe rellenar en `infra/.env.prod`** (las tres activan funciones ya
-programadas):
+programadas). Todas las variables, explicadas, están en la plantilla `infra/.env.prod.example`:
 
 - `TV_WEBHOOK_SECRET` → activa el webhook de Reditum. Guía en `docs/reditum-tradingview.md`.
 - `TWELVEDATA_API_KEY` → activa acciones, divisas e índices. Guía en `docs/proveedores.md`.
 - `ASSISTANT_*` → modelo (Groq) y búsqueda (Tavily) del asistente. Guía en `docs/asistente.md`.
 
-**Muestra de ETH y SOL en 1d** — no esperar a confirmar su ventaja en vivo: con la dispersión real
-harían falta 2.045 y 672 operaciones independientes (décadas de velas), y el backtest tampoco la
-confirma. Lo que sí se detecta a tiempo es una pérdida grande. Lo sigue el check 7 de
-`infra/salud-1d.sql` y la línea `muestra:` del piloto; ver `docs/salud-1d.md`.
+**Hitos cerrados y verificados en producción el 15-sep-2026:**
+
+- **Claves VAPID (0.75.1) — cerrado.** No hay claves en el código. Producción (`NODE_ENV=production`,
+  fijado en el compose) las toma solo de `infra/.env.prod` y, si faltan, apaga el push; desarrollo y
+  tests generan un par al arrancar. Verificado: la api arranca con `origen: entorno`, sin avisos y
+  sin ningún secreto en el log. Ver `docs/pwa-push.md`.
+- **Tamaño muestral de ETH y SOL en 1d (0.76.0) — cerrado.** No esperar a confirmar su ventaja en
+  vivo: con la dispersión real harían falta 2.045 y 672 operaciones independientes (décadas de
+  velas), y el backtest tampoco la confirma. Lo que sí se detecta a tiempo es una pérdida grande. Lo
+  siguen el check 7 de `infra/salud-1d.sql`, la línea `muestra:` del piloto y el Laboratorio; ver
+  `docs/salud-1d.md`. Verificado: el check y el piloto dan las mismas cifras en producción. **Solo
+  cuentan las decisiones de la configuración base** (desde la vela del 8-sep-2026): las anteriores
+  eran de `ens-opt-*`.
 
 **IBKR** — plan acordado en tres fases (datos → papel → real tras flag apagado), documentado en
 `TradeMe_Integracion_IBKR.docx`. Bloqueado en el paso 0: seis preguntas al compañero del equipo que

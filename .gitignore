@@ -46,3 +46,11 @@ infra/.env.prod
 # Volcados de base de datos (datos, no código)
 *.sql.bak
 dataset-backup.sql
+
+# Salidas locales de los estudios y copias de seguridad de operaciones sobre producción. Son datos:
+# las cifras que importan están en docs/ y en el CHANGELOG, y las copias no deben viajar al repositorio.
+artifacts/*_estudio*.json
+artifacts/alfa_*.json
+artifacts/macro_series.json
+artifacts/*.backup-*.json
+artifacts/reevaluacion_ventana_*.json
