@@ -110,7 +110,8 @@ SELECT symbol,
 \echo
 \echo '== 6. Expectancy bruta frente a neta (lo que desde 0.70.0 muestra el panel) =='
 -- Misma formula que costes.ts / costes.py: coste_R = (0,12/100) * |entry| / |entry - stop|.
--- Muestras pequenas: comprueba que el descuento actua, no mide rendimiento.
+-- Muestras pequenas: comprueba que el descuento actua, no mide rendimiento. Y mezcla sistemas: las
+-- evaluadas hasta el 8-sep-2026 se decidieron con las configuraciones optimizadas. El check 7 no.
 WITH una_por_vela AS (
   SELECT DISTINCT ON (symbol, interval, candle_open) *
     FROM snapshots WHERE interval = '1d' AND symbol IN ('ETHUSDT', 'SOLUSDT')
@@ -125,3 +126,102 @@ SELECT symbol,
                                          ELSE 0 END)
              FILTER (WHERE outcome_result IS NOT NULL)::numeric, 4) AS neta
   FROM una_por_vela GROUP BY symbol ORDER BY symbol;
+
+\echo
+\echo '== 7. Tamano muestral: cuanto falta para saber si la expectancy neta es mayor que cero =='
+-- Informativo: no mide la salud del stack sino cuanto se puede afirmar ya. Es la regla de
+-- trademe_quant/tamano_muestral.py (el piloto la registra en cada ciclo como `muestra:` y el
+-- Laboratorio la muestra), con los MISMOS literales: un test falla si se separan. Fijada el
+-- 15-sep-2026. Que significa cada columna, en docs/salud-1d.md.
+--
+-- - Solo decisiones de la configuracion BASE: las `ens-opt-*` eran otro sistema (hasta el 8-sep).
+-- - Independientes: una decision de 1d se evalua durante 10 velas y la del dia siguiente comparte
+--   casi todo el recorrido. Se cuentan de forma voraz: la siguiente que abre 240 h despues.
+-- - sigma: la propia desde 30 evaluadas; antes, la agrupada de todas las reales de ETH y SOL.
+-- - necesarias: independientes para confirmar la expectancy del backtest (alfa 5 %, potencia 80 %).
+WITH RECURSIVE
+hipotesis (clave, mu) AS (
+  VALUES ('ETHUSDT:1d', 0.0588::float8), ('SOLUSDT:1d', 0.1026)
+),
+t95 (gl, t) AS (
+  VALUES
+         (1, 6.314::float8), (2, 2.920), (3, 2.354), (4, 2.132), (5, 2.016), (6, 1.944),
+         (7, 1.895), (8, 1.860), (9, 1.834), (10, 1.813), (11, 1.796), (12, 1.783),
+         (13, 1.771), (14, 1.762), (15, 1.754), (16, 1.746), (17, 1.740), (18, 1.735),
+         (19, 1.730), (20, 1.725), (21, 1.721), (22, 1.718), (23, 1.714), (24, 1.711),
+         (25, 1.709), (26, 1.706), (27, 1.704), (28, 1.702), (29, 1.700), (30, 1.698),
+         (40, 1.684), (60, 1.671), (120, 1.658)
+),
+una_por_vela AS (
+  SELECT DISTINCT ON (symbol, interval, candle_open)
+         symbol || ':' || interval AS clave, candle_open, model_version, outcome_result,
+         outcome_return_r - CASE WHEN plan_entry IS NOT NULL AND plan_stop IS NOT NULL
+                                  AND plan_entry <> plan_stop
+                                 THEN (0.12 / 100.0) * abs(plan_entry) / abs(plan_entry - plan_stop)
+                                 ELSE 0 END AS r
+    FROM snapshots WHERE interval = '1d' AND symbol IN ('ETHUSDT', 'SOLUSDT')
+   ORDER BY symbol, interval, candle_open, captured_at ASC
+),
+evaluadas AS (
+  SELECT * FROM una_por_vela WHERE outcome_result IS NOT NULL AND r IS NOT NULL
+),
+base AS (
+  SELECT * FROM evaluadas WHERE model_version NOT LIKE 'ens-opt-%'
+),
+independientes AS (
+  SELECT clave, MIN(candle_open) AS candle_open FROM base GROUP BY clave
+  UNION ALL
+  SELECT i.clave,
+         (SELECT MIN(b.candle_open) FROM base b
+           WHERE b.clave = i.clave AND b.candle_open >= i.candle_open + interval '240 hours')
+    FROM independientes i
+   WHERE i.candle_open IS NOT NULL
+),
+agrupada AS (
+  SELECT sqrt(SUM((r - m) ^ 2) / NULLIF(COUNT(*) - COUNT(DISTINCT clave), 0)) AS sigma,
+         COUNT(*) AS n
+    FROM (SELECT clave, r, AVG(r) OVER (PARTITION BY clave) AS m FROM evaluadas) x
+),
+por_clave AS (
+  SELECT h.clave, h.mu,
+         COUNT(b.r) AS evaluadas,
+         AVG(b.r) AS media,
+         STDDEV_SAMP(b.r) AS sd_propia,
+         (SELECT COUNT(*) FROM independientes i
+           WHERE i.clave = h.clave AND i.candle_open IS NOT NULL) AS indep
+    FROM hipotesis h LEFT JOIN base b ON b.clave = h.clave
+   GROUP BY h.clave, h.mu
+),
+calculo AS (
+  SELECT p.*,
+         CASE WHEN p.evaluadas >= 30 THEN p.sd_propia ELSE a.sigma END AS sigma,
+         CASE WHEN p.evaluadas >= 30 THEN 'propia'
+              ELSE 'agrupada (' || a.n || ' operaciones)' END AS sigma_de,
+         (SELECT t FROM t95 WHERE gl <= GREATEST(p.indep - 1, 1) ORDER BY gl DESC LIMIT 1) AS t
+    FROM por_clave p CROSS JOIN agrupada a
+),
+final AS (
+  SELECT *,
+         NULLIF(CEIL(((1.6448536 + 0.8416212) * sigma / mu) ^ 2), 0) AS necesarias,
+         sigma / sqrt(NULLIF(indep, 0)) AS ee
+    FROM calculo
+)
+SELECT clave,
+       evaluadas,
+       indep                                                              AS independientes,
+       ROUND(media::numeric, 3)                                           AS media_neta,
+       ROUND(sigma::numeric, 3)                                           AS sigma,
+       sigma_de,
+       CASE WHEN indep >= 2 THEN ROUND((media - t * ee)::numeric, 3) END  AS ic95_inferior,
+       CASE WHEN indep >= 2 THEN ROUND(((t + 0.8416212) * ee)::numeric, 3) END AS detectable_hoy,
+       mu                                                                 AS hipotesis,
+       necesarias::int                                                    AS necesarias,
+       (necesarias * 10)::int                                             AS velas_minimas,
+       ROUND((necesarias * 10 / 365.25)::numeric, 1)                      AS anios_minimos,
+       ROUND((100.0 * indep / necesarias)::numeric, 1)                    AS progreso_pct,
+       CASE WHEN indep < 2 OR sigma IS NULL THEN 'SIN MUESTRA'
+            WHEN media - t * ee > 0 THEN 'CONFIRMADA: expectancy neta > 0'
+            WHEN media + t * ee < 0 THEN 'ATENCION: perdida confirmada'
+            ELSE 'EN CURSO: sin evidencia todavia'
+       END AS estado
+  FROM final ORDER BY clave;
