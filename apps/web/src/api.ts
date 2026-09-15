@@ -352,6 +352,25 @@ export async function fetchDatasetReport(): Promise<DatasetReport | null> {
   }
 }
 
+/** Seguimiento del tamaño muestral de una clave que opera. Lo calcula `trademe_quant.tamano_muestral`. */
+export interface MuestraClave {
+  clave: string;
+  evaluadas: number;
+  independientes: number;
+  media_neta: number | null;
+  sigma: number | null;
+  sigma_origen: string;
+  ic95_inferior: number | null;
+  ic95_superior: number | null;
+  efecto_detectable: number | null;
+  hipotesis: number | null;
+  necesarias: number | null;
+  velas_minimas: number | null;
+  anios_minimos: number | null;
+  progreso: number | null;
+  estado: 'SIN MUESTRA' | 'EN CURSO' | 'CONFIRMADA' | 'PERDIDA';
+}
+
 export interface AutomationStatus {
   enabled: boolean;
   backtest_every_h: number;
@@ -369,6 +388,8 @@ export interface AutomationStatus {
     updated_at?: string | null;
     evidence?: { n?: number; lift?: number; auc?: number; kept?: number };
   };
+  /** Desde 0.76.0: cuánto falta para confirmar la expectancy neta de las claves que operan. */
+  muestra?: MuestraClave[];
   intervals: string[];
   last_cycle: string | null;
   per_tf: Array<{

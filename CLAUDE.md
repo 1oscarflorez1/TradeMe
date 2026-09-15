@@ -131,6 +131,11 @@ programadas):
 - `TWELVEDATA_API_KEY` → activa acciones, divisas e índices. Guía en `docs/proveedores.md`.
 - `ASSISTANT_*` → modelo (Groq) y búsqueda (Tavily) del asistente. Guía en `docs/asistente.md`.
 
+**Muestra de ETH y SOL en 1d** — no esperar a confirmar su ventaja en vivo: con la dispersión real
+harían falta 2.045 y 672 operaciones independientes (décadas de velas), y el backtest tampoco la
+confirma. Lo que sí se detecta a tiempo es una pérdida grande. Lo sigue el check 7 de
+`infra/salud-1d.sql` y la línea `muestra:` del piloto; ver `docs/salud-1d.md`.
+
 **IBKR** — plan acordado en tres fases (datos → papel → real tras flag apagado), documentado en
 `TradeMe_Integracion_IBKR.docx`. Bloqueado en el paso 0: seis preguntas al compañero del equipo que
 tiene la cuenta (usuario de papel, compartir suscripciones de datos, permisos de API, clasificación

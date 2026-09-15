@@ -39,6 +39,8 @@ openssl rand -hex 32        # úsalo como JWT_SECRET
 openssl rand -hex 16        # úsalo como POSTGRES_PASSWORD
 nano infra/.env.prod        # rellena secrets y las URLs ts.net (paso 4)
 ```
+La plantilla separa las cuatro variables obligatorias —vacías, `docker compose` se niega a arrancar
+y dice cuál falta— de las opcionales, que apagan su función si quedan vacías.
 
 ## 4. Publicar con HTTPS del tailnet
 ```bash

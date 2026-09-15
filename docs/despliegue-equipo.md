@@ -45,20 +45,32 @@ En PowerShell, dentro de `C:\Users\hp\Claude\Projects\TradeMe - Build\TradeMe`:
 copy infra\.env.prod.example infra\.env.prod
 notepad infra\.env.prod
 ```
-Rellena (genera valores largos y aleatorios para los dos primeros):
+La plantilla trae **todas** las variables que usa el compose de producción, cada una con su
+explicación, en dos bloques:
+
+- **Obligatorias** — `POSTGRES_PASSWORD`, `JWT_SECRET`, `PUBLIC_WEB_ORIGIN` y `PUBLIC_API_URL`. Van
+  vacías a propósito: si te dejas una, `docker compose` se niega a arrancar y dice cuál falta.
+- **Opcionales** — push (VAPID), webhook de Reditum, Twelve Data, asistente y hosts extra. Vacías,
+  la plataforma arranca igual y esa función queda apagada.
+
+Las dos contraseñas, largas y aleatorias. En PowerShell, cada ejecución da una distinta:
+```powershell
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); -join ($b | ForEach-Object { $_.ToString('x2') })
 ```
-POSTGRES_PASSWORD=<una-clave-larga>
-JWT_SECRET=<otra-clave-larga-distinta>
+Las direcciones públicas, con el nombre de tu tailnet:
+```
 PUBLIC_WEB_ORIGIN=https://trademe.TU-TAILNET.ts.net
 PUBLIC_API_URL=https://trademe.TU-TAILNET.ts.net:8443
-VAPID_PUBLIC_KEY=<la que ya usas>
-VAPID_PRIVATE_KEY=<la que ya usas>
-VAPID_SUBJECT=mailto:tu-correo@ejemplo.com
 ```
-> Las claves VAPID no tienen valor por defecto en el código. Sin ellas la api arranca igual, pero
-> con el push apagado (lo avisa en el log y en Estado). Si no tienes, genéralas con
-> `npx web-push generate-vapid-keys`.
 > El nombre exacto del tailnet lo ves en el panel de Tailscale (algo como `tail1234.ts.net`).
+
+> Las claves VAPID no tienen valor por defecto en el código. Sin ellas la api arranca igual, pero
+> con el push apagado (lo avisa en el log y en Estado). Si ya tenías unas, reutilízalas: cambiarlas
+> obliga a cada dispositivo a volver a activar el push. Si no, genéralas con
+> `npx web-push generate-vapid-keys`.
+
+> `infra\.env.prod` está ignorado por Git; la plantilla no. Nunca escribas un valor real en
+> `infra\.env.prod.example`.
 
 ### 4. Levanta TradeMe en modo producción
 ```powershell

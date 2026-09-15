@@ -19,6 +19,8 @@ mlartifacts/
 .env
 .env.*
 !.env.example
+# La plantilla de producción sí va al repositorio; el fichero con los valores, no (más abajo).
+!infra/.env.prod.example
 
 # OS / editor
 .DS_Store

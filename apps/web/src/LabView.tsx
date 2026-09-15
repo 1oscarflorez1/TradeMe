@@ -9,7 +9,7 @@ import {
   runCalibrate,
   trainMetamodel,
 } from './api';
-import type { AutomationStatus, DatasetReport, MetamodelResult } from './api';
+import type { AutomationStatus, DatasetReport, MetamodelResult, MuestraClave } from './api';
 import type { CalibrationMeta, EnsembleMeta, Interval, RegimeCalibrator, ReliabilityBin } from './types';
 import { CompareBars, Donut, Gauge, ProgressBar, StatusPill } from './Viz';
 
@@ -643,6 +643,7 @@ function AutomationSection() {
             : ''}
         </p>
       )}
+      {st.muestra && st.muestra.length > 0 && <MuestraListaBlanca filas={st.muestra} />}
       <p className="muted calib-legend">
         Ya no necesitas vigilar ni decidir cuándo pulsar: el piloto mide, evalúa tus registros,
         optimiza solo cuando toca (nunca promueve sin ganar en hold-out), **recalibra** tras cada
@@ -651,5 +652,43 @@ function AutomationSection() {
         avisa por la campana 🔔. Los botones quedan para cuando quieras un resultado inmediato.
       </p>
     </section>
+  );
+}
+
+const ESTADO_MUESTRA: Record<MuestraClave['estado'], string> = {
+  'SIN MUESTRA': 'sin operaciones evaluadas con la configuración actual',
+  'EN CURSO': 'sin evidencia todavía',
+  CONFIRMADA: 'expectancy neta > 0 confirmada',
+  PERDIDA: 'pérdida confirmada',
+};
+
+/** Cuánto falta para saber si las claves que operan ganan de verdad (0.76.0). */
+function MuestraListaBlanca({ filas }: { filas: MuestraClave[] }) {
+  const n = (v: number | null, dec = 0) =>
+    v == null ? '—' : v.toLocaleString('es-ES', { maximumFractionDigits: dec, minimumFractionDigits: dec });
+  return (
+    <div
+      className="bt-runmsg"
+      title="Contraste unilateral (α 5 %, potencia 80 %) contra la expectancy neta del backtest. Solo cuentan decisiones de la configuración base, y como independientes: una decisión de 1d se evalúa durante 10 velas y la del día siguiente comparte casi todo el recorrido. Ver docs/salud-1d.md, check 7."
+    >
+      📏 <strong>¿Ganan de verdad las claves que operan?</strong> Operaciones independientes frente a las
+      que harían falta para confirmar la ventaja que les da el backtest.
+      <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.2rem' }}>
+        {filas.map((f) => (
+          <li key={f.clave}>
+            <strong>{f.clave}</strong>: {f.independientes} de {n(f.necesarias)} ({n((f.progreso ?? 0) * 100, 1)} %)
+            {f.velas_minimas != null && <> · al menos {n(f.velas_minimas)} velas, unos {n(f.anios_minimos)} años</>}
+            {' · '}
+            {ESTADO_MUESTRA[f.estado]}
+            {f.estado === 'EN CURSO' && f.media_neta != null && f.efecto_detectable != null && (
+              <>
+                {' '}
+                (media {n(f.media_neta, 3)} R; hoy solo se confirmaría una expectancy ≥ {n(f.efecto_detectable, 2)} R)
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

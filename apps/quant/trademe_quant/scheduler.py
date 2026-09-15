@@ -411,6 +411,20 @@ def run_cycle(cfg: AutoConfig) -> list[str]:
     except Exception as err:  # noqa: BLE001 - un diagnóstico que falla no tumba el ciclo
         log.append(f"error reproducibilidad: {err}")
 
+    # Tamaño muestral de las claves que operan: cuántas operaciones independientes llevan y cuántas
+    # harían falta para confirmar la expectancy neta del backtest. No decide nada; está para que
+    # nadie lea como ventaja lo que todavía es ruido. Ver `tamano_muestral` y docs/salud-1d.md.
+    try:
+        from .tamano_muestral import lineas as lineas_muestra
+        from .tamano_muestral import medir as medir_muestra
+
+        muestra = medir_muestra(dsn)
+        _state["muestra"] = muestra
+        for linea in lineas_muestra(muestra):
+            log.append(f"muestra: {linea}")
+    except Exception as err:  # noqa: BLE001 - un diagnóstico que falla no tumba el ciclo
+        log.append(f"error muestra: {err}")
+
     # Y acto seguido la otra pregunta, la que `data_sources` no responde: ¿alguna de esas fuentes
     # lleva callada más de lo que le toca? El BCE figuraba con 33 pasadas correctas y cero errores
     # mientras su IPC llevaba siete meses sin moverse. Responder «sí» a «¿funcionó la descarga?» no
@@ -717,6 +731,8 @@ def automation_status(cfg: AutoConfig) -> dict[str, object]:
         "last_log": _state["last_log"],
         # Aparte del log: si las líneas de datos hay que buscarlas entre sesenta, no se miran.
         "datos": _state.get("datos", []),
+        # Lo que el Laboratorio enseña de la muestra de las claves que operan (0.76.0).
+        "muestra": _state.get("muestra", []),
         "per_tf": per_tf,
     }
 
@@ -729,7 +745,7 @@ MAX_LINEAS_LOG = 300
 
 #: Prefijos de las líneas que informan del **estado de los datos**, no de una decisión. Se recogen
 #: aparte para que no haya que buscarlas en el log ni dependan de cuántas líneas quepan.
-PREFIJOS_DATOS = ("huecos:", "frescura:", "cobertura:", "histórico:", "datos:")
+PREFIJOS_DATOS = ("huecos:", "frescura:", "cobertura:", "histórico:", "muestra:", "datos:")
 
 
 def resumen_datos(log: list[str]) -> list[str]:

@@ -80,6 +80,18 @@ No es «elegimos las dos mejores» sino **«excluimos las que pierden»**, y esa
 Concentrar no crea ventaja: **evita pérdida esperada**. Es la misma lección que el resto del
 proyecto, y por eso funciona cuando nada de lo que se añadió funcionó.
 
+## Cuánto tardaría en confirmarse en vivo
+
+Mucho más de lo que dura el proyecto. Con la dispersión real de las operaciones (σ = 1,069 R),
+confirmar la expectancy del backtest exige **2.045 operaciones independientes en ETHUSDT:1d y 672
+en SOLUSDT:1d**: al menos ~56 y ~18 años de velas. Una decisión de 1d se evalúa durante 10 velas y
+la del día siguiente comparte casi todo el recorrido, así que las decisiones diarias no son
+observaciones distintas.
+
+Lo que el vivo sí detecta a tiempo es una pérdida grande: −0,5 R de expectancy real se confirmaría
+en unos 290 días. El check 7 de `infra/salud-1d.sql` lo sigue, y el cálculo completo está en
+[`salud-1d.md`](salud-1d.md#el-check-7-cuánto-falta-para-saber-si-ganan-0760).
+
 ## Cuándo revisar esto
 
 La lista está fijada a mano y **no se actualiza sola**, a propósito: una regla que rotase claves cada
@@ -89,7 +101,8 @@ cuando:
 - una clave excluida acumule un tramo largo por encima del umbral de viabilidad — **BTCUSDT:1d es la
   candidata**;
 - o una incluida caiga por debajo de forma sostenida, que es lo que la cuarentena por expediente ya
-  vigila por su cuenta.
+  vigila por su cuenta;
+- o el check 7 de `infra/salud-1d.sql` diga `ATENCION: perdida confirmada`.
 
 ## Cómo reproducir la medición
 
