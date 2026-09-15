@@ -7,6 +7,55 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.76.0] — 2026-09-15
+
+> **Cuánto falta para saber si ETH y SOL en 1d ganan de verdad.** Confirmar en vivo la expectancy
+> neta que les da el backtest exige 2.045 y 672 operaciones independientes: décadas de velas. El
+> piloto, el Laboratorio y el check 7 de salud lo siguen desde ahora. Y llega la plantilla
+> `infra/.env.prod.example`, que la guía del equipo pedía copiar y nunca había existido.
+
+### Verificado — 0.75.1 en producción
+
+- La api arranca con `origen: entorno` y `push: claves VAPID tomadas de las variables de entorno`,
+  sin ninguna línea de aviso ni de error.
+- Ningún secreto aparece en el log: siete comprobados dentro del contenedor, sin imprimir valores.
+
+### Added — Tamaño muestral de las claves que operan
+
+- Nuevo `trademe_quant.tamano_muestral`, con la regla fijada antes de calcular:
+  - **Contraste:** unilateral, α = 5 % y potencia 80 %, contra la expectancy neta del backtest.
+  - **Muestra:** solo decisiones de la configuración base, contadas como **independientes** (una
+    decisión de 1d ocupa 10 velas y la siguiente comparte casi todo su recorrido).
+  - **σ:** la de las propias operaciones desde 30 evaluadas; hasta entonces, la agrupada de las
+    reales de ETH y SOL.
+- **Dónde se ve:**
+  - El piloto lo registra en cada ciclo (`muestra:`), también en `datos` y en `/automation`.
+  - El Laboratorio lo muestra.
+  - El check 7 de `infra/salud-1d.sql` lo reproduce en SQL con los mismos literales.
+- 16 tests, incluido uno que falla si el SQL y Python se separan.
+
+### Medido — 15-sep-2026, en solo lectura
+
+- **Evaluadas con la configuración base: 0.** Las 15 del check 6 se decidieron con las optimizadas
+  (`ens-opt-*`). La base decide desde la vela del 8-sep, y sus primeros desenlaces llegarán hacia
+  el 18-sep.
+- **Lo que haría falta:** con σ = 1,069 R (15 operaciones), **2.045** independientes en ETH (≥ 20.450
+  velas, ~56 años) y **672** en SOL (≥ 6.720, ~18 años).
+- **El backtest tampoco la confirma:** t = 1,05 en ETH y 1,47 en SOL.
+- **Lo que sí se detecta a tiempo:** una expectancy real de −0,5 R se confirmaría en unos 290 días.
+- SQL y Python dan las mismas cifras en producción, también contando las 15 como si fueran base
+  (2 independientes por clave, mismo intervalo, mismo estado).
+
+### Added — Plantilla `infra/.env.prod.example`
+
+- `docs/despliegue-equipo.md` y `docs/despliegue-oracle.md` mandaban copiarla, pero nunca estuvo en
+  el repositorio: el `.env.*` del `.gitignore` se la tragaba. Ahora tiene excepción propia.
+- **Contenido:** las 15 variables que usa `docker-compose.prod.yml`, sin valores:
+  - **Obligatorias, vacías:** `docker compose` se niega a arrancar y dice cuál falta.
+  - **Opcionales:** cada una explica qué función apaga si queda vacía.
+- **La guía del equipo** explica los dos bloques y cómo generar contraseñas en PowerShell sin
+  `openssl`.
+
 ## [0.75.1] — 2026-09-14
 
 > **Fuera la clave VAPID del código.** `config.ts` traía un par por defecto con la privada
