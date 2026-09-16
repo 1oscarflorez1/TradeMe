@@ -1,5 +1,9 @@
 # Backlog y visión (referencia del equipo)
 
+> **Histórico.** Desde el 16-sep-2026 la dirección del proyecto está en [`vision.md`](vision.md):
+> TradeMe pasa de bot predictivo a juez de propuestas, con hoja de ruta por etapas. Este documento
+> se conserva como registro de las fases de julio.
+
 Resumen del backlog compartido, para alinear los hitos de TradeMe con la visión del proyecto.
 
 ## Fases

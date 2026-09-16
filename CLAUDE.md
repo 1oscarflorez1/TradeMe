@@ -1,6 +1,9 @@
 # TradeMe — instrucciones del proyecto
 
 Copiloto de trading: **apoyo a la decisión, no asesoría financiera**. Monorepo pnpm.
+**Dirección desde el 16-sep-2026:** juez de propuestas y bitácora multiactivo, no bot predictivo. La
+visión, la arquitectura objetivo y la hoja de ruta por etapas están en `docs/vision.md`; léela antes
+de proponer cualquier hito.
 Repositorio: `1oscarflorez1/TradeMe`. Despliegue: Docker Compose + Tailscale Funnel.
 
 ---

@@ -7,6 +7,36 @@ y [Versionado Semántico](https://semver.org/lang/es/).
 > asistente lo leen de aquí. No se edita ninguna copia aparte, y CI comprueba que la versión de
 > los `package.json` coincide con la primera entrada de abajo.
 
+## [0.76.2] — 2026-09-16
+
+> **Nueva visión: de bot predictivo a juez de propuestas.** `docs/vision.md` fija qué es TradeMe a
+> partir de ahora, su arquitectura objetivo, el pipeline de datos históricos y la hoja de ruta por
+> etapas. Sin cambios de código.
+
+### Added — `docs/vision.md`
+
+- **Veredicto sobre la propuesta de plataforma integral**, frente por frente. De 18 frentes:
+  - Se adoptan 12.
+  - Se aplazan Forex y futuros.
+  - Se descartan CFDs y arbitraje.
+  - Se reformulan copy trading (como auditoría de señales de terceros) y sentimiento (solo
+    contexto).
+- **Constitución:** cinco artículos y las reglas duras de partida del documento del equipo. El riesgo
+  lo calcula código; los agentes aportan evidencia o vetan, nunca votan; NO TRADE se registra.
+- **Arquitectura de siete módulos** (datos, screener, propuesta, fiscalía de agentes, Guardián de
+  riesgo, bitácora y evaluador) y el ciclo de vida de una propuesta.
+- **Pipeline de datos históricos *point-in-time*** y lo que no puede validar. Los dictámenes de
+  agentes LLM no se pueden evaluar con histórico anterior a la fecha de corte del modelo.
+- **Fuentes de datos con precio y cobertura comprobados** en las páginas oficiales: SEC EDGAR, FRED,
+  ThetaData, ORATS, Massive, Sharadar, Databento y Binance. La etapa inicial no cuesta nada.
+- **Hoja de ruta en cinco etapas (0 a 4)**, cada una con criterio de salida, y las cinco decisiones
+  que el equipo debe tomar.
+
+### Changed
+
+- **`docs/backlog.md`:** queda como registro histórico y apunta a la visión.
+- **`CLAUDE.md`:** apunta a `docs/vision.md` como dirección del proyecto.
+
 ## [0.76.1] — 2026-09-15
 
 > **Cierre de los hitos de claves VAPID y tamaño muestral de 1d**, verificados en producción. Sin
